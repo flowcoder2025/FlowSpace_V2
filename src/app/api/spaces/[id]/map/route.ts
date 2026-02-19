@@ -15,6 +15,25 @@ export async function GET(_request: Request, { params }: RouteParams) {
     }
 
     const { id } = await params;
+
+    // 멤버십 검증 (PUBLIC 공간은 허용, 그 외는 멤버만 접근)
+    const spaceAccess = await prisma.space.findUnique({
+      where: { id },
+      select: { id: true, accessType: true },
+    });
+    if (!spaceAccess) {
+      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    }
+    if (spaceAccess.accessType !== "PUBLIC") {
+      const member = await prisma.spaceMember.findUnique({
+        where: { spaceId_userId: { spaceId: id, userId: session.user.id } },
+        select: { id: true },
+      });
+      if (!member && !session.user.isSuperAdmin) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const space = await prisma.space.findUnique({
       where: { id },
       select: {

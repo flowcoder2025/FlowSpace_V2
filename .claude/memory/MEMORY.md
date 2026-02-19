@@ -66,6 +66,13 @@
 - 에셋 삭제 시 파일시스템 정리 (fs/promises.unlink)
 - useChatStorage 통합 (useChat에 spaceId + localStorage 캐싱)
 
+### Codex 보안 감사 패치 (Ad-hoc) ✅
+- **Critical**: 소켓 userId 위장 방지 (socket.data.userId 강제), 에셋 API IDOR (소유권 검증)
+- **High**: 맵 API 멤버십 검증, STAFF→OWNER 상승 차단, 파티 메시지 스코프 수정
+- **Medium**: 에셋 파일 경로 이중 public 수정, reply 페이로드 전달, 소켓 삭제 DB 반영
+- **Low**: 포탈 링크 양방향 업데이트
+- 11파일 수정 (tsc ✅ lint ✅)
+
 ## Next Steps (Phase 10~)
 1. Phase 10: LiveKit 음성/화상
 2. Phase 11: 배포
@@ -97,3 +104,7 @@
 - `eslint-config-next v16`: refs during render 에러 → state로 전환 필요
 - Phaser `textures.addSpriteSheet(key, canvas)` → TS 타입 불일치 → `as unknown as HTMLImageElement` 캐스트 필요
 - Prisma generate EPERM: dev 서버가 DLL 잠금 → 서버 종료 후 `npx prisma generate` 실행
+- Socket.io: 인증 미들웨어의 socket.data.userId를 항상 신뢰, 클라이언트 전송 userId 무시
+- API 설계: 쿼리 파라미터로 userId 받지 않기 (세션에서 강제 추출)
+- 에셋 저장 경로: DB에는 `/assets/...` 형태, 파일시스템에는 `public/assets/...`로 저장 (이중 public 방지)
+- 역할 변경 API: 호출자 역할 < 대상 역할 설정 불가 원칙 적용

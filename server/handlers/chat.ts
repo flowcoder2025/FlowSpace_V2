@@ -84,12 +84,18 @@ export function handleChat(io: IO, socket: TypedSocket) {
     const tempId = `srv-${Date.now()}-${++tempIdCounter}`;
     const timestamp = new Date().toISOString();
 
+    // party 타입은 chat:send가 아닌 party:message 전용 핸들러 사용
+    if (type === "party") {
+      socket.emit("error", { message: "Use party:message for party chat" });
+      return;
+    }
+
     const message = {
       tempId,
       userId,
       nickname,
       content: sanitized,
-      type: type === "whisper" ? "whisper" : type === "party" ? "party" : "message",
+      type: type === "whisper" ? "whisper" : "message",
       timestamp,
       replyTo,
     };
@@ -197,6 +203,12 @@ export function handleChat(io: IO, socket: TypedSocket) {
     const deletedBy = player?.nickname ?? "Admin";
 
     io.to(spaceId).emit("chat:messageDeleted", { messageId, deletedBy });
+
+    // DB soft delete (비동기)
+    softDeleteMessageAsync(messageId, userId).catch((err) =>
+      console.error("[Chat] DB soft delete failed:", err)
+    );
+
     console.log(`[Chat] Message ${messageId} deleted by ${deletedBy}`);
   });
 
@@ -337,5 +349,26 @@ async function saveChatMessageAsync(
     await prisma.$disconnect();
   } catch (err) {
     console.error("[Chat] DB save error:", err);
+  }
+}
+
+/** DB soft delete (소켓 경로용) */
+async function softDeleteMessageAsync(messageId: string, deletedBy: string): Promise<void> {
+  try {
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient();
+
+    await prisma.chatMessage.update({
+      where: { id: messageId },
+      data: {
+        isDeleted: true,
+        deletedBy,
+        deletedAt: new Date(),
+      },
+    });
+
+    await prisma.$disconnect();
+  } catch (err) {
+    console.error("[Chat] DB soft delete error:", err);
   }
 }

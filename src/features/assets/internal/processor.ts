@@ -65,14 +65,14 @@ export async function processAssetGeneration(
     throw new Error(result.error || "Asset generation failed: no images");
   }
 
-  // 3. 파일 저장
+  // 3. 파일 저장 (public/ 하위에 저장, DB에는 /assets/... 형태로 기록)
   const filename = generateAssetFilename(params.type, params.name);
   const storagePath = ASSET_STORAGE_PATHS[params.type];
   const filePath = join(storagePath, filename);
 
-  await mkdir(dirname(join(process.cwd(), filePath)), { recursive: true });
+  await mkdir(dirname(join(process.cwd(), "public", filePath)), { recursive: true });
   await writeFile(
-    join(process.cwd(), filePath),
+    join(process.cwd(), "public", filePath),
     result.images[0].data || Buffer.alloc(0)
   );
 
@@ -80,9 +80,9 @@ export async function processAssetGeneration(
   const thumbFilename = `thumb_${Date.now().toString(36)}.png`;
   const thumbPath = join(THUMBNAIL_PATH, thumbFilename);
 
-  await mkdir(dirname(join(process.cwd(), thumbPath)), { recursive: true });
+  await mkdir(dirname(join(process.cwd(), "public", thumbPath)), { recursive: true });
   await writeFile(
-    join(process.cwd(), thumbPath),
+    join(process.cwd(), "public", thumbPath),
     result.images[0].data || Buffer.alloc(0)
   );
 

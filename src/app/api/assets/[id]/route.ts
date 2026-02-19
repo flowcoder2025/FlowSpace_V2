@@ -21,13 +21,18 @@ export async function GET(_request: Request, { params }: RouteParams) {
       where: { id },
       include: {
         user: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true },
         },
       },
     });
 
     if (!asset) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    // 소유권 검증 (본인 또는 superAdmin만 접근 가능)
+    if (asset.userId !== session.user.id && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     return NextResponse.json(asset);

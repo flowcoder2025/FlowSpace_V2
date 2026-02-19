@@ -13,20 +13,19 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get("type");
     const status = searchParams.get("status");
-    const userId = searchParams.get("userId") || session.user.id;
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
 
-    const where: Record<string, unknown> = {};
+    // 항상 인증된 사용자의 에셋만 조회 (IDOR 방지)
+    const where: Record<string, unknown> = {
+      userId: session.user.id,
+    };
 
     if (type) {
       where.type = type.toUpperCase();
     }
     if (status) {
       where.status = status.toUpperCase();
-    }
-    if (userId) {
-      where.userId = userId;
     }
 
     const [assets, total] = await Promise.all([

@@ -36,15 +36,15 @@ export const ASSET_SPECS: Record<AssetType, AssetSpec> = {
   },
 };
 
-/** 에셋 저장 경로 */
+/** 에셋 저장 경로 (public/ 기준 상대 경로, DB에는 /assets/... 형태로 저장) */
 export const ASSET_STORAGE_PATHS: Record<AssetType, string> = {
-  character: "public/assets/generated/characters",
-  tileset: "public/assets/generated/tilesets",
-  object: "public/assets/generated/objects",
-  map: "public/assets/generated/maps",
+  character: "assets/generated/characters",
+  tileset: "assets/generated/tilesets",
+  object: "assets/generated/objects",
+  map: "assets/generated/maps",
 };
 
-export const THUMBNAIL_PATH = "public/assets/generated/thumbnails";
+export const THUMBNAIL_PATH = "assets/generated/thumbnails";
 
 /** 에셋 파일명 생성 */
 export function generateAssetFilename(

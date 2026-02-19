@@ -94,12 +94,21 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const actionLabel = action;
 
     switch (action) {
-      case "changeRole":
+      case "changeRole": {
         if (!role) {
           return NextResponse.json({ error: "role is required for changeRole" }, { status: 400 });
         }
+        // OWNER 역할은 superAdmin만 부여 가능
+        if (role === "OWNER" && !session.user.isSuperAdmin) {
+          return NextResponse.json({ error: "Only superAdmin can assign OWNER role" }, { status: 403 });
+        }
+        // STAFF는 STAFF/OWNER 역할 부여 불가 (PARTICIPANT만 가능)
+        if (self?.role === "STAFF" && role !== "PARTICIPANT") {
+          return NextResponse.json({ error: "STAFF can only assign PARTICIPANT role" }, { status: 403 });
+        }
         updatedRole = role;
         break;
+      }
       case "mute":
         updatedRestriction = "MUTED";
         break;

@@ -19,7 +19,11 @@ function getSpacePlayers(spaceId: string): Map<string, PlayerData> {
 }
 
 export function handleRoom(io: IO, socket: TypedSocket) {
-  socket.on("join:space", ({ spaceId, userId, nickname, avatar }) => {
+  socket.on("join:space", ({ spaceId, nickname, avatar }) => {
+    // 인증된 userId 사용 (클라이언트 값 무시)
+    const userId = socket.data.userId;
+    if (!userId) return;
+
     // Socket.io room 참가
     socket.join(spaceId);
     socket.data.spaceId = spaceId;

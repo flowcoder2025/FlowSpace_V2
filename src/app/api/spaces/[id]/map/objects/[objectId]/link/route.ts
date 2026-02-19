@@ -82,11 +82,17 @@ export async function POST(request: Request, { params }: RouteParams) {
       });
     }
 
-    // 양방향 링크: source → target
-    await prisma.mapObject.update({
-      where: { id: objectId },
-      data: { linkedObjectId: body.targetObjectId },
-    });
+    // 양방향 링크: source ↔ target
+    await Promise.all([
+      prisma.mapObject.update({
+        where: { id: objectId },
+        data: { linkedObjectId: body.targetObjectId },
+      }),
+      prisma.mapObject.update({
+        where: { id: body.targetObjectId },
+        data: { linkedObjectId: objectId },
+      }),
+    ]);
 
     return NextResponse.json({
       linked: true,

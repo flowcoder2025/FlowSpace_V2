@@ -101,7 +101,7 @@ interface UseSocketReturn {
   isConnected: boolean;
   players: PlayerData[];
   sendMovement: (data: MovementData) => void;
-  sendChat: (content: string, type: "group" | "whisper" | "party", targetId?: string) => void;
+  sendChat: (content: string, type: "group" | "whisper" | "party", targetId?: string, replyTo?: { id: string; senderNickname: string; content: string }) => void;
   sendWhisper: (targetNickname: string, content: string) => void;
   sendReactionToggle: (messageId: string, reactionType: "thumbsup" | "heart" | "check") => void;
   sendAdminCommand: (command: string, data: Record<string, unknown>) => void;
@@ -343,8 +343,8 @@ export function useSocket({
   }, []);
 
   const sendChat = useCallback(
-    (content: string, type: "group" | "whisper" | "party", targetId?: string) => {
-      socketRef.current?.emit("chat:send", { content, type, targetId });
+    (content: string, type: "group" | "whisper" | "party", targetId?: string, replyTo?: { id: string; senderNickname: string; content: string }) => {
+      socketRef.current?.emit("chat:send", { content, type, targetId, replyTo });
     },
     []
   );

@@ -11,7 +11,7 @@ const MAX_MESSAGES = 200;
 
 interface UseChatOptions {
   /** socket sendChat 함수 */
-  sendChat: (content: string, type: "group" | "whisper" | "party", targetId?: string) => void;
+  sendChat: (content: string, type: "group" | "whisper" | "party", targetId?: string, replyTo?: { id: string; senderNickname: string; content: string }) => void;
   /** socket whisper:send */
   sendWhisper?: (targetNickname: string, content: string) => void;
   /** socket reaction:toggle */
@@ -56,7 +56,6 @@ export function useChat({
   userId,
   nickname,
   role,
-  currentPartyId,
 }: UseChatOptions): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatFocused, setChatFocusedState] = useState(false);
@@ -162,10 +161,11 @@ export function useChat({
         }
 
         default: {
-          const socketType = currentPartyId ? ("party" as const) : ("group" as const);
-
           // 서버에서 broadcast → addMessage에서 중복 방지
-          sendChat(sanitized, socketType);
+          const replyPayload = replyTo
+            ? { id: replyTo.id, senderNickname: replyTo.senderNickname, content: replyTo.content }
+            : undefined;
+          sendChat(sanitized, "group", undefined, replyPayload);
 
           // replyTo 리셋
           if (replyTo) {
@@ -175,7 +175,7 @@ export function useChat({
         }
       }
     },
-    [sendChat, sendWhisper, sendAdminCommand, userId, nickname, role, currentPartyId, addMessage, replyTo]
+    [sendChat, sendWhisper, sendAdminCommand, userId, nickname, role, addMessage, replyTo]
   );
 
   /** 리액션 토글 */
