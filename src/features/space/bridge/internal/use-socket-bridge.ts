@@ -11,25 +11,36 @@ import { useEffect, useRef, useCallback } from "react";
 import { eventBridge, GameEvents, type PlayerPosition } from "@/features/space/game";
 import { useSocket, type PlayerData } from "@/features/space/socket";
 
+interface ChatMessageData {
+  userId: string;
+  nickname: string;
+  content: string;
+  type: string;
+  timestamp: string;
+}
+
 interface UseSocketBridgeOptions {
   spaceId: string;
   userId: string;
   nickname: string;
   avatar: string;
+  onChatMessage?: (data: ChatMessageData) => void;
 }
 
 interface UseSocketBridgeReturn {
   isConnected: boolean;
   players: PlayerData[];
+  sendChat: (content: string, type: "group" | "whisper" | "party", targetId?: string) => void;
 }
 
 export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridgeReturn {
-  const { spaceId, userId, nickname, avatar } = options;
-  const { isConnected, players, sendMovement } = useSocket({
+  const { spaceId, userId, nickname, avatar, onChatMessage } = options;
+  const { isConnected, players, sendMovement, sendChat } = useSocket({
     spaceId,
     userId,
     nickname,
     avatar,
+    onChatMessage,
   });
 
   const prevPlayersRef = useRef<Map<string, PlayerData>>(new Map());
@@ -96,5 +107,5 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
     prevPlayersRef.current = currentMap;
   }, [players]);
 
-  return { isConnected, players };
+  return { isConnected, players, sendChat };
 }

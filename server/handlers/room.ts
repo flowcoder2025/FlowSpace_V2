@@ -9,7 +9,7 @@ type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 // spaceId → Map<userId, PlayerData>
-const spacePlayersMap = new Map<string, Map<string, PlayerData>>();
+export const spacePlayersMap = new Map<string, Map<string, PlayerData>>();
 
 function getSpacePlayers(spaceId: string): Map<string, PlayerData> {
   if (!spacePlayersMap.has(spaceId)) {

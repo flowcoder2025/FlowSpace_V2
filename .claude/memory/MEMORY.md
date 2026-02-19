@@ -9,7 +9,7 @@
 ## Active Epic
 | Epic | 상태 | Phase 진행 | 마지막 업데이트 |
 |------|------|------------|-----------------|
-| ComfyUI Asset Pipeline | 진행중 | Phase 5 완료 | 2026-02-19 |
+| ComfyUI Asset Pipeline | 진행중 | Phase 6 완료 | 2026-02-19 |
 
 ## Architecture Decisions
 - 5개 도메인 에이전트 + 오케스트레이터 체제
@@ -27,8 +27,8 @@
 |-------|--------|--------|
 | Game Engine | Phaser, Avatar, Tiles | Phase 5 완료 |
 | Asset Pipeline | ComfyUI, Processing | Phase 1 완료 |
-| Communication | Socket.io, Realtime | Phase 4 완료 |
-| Frontend | Next.js, UI, Zustand | Phase 1~5 완료 |
+| Communication | Socket.io, Realtime | Phase 4, 6 완료 |
+| Frontend | Next.js, UI, Zustand | Phase 1~6 완료 |
 | Backend | API, Prisma, Auth | Phase 2~3 완료 |
 
 ## Domain Work Protocol (필수 - 반드시 준수)
@@ -86,13 +86,18 @@
 - 공간 진입 페이지 (/space/[id]) + HUD
 - **27 신규 파일, 1 수정** (tsc ✅ lint ✅ build ✅)
 
-## Next Steps (Phase 6~)
-1. **Phase 6: 채팅 시스템** (Communication + Frontend)
-   - Socket.io 채팅 이벤트 (chat:send, chat:message)
-   - 채팅 UI 컴포넌트 + EventBridge 연동
-   - DB ChatMessage 모델 활용
-2. Phase 7: ComfyUI 실제 연동
-3. Phase 8~11: 맵 에디터, 관리자, LiveKit, 배포
+### Phase 6: 채팅 시스템 ✅
+- 서버 채팅 핸들러 (sanitize + group/whisper 분기)
+- 채팅 모듈 (useChat 훅, DOMPurify, CHAT_FOCUS EventBridge)
+- 채팅 UI (ChatPanel: 접기/펼치기, 자동 스크롤, 메시지 표시)
+- 통합: sendChatRef 패턴으로 순환 의존 해결
+- **5 신규 파일, 5 수정** (tsc ✅ lint ✅ build ✅)
+
+## Next Steps (Phase 7~)
+1. **Phase 7: ComfyUI 실제 연동** (Asset Pipeline)
+   - ComfyUI REST API 실제 연결 (현재 Mock mode)
+2. Phase 8~11: 맵 에디터, 관리자, LiveKit, 배포
+3. 채팅 DB 저장 / party 필터링 / 히스토리 (별도 Phase)
 
 ## Supabase DB 연결 정보
 - Host: `aws-1-ap-southeast-2.pooler.supabase.com`

@@ -12,11 +12,20 @@ import { getSocketClient, disconnectSocket } from "./socket-client";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
+interface ChatMessageData {
+  userId: string;
+  nickname: string;
+  content: string;
+  type: string;
+  timestamp: string;
+}
+
 interface UseSocketOptions {
   spaceId: string;
   userId: string;
   nickname: string;
   avatar: string;
+  onChatMessage?: (data: ChatMessageData) => void;
 }
 
 interface UseSocketReturn {
@@ -33,12 +42,18 @@ export function useSocket({
   userId,
   nickname,
   avatar,
+  onChatMessage,
 }: UseSocketOptions): UseSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const socketRef = useRef<TypedSocket | null>(null);
   const lastMoveRef = useRef(0);
   const playersMapRef = useRef(new Map<string, PlayerData>());
+  const onChatMessageRef = useRef(onChatMessage);
+
+  useEffect(() => {
+    onChatMessageRef.current = onChatMessage;
+  }, [onChatMessage]);
 
   useEffect(() => {
     let mounted = true;
@@ -98,6 +113,10 @@ export function useSocket({
             });
           }
           syncPlayers();
+        });
+
+        sock.on("chat:message", (data) => {
+          onChatMessageRef.current?.(data);
         });
 
         sock.on("error", ({ message }) => {

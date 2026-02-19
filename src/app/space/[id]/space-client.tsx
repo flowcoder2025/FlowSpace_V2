@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useGameStore } from "@/stores/game-store";
 import { eventBridge, GameEvents } from "@/features/space/game";
 import { useSocketBridge } from "@/features/space/bridge";
+import { useChat, type ChatMessage } from "@/features/space/chat";
 import GameCanvas from "@/components/space/game-canvas";
 import LoadingScreen from "@/components/space/loading-screen";
 import PlayerList from "@/components/space/player-list";
 import SpaceHud from "@/components/space/space-hud";
+import ChatPanel from "@/components/space/chat-panel";
 
 interface SpaceClientProps {
   space: {
@@ -24,14 +26,54 @@ interface SpaceClientProps {
   };
 }
 
+let chatMsgId = 0;
+
 export default function SpaceClient({ space, user }: SpaceClientProps) {
   const { isLoading, isSceneReady, error, setSceneReady, setError, reset } = useGameStore();
-  const { isConnected, players } = useSocketBridge({
+
+  // sendChat ref: useSocketBridge 반환 후 할당됨
+  const sendChatRef = useRef<(content: string, type: "group" | "whisper" | "party", targetId?: string) => void>(
+    () => {}
+  );
+
+  const sendChatStable = useCallback(
+    (content: string, type: "group" | "whisper" | "party", targetId?: string) => {
+      sendChatRef.current(content, type, targetId);
+    },
+    []
+  );
+
+  const { messages, sendMessage, setChatFocused, addMessage } = useChat({
+    sendChat: sendChatStable,
+    userId: user.id,
+    nickname: user.nickname,
+  });
+
+  const onChatMessage = useCallback(
+    (data: { userId: string; nickname: string; content: string; type: string; timestamp: string }) => {
+      const msg: ChatMessage = {
+        id: `chat-${++chatMsgId}`,
+        userId: data.userId,
+        nickname: data.nickname,
+        content: data.content,
+        type: data.type as ChatMessage["type"],
+        timestamp: data.timestamp,
+      };
+      addMessage(msg);
+    },
+    [addMessage]
+  );
+
+  const { isConnected, players, sendChat } = useSocketBridge({
     spaceId: space.id,
     userId: user.id,
     nickname: user.nickname,
     avatar: user.avatar,
+    onChatMessage,
   });
+
+  // sendChat이 사용 가능해지면 ref 업데이트
+  sendChatRef.current = sendChat;
 
   // SCENE_READY / SCENE_ERROR 이벤트 리스닝
   useEffect(() => {
@@ -96,6 +138,11 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
             }))}
             currentUserId={user.id}
             currentNickname={user.nickname}
+          />
+          <ChatPanel
+            messages={messages}
+            onSend={sendMessage}
+            onFocusChange={setChatFocused}
           />
         </>
       )}

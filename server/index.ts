@@ -3,6 +3,7 @@ import { Server } from "socket.io";
 import { verifySocketToken } from "./middleware/auth";
 import { handleRoom } from "./handlers/room";
 import { handleMovement } from "./handlers/movement";
+import { handleChat } from "./handlers/chat";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -46,6 +47,7 @@ io.on("connection", (socket) => {
 
   handleRoom(io, socket);
   handleMovement(io, socket);
+  handleChat(io, socket);
 
   socket.on("disconnect", (reason) => {
     console.log(
