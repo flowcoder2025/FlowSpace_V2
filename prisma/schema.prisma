@@ -220,6 +220,7 @@ enum SpaceEventType {
   EXIT
   INTERACTION
   CHAT
+  ADMIN_ACTION
 }
 
 // ============================================

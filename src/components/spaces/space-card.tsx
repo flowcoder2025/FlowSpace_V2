@@ -69,17 +69,30 @@ export function SpaceCard({ space }: SpaceCardProps) {
         <span>
           {space.memberCount}/{space.maxUsers} members
         </span>
-        <span
-          className={`rounded-full px-2 py-0.5 ${
-            space.accessType === "PUBLIC"
-              ? "bg-green-50 text-green-600"
-              : space.accessType === "PASSWORD"
-                ? "bg-yellow-50 text-yellow-600"
-                : "bg-red-50 text-red-600"
-          }`}
-        >
-          {space.accessType.toLowerCase()}
-        </span>
+        <div className="flex items-center gap-2">
+          {(space.myRole === "OWNER" || space.myRole === "STAFF") && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/dashboard/spaces/${space.id}`);
+              }}
+              className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600 hover:bg-gray-200 transition-colors"
+            >
+              Dashboard
+            </button>
+          )}
+          <span
+            className={`rounded-full px-2 py-0.5 ${
+              space.accessType === "PUBLIC"
+                ? "bg-green-50 text-green-600"
+                : space.accessType === "PASSWORD"
+                  ? "bg-yellow-50 text-yellow-600"
+                  : "bg-red-50 text-red-600"
+            }`}
+          >
+            {space.accessType.toLowerCase()}
+          </span>
+        </div>
       </div>
     </div>
   );

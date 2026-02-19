@@ -7,6 +7,12 @@ export const ROUTES = {
   ASSETS_GENERATE: "/assets/generate",
   ASSETS_STUDIO: "/assets/studio",
   SPACE: (id: string) => `/space/${id}`,
+  DASHBOARD: (id: string) => `/dashboard/spaces/${id}`,
+  DASHBOARD_MEMBERS: (id: string) => `/dashboard/spaces/${id}/members`,
+  DASHBOARD_MESSAGES: (id: string) => `/dashboard/spaces/${id}/messages`,
+  DASHBOARD_LOGS: (id: string) => `/dashboard/spaces/${id}/logs`,
+  DASHBOARD_ANALYTICS: (id: string) => `/dashboard/spaces/${id}/analytics`,
+  DASHBOARD_SETTINGS: (id: string) => `/dashboard/spaces/${id}/settings`,
 } as const;
 
 export const NAV_ITEMS = [
