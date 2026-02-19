@@ -11,7 +11,7 @@ import { TILE_INDEX } from "./tileset-generator";
 type LayerData = number[][];
 
 /** 빈 레이어 생성 (MAP_ROWS x MAP_COLS, -1 채움) */
-function createEmptyLayer(): LayerData {
+export function createEmptyLayer(): LayerData {
   return Array.from({ length: MAP_ROWS }, () =>
     Array.from({ length: MAP_COLS }, () => -1)
   );
@@ -298,7 +298,7 @@ export interface MapLayerDefinition {
   hasCollision: boolean;
 }
 
-/** 모든 레이어 데이터 생성 */
+/** 모든 레이어 데이터 생성 (기본 맵) */
 export function createMapLayers(): MapLayerDefinition[] {
   return [
     { name: LAYER_NAMES.GROUND, data: createGroundLayer(), depth: 0, hasCollision: false },
@@ -308,4 +308,44 @@ export function createMapLayers(): MapLayerDefinition[] {
     { name: LAYER_NAMES.DECORATIONS, data: createDecorationsLayer(), depth: 30, hasCollision: false },
     { name: LAYER_NAMES.COLLISION, data: createCollisionLayer(), depth: -1, hasCollision: true },
   ];
+}
+
+/** 레이어 이름 → depth/collision 매핑 */
+const LAYER_META: Record<string, { depth: number; hasCollision: boolean }> = {
+  [LAYER_NAMES.GROUND]: { depth: 0, hasCollision: false },
+  [LAYER_NAMES.WALLS]: { depth: 10, hasCollision: true },
+  [LAYER_NAMES.FURNITURE]: { depth: 20, hasCollision: true },
+  [LAYER_NAMES.FURNITURE_TOP]: { depth: 25, hasCollision: false },
+  [LAYER_NAMES.DECORATIONS]: { depth: 30, hasCollision: false },
+  [LAYER_NAMES.COLLISION]: { depth: -1, hasCollision: true },
+};
+
+/** 저장된 맵 데이터에서 레이어 생성 (DB 데이터 → MapLayerDefinition[]) */
+export function createMapLayersFromStored(
+  stored: Record<string, number[][]>
+): MapLayerDefinition[] {
+  const layerOrder = [
+    LAYER_NAMES.GROUND,
+    LAYER_NAMES.WALLS,
+    LAYER_NAMES.FURNITURE,
+    LAYER_NAMES.FURNITURE_TOP,
+    LAYER_NAMES.DECORATIONS,
+    LAYER_NAMES.COLLISION,
+  ] as string[];
+
+  return layerOrder.map((name) => {
+    const meta = LAYER_META[name] ?? { depth: 0, hasCollision: false };
+    const data = stored[name] ?? createEmptyLayer();
+    return { name, data, depth: meta.depth, hasCollision: meta.hasCollision };
+  });
+}
+
+/** 현재 기본 맵을 저장 가능한 형식으로 추출 */
+export function extractDefaultMapData(): Record<string, number[][]> {
+  const layers = createMapLayers();
+  const result: Record<string, number[][]> = {};
+  for (const layer of layers) {
+    result[layer.name] = layer.data;
+  }
+  return result;
 }

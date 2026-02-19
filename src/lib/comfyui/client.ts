@@ -1,11 +1,16 @@
 import { getComfyUIConfig } from "./config";
 import type {
+  ComfyUIMode,
   ComfyUIWorkflow,
+  ComfyUIStatus,
   QueuePromptResponse,
   HistoryEntry,
   GenerateAssetParams,
   GenerateAssetResult,
 } from "./types";
+import { ComfyUIError } from "./types";
+
+const MODE_CACHE_TTL = 30_000;
 
 /**
  * ComfyUI REST API Client
@@ -13,24 +18,49 @@ import type {
  * POST /prompt - 워크플로우 실행 큐 등록
  * GET /history/{id} - 실행 결과 조회
  * GET /view - 생성된 이미지 조회
- * WS /ws - 실시간 진행률 (추후 구현)
  */
 export class ComfyUIClient {
   private baseUrl: string;
-  private mockMode: boolean;
+  private mode: ComfyUIMode;
   private timeout: number;
+  private resolvedModeCache: { value: "mock" | "real"; expiresAt: number } | null = null;
 
   constructor() {
     const config = getComfyUIConfig();
     this.baseUrl = config.baseUrl;
-    this.mockMode = config.mockMode;
+    this.mode = config.mode;
     this.timeout = config.timeout;
   }
 
-  /** ComfyUI 서버 연결 확인 */
-  async checkConnection(): Promise<boolean> {
-    if (this.mockMode) return true;
+  /** 실제 동작 모드 결정 (auto일 때 연결 체크 후 캐시) */
+  private async resolveEffectiveMode(): Promise<"mock" | "real"> {
+    if (this.mode === "mock") return "mock";
+    if (this.mode === "real") return "real";
 
+    // auto: check cache first
+    if (this.resolvedModeCache && Date.now() < this.resolvedModeCache.expiresAt) {
+      return this.resolvedModeCache.value;
+    }
+
+    const connected = await this.pingServer();
+    const resolved = connected ? "real" : "mock";
+
+    this.resolvedModeCache = {
+      value: resolved,
+      expiresAt: Date.now() + MODE_CACHE_TTL,
+    };
+
+    if (!connected) {
+      console.warn(
+        `[ComfyUI] auto mode: 서버 연결 실패 (${this.baseUrl}), mock 모드로 폴백`
+      );
+    }
+
+    return resolved;
+  }
+
+  /** ComfyUI 서버 ping */
+  private async pingServer(): Promise<boolean> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -46,9 +76,30 @@ export class ComfyUIClient {
     }
   }
 
+  /** ComfyUI 서버 연결 확인 */
+  async checkConnection(): Promise<boolean> {
+    const effectiveMode = await this.resolveEffectiveMode();
+    if (effectiveMode === "mock") return true;
+    return this.pingServer();
+  }
+
+  /** 현재 상태 조회 */
+  async getStatus(): Promise<ComfyUIStatus> {
+    const resolvedMode = await this.resolveEffectiveMode();
+    const connected = resolvedMode === "real" ? await this.pingServer() : false;
+
+    return {
+      connected,
+      url: this.baseUrl,
+      mode: this.mode,
+      resolvedMode,
+    };
+  }
+
   /** 워크플로우 실행 큐에 등록 */
   async queuePrompt(workflow: ComfyUIWorkflow): Promise<QueuePromptResponse> {
-    if (this.mockMode) {
+    const effectiveMode = await this.resolveEffectiveMode();
+    if (effectiveMode === "mock") {
       return this.mockQueuePrompt();
     }
 
@@ -67,29 +118,38 @@ export class ComfyUIClient {
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`ComfyUI queue failed: ${response.status} - ${error}`);
+        throw new ComfyUIError(
+          `ComfyUI queue failed: ${response.status} - ${error}`,
+          response.status === 400 ? "INVALID_WORKFLOW" : "UNKNOWN"
+        );
       }
 
       return (await response.json()) as QueuePromptResponse;
-    } finally {
+    } catch (error) {
       clearTimeout(timeoutId);
+      throw ComfyUIError.fromError(error);
     }
   }
 
   /** 실행 결과 조회 */
   async getHistory(promptId: string): Promise<HistoryEntry | null> {
-    if (this.mockMode) {
+    const effectiveMode = await this.resolveEffectiveMode();
+    if (effectiveMode === "mock") {
       return this.mockGetHistory(promptId);
     }
 
-    const response = await fetch(`${this.baseUrl}/history/${promptId}`);
+    try {
+      const response = await fetch(`${this.baseUrl}/history/${promptId}`);
 
-    if (!response.ok) {
-      return null;
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = (await response.json()) as Record<string, HistoryEntry>;
+      return data[promptId] || null;
+    } catch (error) {
+      throw ComfyUIError.fromError(error);
     }
-
-    const data = (await response.json()) as Record<string, HistoryEntry>;
-    return data[promptId] || null;
   }
 
   /** 생성된 이미지 다운로드 */
@@ -98,18 +158,26 @@ export class ComfyUIClient {
     subfolder: string,
     type: string
   ): Promise<ArrayBuffer> {
-    if (this.mockMode) {
+    const effectiveMode = await this.resolveEffectiveMode();
+    if (effectiveMode === "mock") {
       return this.mockGetImage();
     }
 
-    const params = new URLSearchParams({ filename, subfolder, type });
-    const response = await fetch(`${this.baseUrl}/view?${params}`);
+    try {
+      const params = new URLSearchParams({ filename, subfolder, type });
+      const response = await fetch(`${this.baseUrl}/view?${params}`);
 
-    if (!response.ok) {
-      throw new Error(`Failed to get image: ${response.status}`);
+      if (!response.ok) {
+        throw new ComfyUIError(
+          `Failed to get image: ${response.status}`,
+          "UNKNOWN"
+        );
+      }
+
+      return response.arrayBuffer();
+    } catch (error) {
+      throw ComfyUIError.fromError(error);
     }
-
-    return response.arrayBuffer();
   }
 
   /** 실행 완료까지 폴링 */
@@ -130,7 +198,10 @@ export class ComfyUIClient {
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
     }
 
-    throw new Error(`Timeout waiting for prompt ${promptId}`);
+    throw new ComfyUIError(
+      `Timeout waiting for prompt ${promptId}`,
+      "TIMEOUT"
+    );
   }
 
   /** 에셋 생성 (high-level API) */
@@ -166,11 +237,11 @@ export class ComfyUIClient {
         images,
       };
     } catch (error) {
+      const comfyError = ComfyUIError.fromError(error);
       return {
         promptId: "",
         status: "failed",
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        error: comfyError.message,
       };
     }
   }

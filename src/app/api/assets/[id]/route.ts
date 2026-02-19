@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { unlink } from "fs/promises";
+import { join } from "path";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -61,7 +63,15 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
-    // TODO: 파일 시스템에서 실제 파일 삭제
+    // 파일 시스템에서 실제 파일 삭제
+    if (asset.filePath) {
+      const absPath = join(process.cwd(), "public", asset.filePath);
+      await unlink(absPath).catch(() => {});
+    }
+    if (asset.thumbnailPath) {
+      const absThumb = join(process.cwd(), "public", asset.thumbnailPath);
+      await unlink(absThumb).catch(() => {});
+    }
 
     await prisma.generatedAsset.delete({
       where: { id },

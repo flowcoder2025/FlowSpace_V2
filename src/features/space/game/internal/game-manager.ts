@@ -14,6 +14,7 @@ export interface GameOptions {
   userId: string;
   nickname: string;
   avatar: string;
+  mapData?: { version: number; layers: Record<string, number[][]> } | null;
 }
 
 /**
@@ -51,6 +52,9 @@ export async function createGame(
   gameInstance.registry.set("userId", options.userId);
   gameInstance.registry.set("nickname", options.nickname);
   gameInstance.registry.set("avatar", options.avatar);
+  if (options.mapData) {
+    gameInstance.registry.set("mapData", options.mapData);
+  }
 
   return gameInstance;
 }

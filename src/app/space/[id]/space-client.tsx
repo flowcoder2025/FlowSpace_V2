@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { useGameStore } from "@/stores/game-store";
 import { eventBridge, GameEvents } from "@/features/space/game";
 import { useSocketBridge } from "@/features/space/bridge";
 import { useChat, type ChatMessage } from "@/features/space/chat";
+import { useEditor, type StoredMapData, type EditorMapObject } from "@/features/space/editor";
 import GameCanvas from "@/components/space/game-canvas";
 import LoadingScreen from "@/components/space/loading-screen";
 import PlayerList from "@/components/space/player-list";
 import SpaceHud from "@/components/space/space-hud";
 import ChatPanel from "@/components/space/chat-panel";
+import { EditorToggleButton, EditorSidebar } from "@/components/space/editor";
 
 interface SpaceClientProps {
   space: {
@@ -23,6 +25,7 @@ interface SpaceClientProps {
     id: string;
     nickname: string;
     avatar: string;
+    role?: "OWNER" | "STAFF" | "PARTICIPANT";
   };
 }
 
@@ -30,11 +33,64 @@ let chatMsgId = 0;
 
 export default function SpaceClient({ space, user }: SpaceClientProps) {
   const { isLoading, isSceneReady, error, setSceneReady, setError, reset } = useGameStore();
+  const [mapData, setMapData] = useState<StoredMapData | null>(null);
+  const [mapObjects, setMapObjects] = useState<EditorMapObject[]>([]);
 
-  // sendChat ref: useSocketBridge 반환 후 할당됨
+  // 맵 데이터 로드
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMap() {
+      try {
+        const res = await fetch(`/api/spaces/${space.id}/map`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.mapData) setMapData(data.mapData as StoredMapData);
+        if (data.objects) setMapObjects(data.objects as EditorMapObject[]);
+      } catch {
+        // 맵 데이터 로드 실패 시 기본 맵 사용
+      }
+    }
+    loadMap();
+    return () => { cancelled = true; };
+  }, [space.id]);
+
+  // SCENE_READY 후 맵 오브젝트를 EventBridge로 전달
+  useEffect(() => {
+    if (!isSceneReady || mapObjects.length === 0) return;
+    eventBridge.emit(GameEvents.EDITOR_MAP_LOADED, {
+      layers: mapData?.layers ?? null,
+      objects: mapObjects,
+    });
+  }, [isSceneReady, mapData, mapObjects]);
+
+  // 에디터 훅
+  const canEdit = user.role === "OWNER" || user.role === "STAFF";
+  const editor = useEditor({ spaceId: space.id, canEdit });
+
+  // 맵 오브젝트를 에디터 스토어에도 동기화
+  useEffect(() => {
+    if (mapObjects.length > 0) {
+      editor.setMapObjects(mapObjects);
+    }
+  }, [mapObjects]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 맵 타일 데이터를 에디터 스토어에 동기화
+  useEffect(() => {
+    if (mapData?.layers) {
+      editor.setTileData(mapData.layers);
+    }
+  }, [mapData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refs for circular dependency resolution (useChat <-> useSocketBridge)
   const sendChatRef = useRef<(content: string, type: "group" | "whisper" | "party", targetId?: string) => void>(
     () => {}
   );
+  const sendWhisperRef = useRef<(targetNickname: string, content: string) => void>(() => {});
+  const sendReactionToggleRef = useRef<(messageId: string, reactionType: "thumbsup" | "heart" | "check") => void>(
+    () => {}
+  );
+  const sendAdminCommandRef = useRef<(command: string, data: Record<string, unknown>) => void>(() => {});
 
   const sendChatStable = useCallback(
     (content: string, type: "group" | "whisper" | "party", targetId?: string) => {
@@ -42,21 +98,86 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
     },
     []
   );
+  const sendWhisperStable = useCallback(
+    (targetNickname: string, content: string) => sendWhisperRef.current(targetNickname, content),
+    []
+  );
+  const sendReactionStable = useCallback(
+    (messageId: string, reactionType: "thumbsup" | "heart" | "check") =>
+      sendReactionToggleRef.current(messageId, reactionType),
+    []
+  );
+  const sendAdminStable = useCallback(
+    (command: string, data: Record<string, unknown>) => sendAdminCommandRef.current(command, data),
+    []
+  );
 
-  const { messages, sendMessage, setChatFocused, addMessage } = useChat({
+  const chatReturn = useChat({
     sendChat: sendChatStable,
+    sendWhisper: sendWhisperStable,
+    sendReactionToggle: sendReactionStable,
+    sendAdminCommand: sendAdminStable,
+    spaceId: space.id,
     userId: user.id,
     nickname: user.nickname,
+    role: user.role,
   });
 
+  const {
+    messages, activeTab, setActiveTab, sendMessage, setChatFocused, addMessage,
+    replyTo, setReplyTo, toggleReaction, deleteMessage,
+  } = chatReturn;
+
+  // 내부 핸들러 (타입 캐스트로 접근)
+  const chatInternal = chatReturn as unknown as {
+    _handleMessageIdUpdate: (tempId: string, realId: string) => void;
+    _handleMessageFailed: (tempId: string) => void;
+    _handleMessageDeleted: (messageId: string) => void;
+    _handleReactionUpdated: (
+      messageId: string,
+      reactions: Array<{ type: "thumbsup" | "heart" | "check"; userId: string; userNickname: string }>
+    ) => void;
+  };
+
+  // Socket callbacks
   const onChatMessage = useCallback(
-    (data: { userId: string; nickname: string; content: string; type: string; timestamp: string }) => {
+    (data: {
+      id?: string;
+      tempId?: string;
+      userId: string;
+      nickname: string;
+      content: string;
+      type: string;
+      timestamp: string;
+      replyTo?: { id: string; senderNickname: string; content: string };
+      partyId?: string;
+      partyName?: string;
+    }) => {
       const msg: ChatMessage = {
-        id: `chat-${++chatMsgId}`,
+        id: data.id || `chat-${++chatMsgId}`,
+        tempId: data.tempId,
         userId: data.userId,
         nickname: data.nickname,
         content: data.content,
         type: data.type as ChatMessage["type"],
+        timestamp: data.timestamp,
+        replyTo: data.replyTo,
+        partyId: data.partyId,
+        partyName: data.partyName,
+      };
+      addMessage(msg);
+    },
+    [addMessage]
+  );
+
+  const onWhisperReceive = useCallback(
+    (data: { senderId: string; senderNickname: string; content: string; timestamp: string }) => {
+      const msg: ChatMessage = {
+        id: `whisper-in-${++chatMsgId}`,
+        userId: data.senderId,
+        nickname: data.senderNickname,
+        content: data.content,
+        type: "whisper",
         timestamp: data.timestamp,
       };
       addMessage(msg);
@@ -64,16 +185,112 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
     [addMessage]
   );
 
-  const { isConnected, players, sendChat } = useSocketBridge({
+  const onWhisperSent = useCallback(
+    (data: { targetNickname: string; content: string; timestamp: string }) => {
+      // 이미 낙관적으로 추가됨 (useChat에서)
+      void data;
+    },
+    []
+  );
+
+  const onMessageIdUpdate = useCallback(
+    (data: { tempId: string; realId: string }) => {
+      chatInternal._handleMessageIdUpdate?.(data.tempId, data.realId);
+    },
+    [chatInternal]
+  );
+
+  const onMessageFailed = useCallback(
+    (data: { tempId: string; error: string }) => {
+      chatInternal._handleMessageFailed?.(data.tempId);
+    },
+    [chatInternal]
+  );
+
+  const onMessageDeleted = useCallback(
+    (data: { messageId: string; deletedBy: string }) => {
+      chatInternal._handleMessageDeleted?.(data.messageId);
+    },
+    [chatInternal]
+  );
+
+  const onReactionUpdated = useCallback(
+    (data: {
+      messageId: string;
+      reactions: Array<{ type: "thumbsup" | "heart" | "check"; userId: string; userNickname: string }>;
+    }) => {
+      chatInternal._handleReactionUpdated?.(data.messageId, data.reactions);
+    },
+    [chatInternal]
+  );
+
+  const onMemberMuted = useCallback(
+    (data: { nickname: string; mutedBy: string }) => {
+      addMessage({
+        id: `sys-${++chatMsgId}`,
+        userId: "system",
+        nickname: "System",
+        content: `${data.nickname}님이 ${data.mutedBy}에 의해 뮤트되었습니다.`,
+        type: "system",
+        timestamp: new Date().toISOString(),
+      });
+    },
+    [addMessage]
+  );
+
+  const onMemberKicked = useCallback(
+    (data: { nickname: string; kickedBy: string }) => {
+      addMessage({
+        id: `sys-${++chatMsgId}`,
+        userId: "system",
+        nickname: "System",
+        content: `${data.nickname}님이 ${data.kickedBy}에 의해 추방되었습니다.`,
+        type: "system",
+        timestamp: new Date().toISOString(),
+      });
+    },
+    [addMessage]
+  );
+
+  const onAnnouncement = useCallback(
+    (data: { content: string; announcer: string; timestamp: string }) => {
+      addMessage({
+        id: `announce-${++chatMsgId}`,
+        userId: "system",
+        nickname: data.announcer,
+        content: data.content,
+        type: "announcement",
+        timestamp: data.timestamp,
+      });
+    },
+    [addMessage]
+  );
+
+  const {
+    isConnected, players, sendChat, sendWhisper,
+    sendReactionToggle, sendAdminCommand,
+  } = useSocketBridge({
     spaceId: space.id,
     userId: user.id,
     nickname: user.nickname,
     avatar: user.avatar,
     onChatMessage,
+    onWhisperReceive,
+    onWhisperSent,
+    onMessageIdUpdate,
+    onMessageFailed,
+    onMessageDeleted,
+    onReactionUpdated,
+    onMemberMuted,
+    onMemberKicked,
+    onAnnouncement,
   });
 
-  // sendChat이 사용 가능해지면 ref 업데이트
+  // Ref 업데이트
   sendChatRef.current = sendChat;
+  sendWhisperRef.current = sendWhisper;
+  sendReactionToggleRef.current = sendReactionToggle;
+  sendAdminCommandRef.current = sendAdminCommand;
 
   // SCENE_READY / SCENE_ERROR 이벤트 리스닝
   useEffect(() => {
@@ -118,6 +335,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
         userId={user.id}
         nickname={user.nickname}
         avatar={user.avatar}
+        mapData={mapData}
       />
 
       {/* Loading Overlay */}
@@ -130,6 +348,17 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
             spaceName={space.name}
             isConnected={isConnected}
             playerCount={players.length + 1}
+            editorSlot={
+              <EditorToggleButton
+                isEditorMode={editor.isEditorMode}
+                canEdit={editor.canEdit}
+                onToggle={() =>
+                  editor.isEditorMode
+                    ? editor.exitEditor()
+                    : editor.enterEditor()
+                }
+              />
+            }
           />
           <PlayerList
             players={players.map((p) => ({
@@ -141,9 +370,56 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
           />
           <ChatPanel
             messages={messages}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
             onSend={sendMessage}
             onFocusChange={setChatFocused}
+            onReply={setReplyTo}
+            onReactionToggle={toggleReaction}
+            onDeleteMessage={deleteMessage}
+            replyTo={replyTo}
+            currentUserId={user.id}
+            role={user.role}
           />
+
+          {/* Editor Sidebar */}
+          {editor.isEditorMode && (
+            <EditorSidebar
+              activeTool={editor.activeTool}
+              activeLayer={editor.activeLayer}
+              selectedTileIndex={editor.selectedTileIndex}
+              selectedObjectType={editor.selectedObjectType}
+              selectedObject={
+                editor.selectedObjectId
+                  ? editor.mapObjects.find(
+                      (o) => o.id === editor.selectedObjectId
+                    ) ?? null
+                  : null
+              }
+              paletteTab={editor.paletteTab}
+              layerVisibility={editor.layerVisibility}
+              isDirty={editor.isDirty}
+              isSaving={editor.isSaving}
+              onToolChange={editor.setTool}
+              onLayerChange={editor.setLayer}
+              onTileSelect={editor.setTile}
+              onObjectTypeSelect={editor.setObjectType}
+              onToggleLayerVisibility={editor.toggleLayerVisibility}
+              onPaletteTabChange={editor.setPaletteTab}
+              onSave={editor.saveTiles}
+              onDeleteObject={editor.deleteObject}
+              onLinkPortal={(sourceId) => {
+                // 간단한 포탈 링킹: 다음 포탈 선택 대기 모드
+                const portals = editor.mapObjects.filter(
+                  (o) =>
+                    o.objectType === "portal" && o.id !== sourceId
+                );
+                if (portals.length > 0) {
+                  editor.linkPortal(sourceId, portals[0].id);
+                }
+              }}
+            />
+          )}
         </>
       )}
     </div>

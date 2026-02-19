@@ -27,12 +27,16 @@ export class InputController {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private chatFocused = false;
+  private editorMode = false;
   private lastDirection: Direction = "down";
 
   private onChatFocus = (payload: unknown) => {
     const { focused } = payload as { focused: boolean };
     this.chatFocused = focused;
   };
+
+  private onEditorEnter = () => { this.editorMode = true; };
+  private onEditorExit = () => { this.editorMode = false; };
 
   constructor(private scene: Phaser.Scene) {
     const kb = scene.input.keyboard!;
@@ -45,11 +49,13 @@ export class InputController {
     };
 
     eventBridge.on(GameEvents.CHAT_FOCUS, this.onChatFocus);
+    eventBridge.on(GameEvents.EDITOR_ENTER, this.onEditorEnter);
+    eventBridge.on(GameEvents.EDITOR_EXIT, this.onEditorExit);
   }
 
   /** 현재 프레임 이동 입력 */
   getMovement(): MovementInput {
-    if (this.chatFocused) return { ...ZERO_INPUT, direction: this.lastDirection };
+    if (this.chatFocused || this.editorMode) return { ...ZERO_INPUT, direction: this.lastDirection };
 
     let vx = 0;
     let vy = 0;
@@ -91,5 +97,7 @@ export class InputController {
 
   destroy(): void {
     eventBridge.off(GameEvents.CHAT_FOCUS, this.onChatFocus);
+    eventBridge.off(GameEvents.EDITOR_ENTER, this.onEditorEnter);
+    eventBridge.off(GameEvents.EDITOR_EXIT, this.onEditorExit);
   }
 }

@@ -29,6 +29,8 @@ export const DEPTH = {
   PLAYER: 40,
   PLAYER_NAME: 45,
   UI: 50,
+  EDITOR_GRID: 55,
+  EDITOR_CURSOR: 56,
 } as const;
 
 // Tileset

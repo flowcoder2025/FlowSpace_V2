@@ -38,6 +38,21 @@ export const GameEvents = {
   // Party zone events
   PARTY_ZONES_LOADED: "partyZone:loaded",
   PARTY_ZONE_CHANGED: "partyZone:changed",
+
+  // Editor events
+  EDITOR_ENTER: "editor:enter",
+  EDITOR_EXIT: "editor:exit",
+  EDITOR_TOOL_CHANGE: "editor:tool:change",
+  EDITOR_TILE_SELECT: "editor:tile:select",
+  EDITOR_LAYER_SELECT: "editor:layer:select",
+  EDITOR_LAYER_VISIBILITY: "editor:layer:visibility",
+  EDITOR_TILE_PAINTED: "editor:tile:painted",
+  EDITOR_TILE_PAINT_REQUEST: "editor:tile:paintRequest",
+  EDITOR_OBJECT_PLACED: "editor:object:placed",
+  EDITOR_OBJECT_MOVED: "editor:object:moved",
+  EDITOR_OBJECT_DELETED: "editor:object:deleted",
+  EDITOR_OBJECT_SELECTED: "editor:object:selected",
+  EDITOR_MAP_LOADED: "editor:map:loaded",
 } as const;
 
 // ============================================
@@ -141,4 +156,85 @@ export interface PartyZonesLoadedPayload {
 
 export interface PartyZoneChangedPayload {
   currentZone: PartyZoneData | null;
+}
+
+// ============================================
+// Editor Payload Types
+// ============================================
+
+export interface EditorEnterPayload {
+  enabled: boolean;
+}
+
+export interface EditorToolChangePayload {
+  tool: string;
+}
+
+export interface EditorTileSelectPayload {
+  tileIndex: number;
+}
+
+export interface EditorLayerSelectPayload {
+  layer: string;
+}
+
+export interface EditorLayerVisibilityPayload {
+  layer: string;
+  visible: boolean;
+}
+
+export interface EditorTilePaintedPayload {
+  layer: string;
+  col: number;
+  row: number;
+  tileIndex: number;
+}
+
+export interface EditorTilePaintRequestPayload {
+  layer: string;
+  col: number;
+  row: number;
+  tileIndex: number;
+}
+
+export interface EditorObjectPlacedPayload {
+  id: string;
+  tempId?: string;
+  objectType: string;
+  positionX: number;
+  positionY: number;
+  label?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface EditorObjectMovedPayload {
+  id: string;
+  positionX: number;
+  positionY: number;
+}
+
+export interface EditorObjectDeletedPayload {
+  id: string;
+}
+
+export interface EditorObjectSelectedPayload {
+  id: string | null;
+}
+
+export interface EditorMapLoadedPayload {
+  layers: Record<string, number[][]> | null;
+  objects: Array<{
+    id: string;
+    objectType: string;
+    positionX: number;
+    positionY: number;
+    assetId?: string | null;
+    label?: string | null;
+    rotation: number;
+    width: number;
+    height: number;
+    linkedObjectId?: string | null;
+    customData?: Record<string, unknown> | null;
+  }>;
 }

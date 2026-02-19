@@ -7,9 +7,10 @@ interface GameCanvasProps {
   userId: string;
   nickname: string;
   avatar: string;
+  mapData?: { version: number; layers: Record<string, number[][]> } | null;
 }
 
-export default function GameCanvas({ spaceId, userId, nickname, avatar }: GameCanvasProps) {
+export default function GameCanvas({ spaceId, userId, nickname, avatar, mapData }: GameCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
 
@@ -30,6 +31,7 @@ export default function GameCanvas({ spaceId, userId, nickname, avatar }: GameCa
         userId,
         nickname,
         avatar,
+        mapData: mapData ?? undefined,
       });
 
       if (destroyed) {
@@ -49,7 +51,7 @@ export default function GameCanvas({ spaceId, userId, nickname, avatar }: GameCa
         gameRef.current = null;
       }
     };
-  }, [spaceId, userId, nickname, avatar]);
+  }, [spaceId, userId, nickname, avatar, mapData]);
 
   return (
     <div

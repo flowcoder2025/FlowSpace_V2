@@ -1,11 +1,87 @@
 // ComfyUI API Types
 
+/** ComfyUI 동작 모드 */
+export type ComfyUIMode = "auto" | "mock" | "real";
+
 /** ComfyUI 연결 설정 */
 export interface ComfyUIConfig {
   baseUrl: string;
   wsUrl: string;
-  mockMode: boolean;
+  mode: ComfyUIMode;
   timeout: number;
+}
+
+/** ComfyUI 상태 정보 */
+export interface ComfyUIStatus {
+  connected: boolean;
+  url: string;
+  mode: ComfyUIMode;
+  resolvedMode: "mock" | "real";
+}
+
+/** ComfyUI 에러 타입 분류 */
+export type ComfyUIErrorType =
+  | "CONNECTION_REFUSED"
+  | "TIMEOUT"
+  | "MISSING_MODEL"
+  | "INVALID_WORKFLOW"
+  | "QUEUE_FULL"
+  | "UNKNOWN";
+
+/** ComfyUI 전용 에러 클래스 */
+export class ComfyUIError extends Error {
+  constructor(
+    message: string,
+    public readonly type: ComfyUIErrorType,
+    public readonly cause?: unknown
+  ) {
+    super(message);
+    this.name = "ComfyUIError";
+  }
+
+  static fromError(error: unknown): ComfyUIError {
+    if (error instanceof ComfyUIError) return error;
+
+    const message =
+      error instanceof Error ? error.message : "Unknown error occurred";
+
+    if (
+      message.includes("ECONNREFUSED") ||
+      message.includes("fetch failed")
+    ) {
+      return new ComfyUIError(
+        `ComfyUI 서버에 연결할 수 없습니다: ${message}`,
+        "CONNECTION_REFUSED",
+        error
+      );
+    }
+
+    if (message.includes("abort") || message.includes("timeout")) {
+      return new ComfyUIError(
+        `ComfyUI 요청 시간 초과: ${message}`,
+        "TIMEOUT",
+        error
+      );
+    }
+
+    if (message.includes("model") || message.includes("checkpoint")) {
+      return new ComfyUIError(
+        `ComfyUI 모델을 찾을 수 없습니다: ${message}`,
+        "MISSING_MODEL",
+        error
+      );
+    }
+
+    if (message.includes("workflow") || message.includes("prompt")) {
+      return new ComfyUIError(
+        `유효하지 않은 워크플로우입니다: ${message}`,
+        "INVALID_WORKFLOW",
+        error
+      );
+    }
+
+    return new ComfyUIError(message, "UNKNOWN", error);
+  }
 }
 
 /** ComfyUI 워크플로우 노드 */

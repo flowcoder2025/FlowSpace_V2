@@ -10,64 +10,332 @@ type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 const MAX_CONTENT_LENGTH = 500;
 
+// Rate limiting: userId → last message timestamp
+const rateLimitMap = new Map<string, number>();
+const RATE_LIMIT_MS = 500;
+
+// In-memory reaction store: messageId → reactions[]
+const messageReactionsMap = new Map<
+  string,
+  Array<{ type: "thumbsup" | "heart" | "check"; userId: string; userNickname: string }>
+>();
+
+let tempIdCounter = 0;
+
 function sanitizeContent(raw: string): string {
-  // 앞뒤 공백 제거 후 길이 제한
   const trimmed = raw.trim().slice(0, MAX_CONTENT_LENGTH);
-  // 기본 HTML 태그 제거 (XSS 방지)
   return trimmed.replace(/[<>]/g, "");
 }
 
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const last = rateLimitMap.get(userId) || 0;
+  if (now - last < RATE_LIMIT_MS) return false;
+  rateLimitMap.set(userId, now);
+  return true;
+}
+
+function isMuted(socket: TypedSocket): boolean {
+  return socket.data.restriction === "MUTED";
+}
+
+function isAdmin(socket: TypedSocket): boolean {
+  return socket.data.role === "OWNER" || socket.data.role === "STAFF";
+}
+
+/** 닉네임으로 타겟 소켓 찾기 */
+function findSocketsByNickname(io: IO, spaceId: string, nickname: string): TypedSocket[] {
+  const sockets = io.sockets.adapter.rooms.get(spaceId);
+  if (!sockets) return [];
+
+  const result: TypedSocket[] = [];
+  const spacePlayers = spacePlayersMap.get(spaceId);
+
+  for (const socketId of sockets) {
+    const s = io.sockets.sockets.get(socketId) as TypedSocket | undefined;
+    if (!s) continue;
+    const player = spacePlayers?.get(s.data.userId);
+    if (player?.nickname === nickname) {
+      result.push(s);
+    }
+  }
+  return result;
+}
+
 export function handleChat(io: IO, socket: TypedSocket) {
-  socket.on("chat:send", ({ content, type, targetId }) => {
+  // ── 일반/그룹 메시지 ──
+  socket.on("chat:send", ({ content, type, replyTo }) => {
     const spaceId = socket.data.spaceId;
     const userId = socket.data.userId;
-
     if (!spaceId || !userId) return;
+    if (isMuted(socket)) {
+      socket.emit("error", { message: "You are muted" });
+      return;
+    }
+    if (!checkRateLimit(userId)) return;
 
     const sanitized = sanitizeContent(content);
     if (sanitized.length === 0) return;
 
-    // spacePlayersMap에서 닉네임 조회
     const spacePlayers = spacePlayersMap.get(spaceId);
     const player = spacePlayers?.get(userId);
     const nickname = player?.nickname ?? "Unknown";
 
+    const tempId = `srv-${Date.now()}-${++tempIdCounter}`;
+    const timestamp = new Date().toISOString();
+
     const message = {
+      tempId,
       userId,
       nickname,
       content: sanitized,
-      type,
-      timestamp: new Date().toISOString(),
+      type: type === "whisper" ? "whisper" : type === "party" ? "party" : "message",
+      timestamp,
+      replyTo,
     };
 
-    switch (type) {
-      case "whisper": {
-        if (!targetId) return;
-        // targetId는 userId → 해당 유저의 소켓을 찾아 전송
-        const targetPlayer = spacePlayers?.get(targetId);
-        if (!targetPlayer) return;
-        // 같은 space의 소켓 중 targetId를 가진 소켓에 전송
-        const sockets = io.sockets.adapter.rooms.get(spaceId);
-        if (sockets) {
-          for (const socketId of sockets) {
-            const s = io.sockets.sockets.get(socketId);
-            if (s?.data.userId === targetId) {
-              s.emit("chat:message", message);
-            }
-          }
-        }
-        // 보낸 사람에게도 표시
-        socket.emit("chat:message", message);
-        break;
+    // Optimistic broadcast
+    io.to(spaceId).emit("chat:message", message);
+
+    // DB 비동기 저장 (fire-and-forget, import 없이 로그만)
+    saveChatMessageAsync(spaceId, userId, nickname, sanitized, message.type, tempId, replyTo).catch(
+      (err) => {
+        console.error("[Chat] DB save failed:", err);
+        socket.emit("chat:messageFailed", { tempId, error: "Failed to save message" });
       }
-      case "group":
-      case "party":
-      default:
-        // 같은 space 전체에 브로드캐스트
-        io.to(spaceId).emit("chat:message", message);
-        break;
-    }
+    );
 
     console.log(`[Chat] ${nickname} (${type}): ${sanitized.slice(0, 50)}`);
   });
+
+  // ── 귓속말 ──
+  socket.on("whisper:send", ({ targetNickname, content }) => {
+    const spaceId = socket.data.spaceId;
+    const userId = socket.data.userId;
+    if (!spaceId || !userId) return;
+    if (isMuted(socket)) {
+      socket.emit("error", { message: "You are muted" });
+      return;
+    }
+    if (!checkRateLimit(userId)) return;
+
+    const sanitized = sanitizeContent(content);
+    if (sanitized.length === 0) return;
+
+    const spacePlayers = spacePlayersMap.get(spaceId);
+    const player = spacePlayers?.get(userId);
+    const senderNickname = player?.nickname ?? "Unknown";
+
+    const timestamp = new Date().toISOString();
+
+    // 타겟 소켓 찾기
+    const targetSockets = findSocketsByNickname(io, spaceId, targetNickname);
+    if (targetSockets.length === 0) {
+      socket.emit("error", { message: `User "${targetNickname}" not found` });
+      return;
+    }
+
+    // 수신자에게 전송
+    for (const ts of targetSockets) {
+      ts.emit("whisper:receive", {
+        senderId: userId,
+        senderNickname,
+        content: sanitized,
+        timestamp,
+      });
+    }
+
+    // 발신자에게 확인
+    socket.emit("whisper:sent", {
+      targetNickname,
+      content: sanitized,
+      timestamp,
+    });
+
+    console.log(`[Chat] Whisper: ${senderNickname} → ${targetNickname}`);
+  });
+
+  // ── 리액션 토글 ──
+  socket.on("reaction:toggle", ({ messageId, reactionType }) => {
+    const spaceId = socket.data.spaceId;
+    const userId = socket.data.userId;
+    if (!spaceId || !userId) return;
+
+    const spacePlayers = spacePlayersMap.get(spaceId);
+    const player = spacePlayers?.get(userId);
+    const userNickname = player?.nickname ?? "Unknown";
+
+    let reactions = messageReactionsMap.get(messageId) || [];
+    const existing = reactions.findIndex((r) => r.userId === userId && r.type === reactionType);
+
+    if (existing >= 0) {
+      reactions.splice(existing, 1);
+    } else {
+      reactions.push({ type: reactionType, userId, userNickname });
+    }
+
+    messageReactionsMap.set(messageId, reactions);
+
+    io.to(spaceId).emit("reaction:updated", {
+      messageId,
+      reactions: [...reactions],
+    });
+  });
+
+  // ── 메시지 삭제 ──
+  socket.on("chat:delete", ({ messageId }) => {
+    const spaceId = socket.data.spaceId;
+    const userId = socket.data.userId;
+    if (!spaceId || !userId) return;
+    if (!isAdmin(socket)) {
+      socket.emit("error", { message: "Insufficient permissions" });
+      return;
+    }
+
+    const spacePlayers = spacePlayersMap.get(spaceId);
+    const player = spacePlayers?.get(userId);
+    const deletedBy = player?.nickname ?? "Admin";
+
+    io.to(spaceId).emit("chat:messageDeleted", { messageId, deletedBy });
+    console.log(`[Chat] Message ${messageId} deleted by ${deletedBy}`);
+  });
+
+  // ── 관리 명령: mute ──
+  socket.on("admin:mute", ({ targetNickname, duration }) => {
+    const spaceId = socket.data.spaceId;
+    if (!spaceId || !isAdmin(socket)) {
+      socket.emit("error", { message: "Insufficient permissions" });
+      return;
+    }
+
+    const targetSockets = findSocketsByNickname(io, spaceId, targetNickname);
+    for (const ts of targetSockets) {
+      ts.data.restriction = "MUTED";
+    }
+
+    const spacePlayers = spacePlayersMap.get(spaceId);
+    const mutedBy = spacePlayers?.get(socket.data.userId)?.nickname ?? "Admin";
+
+    io.to(spaceId).emit("member:muted", {
+      memberId: targetSockets[0]?.data.userId ?? "",
+      nickname: targetNickname,
+      mutedBy,
+      duration,
+    });
+    console.log(`[Chat] ${targetNickname} muted by ${mutedBy}`);
+  });
+
+  // ── 관리 명령: unmute ──
+  socket.on("admin:unmute", ({ targetNickname }) => {
+    const spaceId = socket.data.spaceId;
+    if (!spaceId || !isAdmin(socket)) {
+      socket.emit("error", { message: "Insufficient permissions" });
+      return;
+    }
+
+    const targetSockets = findSocketsByNickname(io, spaceId, targetNickname);
+    for (const ts of targetSockets) {
+      ts.data.restriction = "NONE";
+    }
+
+    const spacePlayers = spacePlayersMap.get(spaceId);
+    const unmutedBy = spacePlayers?.get(socket.data.userId)?.nickname ?? "Admin";
+
+    io.to(spaceId).emit("member:unmuted", {
+      memberId: targetSockets[0]?.data.userId ?? "",
+      nickname: targetNickname,
+      unmutedBy,
+    });
+    console.log(`[Chat] ${targetNickname} unmuted by ${unmutedBy}`);
+  });
+
+  // ── 관리 명령: kick ──
+  socket.on("admin:kick", ({ targetNickname }) => {
+    const spaceId = socket.data.spaceId;
+    if (!spaceId || !isAdmin(socket)) {
+      socket.emit("error", { message: "Insufficient permissions" });
+      return;
+    }
+
+    const targetSockets = findSocketsByNickname(io, spaceId, targetNickname);
+    const spacePlayers = spacePlayersMap.get(spaceId);
+    const kickedBy = spacePlayers?.get(socket.data.userId)?.nickname ?? "Admin";
+
+    io.to(spaceId).emit("member:kicked", {
+      memberId: targetSockets[0]?.data.userId ?? "",
+      nickname: targetNickname,
+      kickedBy,
+    });
+
+    // 소켓 강제 해제
+    for (const ts of targetSockets) {
+      ts.leave(spaceId);
+      ts.disconnect(true);
+    }
+
+    console.log(`[Chat] ${targetNickname} kicked by ${kickedBy}`);
+  });
+
+  // ── 관리 명령: announce ──
+  socket.on("admin:announce", ({ content }) => {
+    const spaceId = socket.data.spaceId;
+    if (!spaceId || !isAdmin(socket)) {
+      socket.emit("error", { message: "Insufficient permissions" });
+      return;
+    }
+
+    const sanitized = sanitizeContent(content);
+    if (sanitized.length === 0) return;
+
+    const spacePlayers = spacePlayersMap.get(spaceId);
+    const announcer = spacePlayers?.get(socket.data.userId)?.nickname ?? "Admin";
+
+    io.to(spaceId).emit("space:announcement", {
+      content: sanitized,
+      announcer,
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`[Chat] Announcement by ${announcer}: ${sanitized.slice(0, 50)}`);
+  });
+}
+
+/** DB 비동기 저장 (Prisma 사용 가능 시) */
+async function saveChatMessageAsync(
+  spaceId: string,
+  senderId: string,
+  senderName: string,
+  content: string,
+  type: string,
+  _tempId: string,
+  _replyTo?: { id: string; senderNickname: string; content: string }
+): Promise<void> {
+  try {
+    // Dynamic import to avoid bundling issues in socket server
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient();
+
+    const messageTypeMap: Record<string, string> = {
+      message: "MESSAGE",
+      whisper: "WHISPER",
+      party: "PARTY",
+      system: "SYSTEM",
+      announcement: "ANNOUNCEMENT",
+    };
+
+    await prisma.chatMessage.create({
+      data: {
+        spaceId,
+        senderId,
+        senderType: "USER",
+        senderName,
+        content,
+        type: (messageTypeMap[type] ?? "MESSAGE") as "MESSAGE" | "WHISPER" | "PARTY" | "SYSTEM" | "ANNOUNCEMENT",
+      },
+    });
+
+    await prisma.$disconnect();
+  } catch (err) {
+    console.error("[Chat] DB save error:", err);
+  }
 }

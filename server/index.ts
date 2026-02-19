@@ -4,6 +4,8 @@ import { verifySocketToken } from "./middleware/auth";
 import { handleRoom } from "./handlers/room";
 import { handleMovement } from "./handlers/movement";
 import { handleChat } from "./handlers/chat";
+import { handleParty } from "./handlers/party";
+import { handleEditor } from "./handlers/editor";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -48,6 +50,8 @@ io.on("connection", (socket) => {
   handleRoom(io, socket);
   handleMovement(io, socket);
   handleChat(io, socket);
+  handleParty(io, socket);
+  handleEditor(io, socket);
 
   socket.on("disconnect", (reason) => {
     console.log(

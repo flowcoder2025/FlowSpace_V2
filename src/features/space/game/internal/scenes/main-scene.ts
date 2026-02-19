@@ -13,14 +13,16 @@ import { InputController } from "../player/input-controller";
 import { RemotePlayerManager } from "../remote/remote-player-manager";
 import { CameraController } from "../camera/camera-controller";
 import { ObjectManager } from "../objects/object-manager";
+import { EditorSystem } from "@/features/space/editor/internal/editor-system";
 
 export class MainScene extends Phaser.Scene {
-  private tilemapResult!: TilemapResult;
+  tilemapResult!: TilemapResult;
   private localPlayer!: LocalPlayer;
   private inputController!: InputController;
   private remotePlayerManager!: RemotePlayerManager;
   private cameraController!: CameraController;
   private objectManager!: ObjectManager;
+  private editorSystem!: EditorSystem;
 
   constructor() {
     super({ key: SCENE_KEYS.MAIN });
@@ -35,6 +37,7 @@ export class MainScene extends Phaser.Scene {
       this.initCamera();
       this.initObjects();
       this.initCollisions();
+      this.initEditor();
       this.notifyReady();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown scene error";
@@ -44,6 +47,9 @@ export class MainScene extends Phaser.Scene {
 
   update(): void {
     if (!this.localPlayer) return;
+
+    // 에디터 업데이트
+    this.editorSystem?.update();
 
     // 입력 처리
     const input = this.inputController.getMovement();
@@ -66,7 +72,11 @@ export class MainScene extends Phaser.Scene {
 
   /** 타일맵 서브시스템 초기화 */
   private initTilemap(): void {
-    this.tilemapResult = createTilemapSystem(this);
+    const storedMapData = this.registry.get("mapData") as
+      | { layers: Record<string, number[][]> }
+      | undefined;
+    const externalLayers = storedMapData?.layers ?? undefined;
+    this.tilemapResult = createTilemapSystem(this, externalLayers);
   }
 
   /** 로컬 플레이어 생성 */
@@ -113,6 +123,11 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  /** 에디터 시스템 초기화 */
+  private initEditor(): void {
+    this.editorSystem = new EditorSystem(this, this.tilemapResult);
+  }
+
   /** SCENE_READY 이벤트 발행 */
   private notifyReady(): void {
     eventBridge.emit(GameEvents.SCENE_READY, {
@@ -122,8 +137,10 @@ export class MainScene extends Phaser.Scene {
 
   /** 씬 종료 시 정리 */
   shutdown(): void {
+    this.editorSystem?.destroy();
     this.remotePlayerManager?.destroy();
     this.objectManager?.destroy();
     this.inputController?.destroy();
+    this.cameraController?.destroy();
   }
 }

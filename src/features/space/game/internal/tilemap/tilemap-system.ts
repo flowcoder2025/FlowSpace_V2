@@ -6,7 +6,12 @@
 
 import { TILE_SIZE, MAP_COLS, MAP_ROWS, MAP_WIDTH, MAP_HEIGHT } from "@/constants/game-constants";
 import { generateTileset, TILESET_KEY } from "./tileset-generator";
-import { createMapLayers, COLLISION_LAYER_NAMES, type MapLayerDefinition } from "./map-data";
+import {
+  createMapLayers,
+  createMapLayersFromStored,
+  COLLISION_LAYER_NAMES,
+  type MapLayerDefinition,
+} from "./map-data";
 
 const TILEMAP_KEY = "main-map";
 const TILESET_NAME = "main-tileset";
@@ -24,8 +29,13 @@ export interface TilemapResult {
  * 2. Tilemap 생성 (make.tilemap)
  * 3. 레이어 생성 + 데이터 채우기
  * 4. 충돌 레이어 설정
+ *
+ * @param externalLayers - DB에서 가져온 레이어 데이터 (없으면 기본 맵 사용)
  */
-export function createTilemapSystem(scene: Phaser.Scene): TilemapResult {
+export function createTilemapSystem(
+  scene: Phaser.Scene,
+  externalLayers?: Record<string, number[][]>
+): TilemapResult {
   // 1. 타일셋 텍스처 생성
   generateTileset(scene);
 
@@ -45,8 +55,10 @@ export function createTilemapSystem(scene: Phaser.Scene): TilemapResult {
     throw new Error("Failed to add tileset image");
   }
 
-  // 4. 레이어 생성
-  const layerDefs = createMapLayers();
+  // 4. 레이어 생성 (외부 데이터 우선, 없으면 기본 맵)
+  const layerDefs = externalLayers
+    ? createMapLayersFromStored(externalLayers)
+    : createMapLayers();
   const layers = new Map<string, Phaser.Tilemaps.TilemapLayer>();
   const collisionLayers: Phaser.Tilemaps.TilemapLayer[] = [];
 

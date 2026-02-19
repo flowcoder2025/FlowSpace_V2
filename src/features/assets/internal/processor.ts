@@ -1,6 +1,6 @@
 import { writeFile, mkdir } from "fs/promises";
 import { join, dirname } from "path";
-import { ComfyUIClient } from "@/lib/comfyui";
+import { ComfyUIClient, ComfyUIError } from "@/lib/comfyui";
 import { loadWorkflowTemplate, injectWorkflowParams } from "./workflow-loader";
 import {
   ASSET_SPECS,
@@ -30,17 +30,38 @@ export async function processAssetGeneration(
 
   // 2. ComfyUI 실행
   const client = new ComfyUIClient();
-  const result = await client.generateAsset(
-    {
-      type: params.type,
-      prompt: params.prompt,
-      name: params.name,
-      seed: params.seed,
-    },
-    injectedWorkflow
-  );
+
+  let result;
+  try {
+    result = await client.generateAsset(
+      {
+        type: params.type,
+        prompt: params.prompt,
+        name: params.name,
+        seed: params.seed,
+      },
+      injectedWorkflow
+    );
+  } catch (error) {
+    const comfyError = ComfyUIError.fromError(error);
+    console.error(`[AssetProcessor] ComfyUI 에러 [${comfyError.type}]:`, comfyError.message);
+
+    switch (comfyError.type) {
+      case "CONNECTION_REFUSED":
+        throw new Error("ComfyUI 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.");
+      case "TIMEOUT":
+        throw new Error("에셋 생성 시간이 초과되었습니다. 다시 시도하세요.");
+      case "MISSING_MODEL":
+        throw new Error("필요한 AI 모델이 ComfyUI에 설치되지 않았습니다.");
+      case "INVALID_WORKFLOW":
+        throw new Error("워크플로우 구성이 올바르지 않습니다.");
+      default:
+        throw new Error(`에셋 생성 실패: ${comfyError.message}`);
+    }
+  }
 
   if (result.status === "failed" || !result.images?.length) {
+    console.error("[AssetProcessor] 생성 실패:", result.error);
     throw new Error(result.error || "Asset generation failed: no images");
   }
 

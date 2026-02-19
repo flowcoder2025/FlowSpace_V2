@@ -133,6 +133,8 @@ model Space {
   status   SpaceStatus @default(ACTIVE)
   maxUsers Int         @default(50)
 
+  mapData Json?
+
   owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   template Template @relation(fields: [templateId], references: [id])
 
@@ -280,13 +282,20 @@ model SpaceMember {
 // 10. MapObject (맵 오브젝트)
 // ============================================
 model MapObject {
-  id      String @id @default(cuid())
+  id      String  @id @default(cuid())
   spaceId String
-  assetId String
+  assetId String?
 
-  positionX Int
-  positionY Int
-  rotation  Int @default(0)
+  objectType String
+  label      String?
+
+  positionX Float
+  positionY Float
+  rotation  Int   @default(0)
+  width     Int   @default(1)
+  height    Int   @default(1)
+
+  isActive Boolean @default(true)
 
   linkedObjectId String?    @unique
   linkedObject   MapObject? @relation("ObjectPair", fields: [linkedObjectId], references: [id], onDelete: SetNull)
@@ -305,6 +314,7 @@ model MapObject {
   @@index([spaceId])
   @@index([assetId])
   @@index([linkedObjectId])
+  @@index([spaceId, isActive])
 }
 
 // ============================================

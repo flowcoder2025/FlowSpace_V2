@@ -1,8 +1,8 @@
 /**
- * Socket ↔ EventBridge 양방향 브릿지
+ * Socket <-> EventBridge 양방향 브릿지
  *
- * Socket 이벤트 → EventBridge (REMOTE_*)
- * EventBridge (PLAYER_MOVED) → Socket emit
+ * Socket 이벤트 -> EventBridge (REMOTE_*)
+ * EventBridge (PLAYER_MOVED) -> Socket emit
  */
 
 "use client";
@@ -12,11 +12,16 @@ import { eventBridge, GameEvents, type PlayerPosition } from "@/features/space/g
 import { useSocket, type PlayerData } from "@/features/space/socket";
 
 interface ChatMessageData {
+  id?: string;
+  tempId?: string;
   userId: string;
   nickname: string;
   content: string;
   type: string;
   timestamp: string;
+  replyTo?: { id: string; senderNickname: string; content: string };
+  partyId?: string;
+  partyName?: string;
 }
 
 interface UseSocketBridgeOptions {
@@ -25,27 +30,67 @@ interface UseSocketBridgeOptions {
   nickname: string;
   avatar: string;
   onChatMessage?: (data: ChatMessageData) => void;
+  onWhisperReceive?: (data: { senderId: string; senderNickname: string; content: string; timestamp: string }) => void;
+  onWhisperSent?: (data: { targetNickname: string; content: string; timestamp: string }) => void;
+  onMessageIdUpdate?: (data: { tempId: string; realId: string }) => void;
+  onMessageFailed?: (data: { tempId: string; error: string }) => void;
+  onMessageDeleted?: (data: { messageId: string; deletedBy: string }) => void;
+  onReactionUpdated?: (data: { messageId: string; reactions: Array<{ type: "thumbsup" | "heart" | "check"; userId: string; userNickname: string }> }) => void;
+  onPartyMessage?: (data: ChatMessageData) => void;
+  onMemberMuted?: (data: { memberId: string; nickname: string; mutedBy: string }) => void;
+  onMemberUnmuted?: (data: { memberId: string; nickname: string; unmutedBy: string }) => void;
+  onMemberKicked?: (data: { memberId: string; nickname: string; kickedBy: string }) => void;
+  onAnnouncement?: (data: { content: string; announcer: string; timestamp: string }) => void;
+  onEditorTileUpdated?: (data: { userId: string; layer: string; col: number; row: number; tileIndex: number }) => void;
+  onEditorObjectPlaced?: (data: { userId: string; id: string; objectType: string; positionX: number; positionY: number; label?: string }) => void;
+  onEditorObjectMoved?: (data: { userId: string; id: string; positionX: number; positionY: number }) => void;
+  onEditorObjectDeleted?: (data: { userId: string; id: string }) => void;
 }
 
 interface UseSocketBridgeReturn {
   isConnected: boolean;
   players: PlayerData[];
   sendChat: (content: string, type: "group" | "whisper" | "party", targetId?: string) => void;
+  sendWhisper: (targetNickname: string, content: string) => void;
+  sendReactionToggle: (messageId: string, reactionType: "thumbsup" | "heart" | "check") => void;
+  sendAdminCommand: (command: string, data: Record<string, unknown>) => void;
+  joinParty: (zoneId: string) => void;
+  leaveParty: (zoneId: string) => void;
+  sendPartyMessage: (content: string) => void;
+  sendEditorTileUpdate: (data: { layer: string; col: number; row: number; tileIndex: number }) => void;
+  sendEditorObjectPlace: (data: { id: string; objectType: string; positionX: number; positionY: number; label?: string }) => void;
+  sendEditorObjectMove: (data: { id: string; positionX: number; positionY: number }) => void;
+  sendEditorObjectDelete: (data: { id: string }) => void;
 }
 
 export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridgeReturn {
-  const { spaceId, userId, nickname, avatar, onChatMessage } = options;
-  const { isConnected, players, sendMovement, sendChat } = useSocket({
-    spaceId,
-    userId,
-    nickname,
-    avatar,
-    onChatMessage,
+  const {
+    spaceId, userId, nickname, avatar,
+    onChatMessage, onWhisperReceive, onWhisperSent,
+    onMessageIdUpdate, onMessageFailed, onMessageDeleted,
+    onReactionUpdated, onPartyMessage,
+    onMemberMuted, onMemberUnmuted, onMemberKicked, onAnnouncement,
+    onEditorTileUpdated, onEditorObjectPlaced, onEditorObjectMoved, onEditorObjectDeleted,
+  } = options;
+
+  const {
+    isConnected, players, sendMovement, sendChat,
+    sendWhisper, sendReactionToggle, sendAdminCommand,
+    joinParty, leaveParty, sendPartyMessage,
+    sendEditorTileUpdate, sendEditorObjectPlace,
+    sendEditorObjectMove, sendEditorObjectDelete,
+  } = useSocket({
+    spaceId, userId, nickname, avatar,
+    onChatMessage, onWhisperReceive, onWhisperSent,
+    onMessageIdUpdate, onMessageFailed, onMessageDeleted,
+    onReactionUpdated, onPartyMessage,
+    onMemberMuted, onMemberUnmuted, onMemberKicked, onAnnouncement,
+    onEditorTileUpdated, onEditorObjectPlaced, onEditorObjectMoved, onEditorObjectDeleted,
   });
 
   const prevPlayersRef = useRef<Map<string, PlayerData>>(new Map());
 
-  // EventBridge → Socket: PLAYER_MOVED → sock.emit("move")
+  // EventBridge -> Socket: PLAYER_MOVED -> sock.emit("move")
   const onPlayerMoved = useCallback(
     (payload: unknown) => {
       const data = payload as PlayerPosition;
@@ -65,7 +110,7 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
     };
   }, [onPlayerMoved]);
 
-  // Socket → EventBridge: players 변경 감지 → REMOTE_* 이벤트 발행
+  // Socket -> EventBridge: players 변경 감지 -> REMOTE_* 이벤트 발행
   useEffect(() => {
     const prevMap = prevPlayersRef.current;
     const currentMap = new Map(players.map((p) => [p.userId, p]));
@@ -107,5 +152,11 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
     prevPlayersRef.current = currentMap;
   }, [players]);
 
-  return { isConnected, players, sendChat };
+  return {
+    isConnected, players, sendChat,
+    sendWhisper, sendReactionToggle, sendAdminCommand,
+    joinParty, leaveParty, sendPartyMessage,
+    sendEditorTileUpdate, sendEditorObjectPlace,
+    sendEditorObjectMove, sendEditorObjectDelete,
+  };
 }

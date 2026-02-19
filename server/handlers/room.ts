@@ -24,6 +24,15 @@ export function handleRoom(io: IO, socket: TypedSocket) {
     socket.join(spaceId);
     socket.data.spaceId = spaceId;
 
+    // 기본 role/restriction 설정 (DB 조회 전 기본값)
+    socket.data.role = socket.data.role ?? "PARTICIPANT";
+    socket.data.restriction = socket.data.restriction ?? "NONE";
+
+    // DB에서 멤버 정보 비동기 로드
+    loadMemberInfo(spaceId, userId, socket).catch((err) =>
+      console.error("[Room] Failed to load member info:", err)
+    );
+
     const player: PlayerData = {
       userId,
       nickname,
@@ -76,4 +85,27 @@ function leaveSpace(io: IO, socket: TypedSocket, spaceId: string) {
   }
 
   console.log(`[Room] ${userId} left ${spaceId} (${players.size} players)`);
+}
+
+/** DB에서 SpaceMember 정보 로드하여 socket.data에 할당 */
+async function loadMemberInfo(spaceId: string, userId: string, socket: TypedSocket): Promise<void> {
+  try {
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient();
+
+    const member = await prisma.spaceMember.findUnique({
+      where: { spaceId_userId: { spaceId, userId } },
+      select: { id: true, role: true, restriction: true },
+    });
+
+    if (member) {
+      socket.data.memberId = member.id;
+      socket.data.role = member.role as "OWNER" | "STAFF" | "PARTICIPANT";
+      socket.data.restriction = member.restriction as "NONE" | "MUTED" | "BANNED";
+    }
+
+    await prisma.$disconnect();
+  } catch (err) {
+    console.error("[Room] Prisma member load error:", err);
+  }
 }

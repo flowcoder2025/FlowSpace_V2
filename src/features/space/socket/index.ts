@@ -6,4 +6,5 @@ export type {
   ServerToClientEvents,
   PlayerData,
   MovementData,
+  SocketData,
 } from "./internal/types";
