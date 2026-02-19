@@ -13,3 +13,6 @@ export {
   fetchGeneratedAssets,
 } from "./internal/asset-loader";
 export type { LoadableAsset } from "./internal/asset-loader";
+
+export { createGame, destroyGame } from "./internal/game-manager";
+export type { GameOptions } from "./internal/game-manager";

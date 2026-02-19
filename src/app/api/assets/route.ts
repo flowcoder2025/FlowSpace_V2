@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 /** GET /api/assets - 에셋 목록 (필터링) */
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get("type");
     const status = searchParams.get("status");
-    const userId = searchParams.get("userId");
+    const userId = searchParams.get("userId") || session.user.id;
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
 

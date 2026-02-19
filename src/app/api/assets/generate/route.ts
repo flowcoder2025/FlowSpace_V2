@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { processAssetGeneration } from "@/features/assets";
 import type { CreateAssetParams } from "@/features/assets";
@@ -13,9 +14,12 @@ const ASSET_TYPE_MAP = {
 /** POST /api/assets/generate - 에셋 생성 작업 시작 */
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as CreateAssetParams & {
-      userId: string;
-    };
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = (await request.json()) as CreateAssetParams;
 
     // 입력 유효성 검증
     if (!body.type || !body.name || !body.prompt) {
@@ -32,8 +36,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // TODO: 실제 인증에서 userId 가져오기
-    const userId = body.userId || "system";
+    const userId = session.user.id;
 
     // DB에 pending 상태로 생성
     const dbAsset = await prisma.generatedAsset.create({

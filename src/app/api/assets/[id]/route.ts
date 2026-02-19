@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -8,6 +9,11 @@ interface RouteParams {
 /** GET /api/assets/[id] - 에셋 상세 + 상태 */
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const asset = await prisma.generatedAsset.findUnique({
       where: { id },
@@ -37,10 +43,19 @@ export async function GET(_request: Request, { params }: RouteParams) {
 /** DELETE /api/assets/[id] - 에셋 삭제 */
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const asset = await prisma.generatedAsset.findUnique({
       where: { id },
     });
+
+    if (asset && asset.userId !== session.user.id && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     if (!asset) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
