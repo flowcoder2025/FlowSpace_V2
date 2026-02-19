@@ -1,5 +1,11 @@
 import { io, Socket } from "socket.io-client";
 import type { ClientToServerEvents, ServerToClientEvents } from "./types";
+import {
+  RECONNECTION_ATTEMPTS,
+  RECONNECTION_DELAY,
+  RECONNECTION_DELAY_MAX,
+  RECONNECTION_TIMEOUT,
+} from "@/features/space/chat/internal/chat-constants";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -23,9 +29,10 @@ export async function getSocketClient(): Promise<TypedSocket> {
     auth: { token },
     transports: ["websocket", "polling"],
     reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 30000,
-    reconnectionAttempts: Infinity,
+    reconnectionAttempts: RECONNECTION_ATTEMPTS,
+    reconnectionDelay: RECONNECTION_DELAY,
+    reconnectionDelayMax: RECONNECTION_DELAY_MAX,
+    timeout: RECONNECTION_TIMEOUT,
   });
 
   return socket;

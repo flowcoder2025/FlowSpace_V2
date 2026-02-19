@@ -9,7 +9,7 @@
 ## Active Epic
 | Epic | 상태 | Phase 진행 | 마지막 업데이트 |
 |------|------|------------|-----------------|
-| (없음) | 다음: Phase 10~11 | | 2026-02-19 |
+| (없음) | 다음: Phase 11 LiveKit | | 2026-02-20 |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -17,6 +17,7 @@
 | ComfyUI Asset Pipeline | 2026-02-19 | Phase 1~7 |
 | Map Editor | 2026-02-19 | Phase 8 |
 | Admin Dashboard | 2026-02-19 | Phase 9 |
+| Chat Port (flow_metaverse → FlowSpace) | 2026-02-20 | Phase 10 (6 sub-phases) |
 
 ## Architecture Decisions
 - 5개 도메인 에이전트 + 오케스트레이터 체제
@@ -35,9 +36,9 @@
 |-------|--------|--------|
 | Game Engine | Phaser, Avatar, Tiles | Phase 5, 8 완료 |
 | Asset Pipeline | ComfyUI, Processing | Phase 1, 7 완료 |
-| Communication | Socket.io, Realtime | Phase 4, 6, 8 완료 |
-| Frontend | Next.js, UI, Zustand | Phase 1~9 완료 |
-| Backend | API, Prisma, Auth | Phase 2~3, 9 완료 |
+| Communication | Socket.io, Realtime | Phase 4, 6, 8, 10 완료 |
+| Frontend | Next.js, UI, Zustand | Phase 1~10 완료 |
+| Backend | API, Prisma, Auth | Phase 2~3, 9~10 완료 |
 
 ## Domain Work Protocol (필수 - 반드시 준수)
 > **이전 세션에서 팀 프로토콜 미준수 발생. 다음 규칙 반드시 적용:**
@@ -54,41 +55,37 @@
 ### Phase 9: 관리자 대시보드 ✅
 - requireSpaceAdmin 권한 헬퍼 (OWNER/STAFF/superAdmin)
 - `/dashboard/spaces/[id]` 라우트 + 사이드바 레이아웃
-- Admin API 7개: stats, members, logs, announce, messages, messages/[id], analytics
-- 대시보드 컴포넌트 8개: sidebar, stat-card, announce-form, member-table, event-log-table, message-moderation, usage-chart, space-settings-form
-- SpaceEventType에 ADMIN_ACTION 추가
-- SpaceCard에 Dashboard 링크 (OWNER/STAFF)
+- Admin API 7개 + 대시보드 컴포넌트 8개
 - **20 신규, 3 수정** (tsc ✅ lint ✅)
 
-### Codex 리스크 패치 (Phase 9 세션에서 처리)
-- 워크플로우 API 경로 수정 (`/api/assets/workflows` → `/api/workflows`)
-- 진행률 표시 STATUS_PROGRESS 매핑 (status 기반)
-- 에셋 삭제 시 파일시스템 정리 (fs/promises.unlink)
-- useChatStorage 통합 (useChat에 spaceId + localStorage 캐싱)
+### Phase 10: Chat System Port ✅ (2026-02-20)
+- **상수 추출**: `chat-constants.ts` (14개 매직넘버 → 공유 상수, 한/영 별칭 7쌍)
+- **파서 업그레이드**: 한/영 관리자 별칭, 에디터 명령어 config 주입, 도움말 모듈
+- **필터 업그레이드**: www./도메인 URL 감지, links 탭 시스템 제외, 크로스탭 안읽음, 50자 말줄임
+- **소켓 회복력**: 30회 재연결 (500ms→5s 지수백오프), beforeunload/pagehide, socketError 상태
+- **에러 세분화**: chat:error/whisper:error/party:error/admin:error (코드+메시지)
+- **UI 강화**: ↑↓ 귓속말 히스토리, A-/A+ 폰트 3단계, playersMap SSOT 닉네임, URL <a> 렌더링
+- **2 신규 + 17 수정** = 19파일 (tsc ✅ lint ✅)
 
 ### Codex 보안 감사 패치 (Ad-hoc) ✅
-- **Critical**: 소켓 userId 위장 방지 (socket.data.userId 강제), 에셋 API IDOR (소유권 검증)
-- **High**: 맵 API 멤버십 검증, STAFF→OWNER 상승 차단, 파티 메시지 스코프 수정
-- **Medium**: 에셋 파일 경로 이중 public 수정, reply 페이로드 전달, 소켓 삭제 DB 반영
-- **Low**: 포탈 링크 양방향 업데이트
+- 9건 패치 (Critical 2, High 3, Medium 3, Low 1)
 - 11파일 수정 (tsc ✅ lint ✅)
 
-## Next Steps (Phase 10~)
-1. Phase 10: LiveKit 음성/화상
-2. Phase 11: 배포
+## Next Steps (Phase 11~)
+1. Phase 11: LiveKit 음성/화상
+2. 배포 준비
 3. ⚠️ `npx next build` 확인 필요 (dev 서버 종료 후 실행)
 
 ## Supabase DB 연결 정보
 - Host: `aws-1-ap-southeast-2.pooler.supabase.com`
 - Ref: `afdfkpxsfuyccdvrkqwu`
 - Direct URL이 IPv6만 반환 → Session Pooler(:5432) 사용
-- Prisma directUrl에 pooler URL 사용 중
 
 ## Key References (flow_metaverse)
 - EventBridge: `src/features/space/game/events.ts`
 - AssetRegistry: `src/config/asset-registry.ts`
 - Avatar: `src/features/space/avatar/config.ts`
-- MainScene: `src/features/space/game/scenes/MainScene.ts` (1661줄 → 분할 완료)
+- MainScene: `src/features/space/game/scenes/MainScene.ts`
 - Socket types: `src/features/space/socket/types.ts`
 
 ## Technical Notes
@@ -108,3 +105,4 @@
 - API 설계: 쿼리 파라미터로 userId 받지 않기 (세션에서 강제 추출)
 - 에셋 저장 경로: DB에는 `/assets/...` 형태, 파일시스템에는 `public/assets/...`로 저장 (이중 public 방지)
 - 역할 변경 API: 호출자 역할 < 대상 역할 설정 불가 원칙 적용
+- useState lazy initializer로 localStorage 읽기 (useEffect setState → lint 에러 방지)

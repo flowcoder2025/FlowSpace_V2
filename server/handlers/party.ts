@@ -4,11 +4,13 @@ import type {
   ServerToClientEvents,
 } from "../../src/features/space/socket/internal/types";
 import { spacePlayersMap } from "./room";
+import {
+  MAX_CONTENT_LENGTH,
+  DEFAULT_NICKNAME,
+} from "../../src/features/space/chat/internal/chat-constants";
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
-
-const MAX_CONTENT_LENGTH = 500;
 
 function sanitizeContent(raw: string): string {
   const trimmed = raw.trim().slice(0, MAX_CONTENT_LENGTH);
@@ -44,7 +46,7 @@ export function handleParty(io: IO, socket: TypedSocket) {
     io.to(roomKey).emit("party:updated", { zoneId, members });
 
     const spacePlayers = spacePlayersMap.get(spaceId);
-    const nickname = spacePlayers?.get(userId)?.nickname ?? "Unknown";
+    const nickname = spacePlayers?.get(userId)?.nickname ?? DEFAULT_NICKNAME;
     console.log(`[Party] ${nickname} joined party ${zoneId}`);
   });
 
@@ -63,7 +65,7 @@ export function handleParty(io: IO, socket: TypedSocket) {
     io.to(roomKey).emit("party:updated", { zoneId, members });
 
     const spacePlayers = spacePlayersMap.get(spaceId);
-    const nickname = spacePlayers?.get(userId)?.nickname ?? "Unknown";
+    const nickname = spacePlayers?.get(userId)?.nickname ?? DEFAULT_NICKNAME;
     console.log(`[Party] ${nickname} left party ${zoneId}`);
   });
 
@@ -75,7 +77,7 @@ export function handleParty(io: IO, socket: TypedSocket) {
     if (!spaceId || !userId || !partyId) return;
 
     if (socket.data.restriction === "MUTED") {
-      socket.emit("error", { message: "You are muted" });
+      socket.emit("party:error", { code: "MUTED", message: "You are muted" });
       return;
     }
 
@@ -84,7 +86,7 @@ export function handleParty(io: IO, socket: TypedSocket) {
 
     const spacePlayers = spacePlayersMap.get(spaceId);
     const player = spacePlayers?.get(userId);
-    const nickname = player?.nickname ?? "Unknown";
+    const nickname = player?.nickname ?? DEFAULT_NICKNAME;
     const partyName = socket.data.partyName ?? `Party ${partyId}`;
 
     const roomKey = partyRoomKey(spaceId, partyId);

@@ -4,15 +4,17 @@ import type {
   ServerToClientEvents,
 } from "../../src/features/space/socket/internal/types";
 import { spacePlayersMap } from "./room";
+import {
+  MAX_CONTENT_LENGTH,
+  RATE_LIMIT_MS,
+  DEFAULT_NICKNAME,
+} from "../../src/features/space/chat/internal/chat-constants";
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
-const MAX_CONTENT_LENGTH = 500;
-
 // Rate limiting: userId → last message timestamp
 const rateLimitMap = new Map<string, number>();
-const RATE_LIMIT_MS = 500;
 
 // In-memory reaction store: messageId → reactions[]
 const messageReactionsMap = new Map<
@@ -69,7 +71,7 @@ export function handleChat(io: IO, socket: TypedSocket) {
     const userId = socket.data.userId;
     if (!spaceId || !userId) return;
     if (isMuted(socket)) {
-      socket.emit("error", { message: "You are muted" });
+      socket.emit("chat:error", { code: "MUTED", message: "You are muted" });
       return;
     }
     if (!checkRateLimit(userId)) return;
@@ -79,14 +81,14 @@ export function handleChat(io: IO, socket: TypedSocket) {
 
     const spacePlayers = spacePlayersMap.get(spaceId);
     const player = spacePlayers?.get(userId);
-    const nickname = player?.nickname ?? "Unknown";
+    const nickname = player?.nickname ?? DEFAULT_NICKNAME;
 
     const tempId = `srv-${Date.now()}-${++tempIdCounter}`;
     const timestamp = new Date().toISOString();
 
     // party 타입은 chat:send가 아닌 party:message 전용 핸들러 사용
     if (type === "party") {
-      socket.emit("error", { message: "Use party:message for party chat" });
+      socket.emit("chat:error", { code: "INVALID_TYPE", message: "Use party:message for party chat" });
       return;
     }
 
@@ -120,7 +122,7 @@ export function handleChat(io: IO, socket: TypedSocket) {
     const userId = socket.data.userId;
     if (!spaceId || !userId) return;
     if (isMuted(socket)) {
-      socket.emit("error", { message: "You are muted" });
+      socket.emit("whisper:error", { code: "MUTED", message: "You are muted" });
       return;
     }
     if (!checkRateLimit(userId)) return;
@@ -130,14 +132,14 @@ export function handleChat(io: IO, socket: TypedSocket) {
 
     const spacePlayers = spacePlayersMap.get(spaceId);
     const player = spacePlayers?.get(userId);
-    const senderNickname = player?.nickname ?? "Unknown";
+    const senderNickname = player?.nickname ?? DEFAULT_NICKNAME;
 
     const timestamp = new Date().toISOString();
 
     // 타겟 소켓 찾기
     const targetSockets = findSocketsByNickname(io, spaceId, targetNickname);
     if (targetSockets.length === 0) {
-      socket.emit("error", { message: `User "${targetNickname}" not found` });
+      socket.emit("whisper:error", { code: "TARGET_NOT_FOUND", message: `User "${targetNickname}" not found` });
       return;
     }
 
@@ -169,7 +171,7 @@ export function handleChat(io: IO, socket: TypedSocket) {
 
     const spacePlayers = spacePlayersMap.get(spaceId);
     const player = spacePlayers?.get(userId);
-    const userNickname = player?.nickname ?? "Unknown";
+    const userNickname = player?.nickname ?? DEFAULT_NICKNAME;
 
     let reactions = messageReactionsMap.get(messageId) || [];
     const existing = reactions.findIndex((r) => r.userId === userId && r.type === reactionType);
@@ -194,7 +196,7 @@ export function handleChat(io: IO, socket: TypedSocket) {
     const userId = socket.data.userId;
     if (!spaceId || !userId) return;
     if (!isAdmin(socket)) {
-      socket.emit("error", { message: "Insufficient permissions" });
+      socket.emit("admin:error", { code: "FORBIDDEN", message: "Insufficient permissions" });
       return;
     }
 
@@ -216,7 +218,7 @@ export function handleChat(io: IO, socket: TypedSocket) {
   socket.on("admin:mute", ({ targetNickname, duration }) => {
     const spaceId = socket.data.spaceId;
     if (!spaceId || !isAdmin(socket)) {
-      socket.emit("error", { message: "Insufficient permissions" });
+      socket.emit("admin:error", { code: "FORBIDDEN", message: "Insufficient permissions" });
       return;
     }
 
@@ -241,7 +243,7 @@ export function handleChat(io: IO, socket: TypedSocket) {
   socket.on("admin:unmute", ({ targetNickname }) => {
     const spaceId = socket.data.spaceId;
     if (!spaceId || !isAdmin(socket)) {
-      socket.emit("error", { message: "Insufficient permissions" });
+      socket.emit("admin:error", { code: "FORBIDDEN", message: "Insufficient permissions" });
       return;
     }
 
@@ -265,7 +267,7 @@ export function handleChat(io: IO, socket: TypedSocket) {
   socket.on("admin:kick", ({ targetNickname }) => {
     const spaceId = socket.data.spaceId;
     if (!spaceId || !isAdmin(socket)) {
-      socket.emit("error", { message: "Insufficient permissions" });
+      socket.emit("admin:error", { code: "FORBIDDEN", message: "Insufficient permissions" });
       return;
     }
 
@@ -292,7 +294,7 @@ export function handleChat(io: IO, socket: TypedSocket) {
   socket.on("admin:announce", ({ content }) => {
     const spaceId = socket.data.spaceId;
     if (!spaceId || !isAdmin(socket)) {
-      socket.emit("error", { message: "Insufficient permissions" });
+      socket.emit("admin:error", { code: "FORBIDDEN", message: "Insufficient permissions" });
       return;
     }
 

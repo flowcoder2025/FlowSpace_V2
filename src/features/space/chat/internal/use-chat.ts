@@ -6,8 +6,8 @@ import { eventBridge, GameEvents } from "@/features/space/game";
 import type { ChatMessage, ChatTab, ReplyTo } from "./chat-types";
 import { parseInput } from "./chat-parser";
 import { useChatStorage } from "./use-chat-storage";
-
-const MAX_MESSAGES = 200;
+import { MAX_MESSAGES } from "./chat-constants";
+import { generateHelpText } from "./command-hints";
 
 interface UseChatOptions {
   /** socket sendChat 함수 */
@@ -28,6 +28,8 @@ interface UseChatOptions {
   role?: "OWNER" | "STAFF" | "PARTICIPANT";
   /** 현재 파티 ID */
   currentPartyId?: string;
+  /** 에디터 명령어 콜백 */
+  onEditorCommand?: (command: string, params: Record<string, string>) => void;
 }
 
 interface UseChatReturn {
@@ -56,6 +58,7 @@ export function useChat({
   userId,
   nickname,
   role,
+  onEditorCommand,
 }: UseChatOptions): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatFocused, setChatFocusedState] = useState(false);
@@ -130,14 +133,38 @@ export function useChat({
 
       switch (parsed.type) {
         case "admin": {
-          if (!sendAdminCommand || !parsed.adminCommand) break;
+          if (!parsed.adminCommand) break;
+
+          // help → 로컬 시스템 메시지
+          if (parsed.adminCommand === "help") {
+            const helpText = generateHelpText(isAdmin);
+            addMessage({
+              id: `sys-${++messageIdCounter}`,
+              userId: "system",
+              nickname: "System",
+              content: helpText,
+              type: "system",
+              timestamp: new Date().toISOString(),
+            });
+            break;
+          }
+
+          if (!sendAdminCommand) break;
+
           if (parsed.adminCommand === "announce") {
             sendAdminCommand("admin:announce", { content: parsed.content });
+          } else if (parsed.adminCommand === "proximity") {
+            sendAdminCommand("admin:proximity", { range: parsed.content });
           } else if (parsed.targetNickname) {
             sendAdminCommand(`admin:${parsed.adminCommand}`, {
               targetNickname: parsed.targetNickname,
             });
           }
+          break;
+        }
+
+        case "editor_command": {
+          onEditorCommand?.(parsed.content, parsed.editorParams ?? {});
           break;
         }
 
@@ -175,7 +202,7 @@ export function useChat({
         }
       }
     },
-    [sendChat, sendWhisper, sendAdminCommand, userId, nickname, role, addMessage, replyTo]
+    [sendChat, sendWhisper, sendAdminCommand, userId, nickname, role, addMessage, replyTo, onEditorCommand]
   );
 
   /** 리액션 토글 */

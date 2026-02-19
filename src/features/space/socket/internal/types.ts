@@ -202,5 +202,15 @@ export interface ServerToClientEvents {
     id: string;
   }) => void;
 
+  // Error events (세분화)
+  "chat:error": (data: { code: string; message: string }) => void;
+  "whisper:error": (data: { code: string; message: string }) => void;
+  "party:error": (data: { code: string; message: string }) => void;
+  "admin:error": (data: { code: string; message: string }) => void;
+
+  // Whisper optimistic update support
+  "whisper:messageIdUpdate": (data: { tempId: string; realId: string }) => void;
+  "whisper:messageFailed": (data: { tempId: string; error: string }) => void;
+
   error: (data: { message: string }) => void;
 }

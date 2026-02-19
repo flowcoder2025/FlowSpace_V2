@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import type { ChatMessage } from "./chat-types";
-
-const STORAGE_PREFIX = "flowspace-chat-";
-const MAX_CACHED_MESSAGES = 200;
-const DEBOUNCE_MS = 500;
-const EXPIRY_DAYS = 7;
+import {
+  STORAGE_PREFIX,
+  MAX_MESSAGES,
+  DEBOUNCE_MS,
+  CACHE_EXPIRY_DAYS,
+} from "./chat-constants";
 
 interface UseChatStorageOptions {
   spaceId: string;
@@ -37,7 +38,7 @@ export function useChatStorage({ spaceId, messages }: UseChatStorageOptions): Us
         const filtered = messages
           .filter((m) => !m.tempId?.startsWith("msg-") || m.id !== m.tempId)
           .filter((m) => !m.failed)
-          .slice(-MAX_CACHED_MESSAGES);
+          .slice(-MAX_MESSAGES);
 
         const data = {
           messages: filtered,
@@ -74,7 +75,7 @@ export function useChatStorage({ spaceId, messages }: UseChatStorageOptions): Us
       const now = new Date();
       const diffDays = (now.getTime() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
 
-      if (diffDays > EXPIRY_DAYS) {
+      if (diffDays > CACHE_EXPIRY_DAYS) {
         localStorage.removeItem(storageKey);
         return [];
       }
@@ -122,7 +123,7 @@ function cleanupExpiredCaches() {
         const data = JSON.parse(raw) as { savedAt: string };
         const savedDate = new Date(data.savedAt);
         const diffDays = (now.getTime() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
-        if (diffDays > EXPIRY_DAYS) {
+        if (diffDays > CACHE_EXPIRY_DAYS) {
           keysToRemove.push(key);
         }
       } catch {

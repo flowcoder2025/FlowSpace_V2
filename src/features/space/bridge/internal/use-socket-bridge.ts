@@ -49,6 +49,7 @@ interface UseSocketBridgeOptions {
 
 interface UseSocketBridgeReturn {
   isConnected: boolean;
+  socketError: string | null;
   players: PlayerData[];
   sendChat: (content: string, type: "group" | "whisper" | "party", targetId?: string) => void;
   sendWhisper: (targetNickname: string, content: string) => void;
@@ -74,7 +75,7 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
   } = options;
 
   const {
-    isConnected, players, sendMovement, sendChat,
+    isConnected, socketError, players, sendMovement, sendChat,
     sendWhisper, sendReactionToggle, sendAdminCommand,
     joinParty, leaveParty, sendPartyMessage,
     sendEditorTileUpdate, sendEditorObjectPlace,
@@ -153,7 +154,7 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
   }, [players]);
 
   return {
-    isConnected, players, sendChat,
+    isConnected, socketError, players, sendChat,
     sendWhisper, sendReactionToggle, sendAdminCommand,
     joinParty, leaveParty, sendPartyMessage,
     sendEditorTileUpdate, sendEditorObjectPlace,

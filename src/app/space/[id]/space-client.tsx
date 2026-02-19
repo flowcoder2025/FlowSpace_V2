@@ -267,7 +267,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
   );
 
   const {
-    isConnected, players, sendChat, sendWhisper,
+    isConnected, socketError, players, sendChat, sendWhisper,
     sendReactionToggle, sendAdminCommand,
   } = useSocketBridge({
     spaceId: space.id,
@@ -380,6 +380,8 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
             replyTo={replyTo}
             currentUserId={user.id}
             role={user.role}
+            players={players}
+            socketError={socketError}
           />
 
           {/* Editor Sidebar */}

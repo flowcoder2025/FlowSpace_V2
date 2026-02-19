@@ -9,6 +9,7 @@ import type {
   MovementData,
 } from "./types";
 import { getSocketClient, disconnectSocket } from "./socket-client";
+import { MOVE_THROTTLE_MS, DEFAULT_NICKNAME } from "@/features/space/chat/internal/chat-constants";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -74,6 +75,11 @@ interface EditorObjectDeletedData {
   id: string;
 }
 
+interface SocketErrorData {
+  code: string;
+  message: string;
+}
+
 interface UseSocketOptions {
   spaceId: string;
   userId: string;
@@ -95,10 +101,12 @@ interface UseSocketOptions {
   onEditorObjectPlaced?: (data: EditorObjectPlacedData) => void;
   onEditorObjectMoved?: (data: EditorObjectMovedData) => void;
   onEditorObjectDeleted?: (data: EditorObjectDeletedData) => void;
+  onSocketError?: (data: SocketErrorData) => void;
 }
 
 interface UseSocketReturn {
   isConnected: boolean;
+  socketError: string | null;
   players: PlayerData[];
   sendMovement: (data: MovementData) => void;
   sendChat: (content: string, type: "group" | "whisper" | "party", targetId?: string, replyTo?: { id: string; senderNickname: string; content: string }) => void;
@@ -113,8 +121,6 @@ interface UseSocketReturn {
   sendEditorObjectMove: (data: { id: string; positionX: number; positionY: number }) => void;
   sendEditorObjectDelete: (data: { id: string }) => void;
 }
-
-const MOVE_THROTTLE_MS = 100;
 
 export function useSocket({
   spaceId,
@@ -137,8 +143,10 @@ export function useSocket({
   onEditorObjectPlaced,
   onEditorObjectMoved,
   onEditorObjectDeleted,
+  onSocketError,
 }: UseSocketOptions): UseSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
+  const [socketError, setSocketError] = useState<string | null>(null);
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const socketRef = useRef<TypedSocket | null>(null);
   const lastMoveRef = useRef(0);
@@ -161,6 +169,7 @@ export function useSocket({
   const onEditorObjectPlacedRef = useRef(onEditorObjectPlaced);
   const onEditorObjectMovedRef = useRef(onEditorObjectMoved);
   const onEditorObjectDeletedRef = useRef(onEditorObjectDeleted);
+  const onSocketErrorRef = useRef(onSocketError);
 
   useEffect(() => {
     onChatMessageRef.current = onChatMessage;
@@ -179,11 +188,13 @@ export function useSocket({
     onEditorObjectPlacedRef.current = onEditorObjectPlaced;
     onEditorObjectMovedRef.current = onEditorObjectMoved;
     onEditorObjectDeletedRef.current = onEditorObjectDeleted;
+    onSocketErrorRef.current = onSocketError;
   }, [
     onChatMessage, onWhisperReceive, onWhisperSent, onMessageIdUpdate,
     onMessageFailed, onMessageDeleted, onReactionUpdated, onPartyMessage,
     onMemberMuted, onMemberUnmuted, onMemberKicked, onAnnouncement,
     onEditorTileUpdated, onEditorObjectPlaced, onEditorObjectMoved, onEditorObjectDeleted,
+    onSocketError,
   ]);
 
   useEffect(() => {
@@ -202,6 +213,7 @@ export function useSocket({
 
         sock.on("connect", () => {
           setIsConnected(true);
+          setSocketError(null);
           sock.emit("join:space", { spaceId, userId, nickname, avatar });
         });
 
@@ -209,6 +221,30 @@ export function useSocket({
           setIsConnected(false);
         });
 
+        // ── 재연결 모니터링 ──
+        sock.io.on("reconnect_attempt", (attempt) => {
+          console.log(`[Socket] Reconnect attempt #${attempt}`);
+          setSocketError(`재연결 시도 중... (#${attempt})`);
+        });
+
+        sock.io.on("reconnect", () => {
+          console.log("[Socket] Reconnected successfully");
+          setSocketError(null);
+          setIsConnected(true);
+          // 재연결 시 자동 join:space 재발송
+          sock.emit("join:space", { spaceId, userId, nickname, avatar });
+        });
+
+        sock.io.on("reconnect_error", (err) => {
+          console.error("[Socket] Reconnect error:", err.message);
+        });
+
+        sock.io.on("reconnect_failed", () => {
+          console.error("[Socket] Reconnect failed after all attempts");
+          setSocketError("서버 연결에 실패했습니다. 페이지를 새로고침해주세요.");
+        });
+
+        // ── 플레이어 이벤트 ──
         sock.on("players:list", ({ players: list }) => {
           playersMapRef.current.clear();
           for (const p of list) {
@@ -238,7 +274,7 @@ export function useSocket({
           } else if (movedId !== userId) {
             playersMapRef.current.set(movedId, {
               userId: movedId,
-              nickname: "Unknown",
+              nickname: DEFAULT_NICKNAME,
               avatar: "default",
               position: { x, y },
             });
@@ -246,7 +282,7 @@ export function useSocket({
           syncPlayers();
         });
 
-        // Chat events
+        // ── Chat events ──
         sock.on("chat:message", (data) => {
           onChatMessageRef.current?.(data);
         });
@@ -263,7 +299,7 @@ export function useSocket({
           onMessageDeletedRef.current?.(data);
         });
 
-        // Whisper events
+        // ── Whisper events ──
         sock.on("whisper:receive", (data) => {
           onWhisperReceiveRef.current?.(data);
         });
@@ -272,17 +308,17 @@ export function useSocket({
           onWhisperSentRef.current?.(data);
         });
 
-        // Party events
+        // ── Party events ──
         sock.on("party:message", (data) => {
           onPartyMessageRef.current?.({ ...data, type: "party" });
         });
 
-        // Reaction events
+        // ── Reaction events ──
         sock.on("reaction:updated", (data) => {
           onReactionUpdatedRef.current?.(data);
         });
 
-        // Admin events
+        // ── Admin events ──
         sock.on("member:muted", (data) => {
           onMemberMutedRef.current?.(data);
         });
@@ -299,7 +335,21 @@ export function useSocket({
           onAnnouncementRef.current?.(data);
         });
 
-        // Editor events
+        // ── Error events (세분화) ──
+        sock.on("chat:error", (data) => {
+          onSocketErrorRef.current?.(data);
+        });
+        sock.on("whisper:error", (data) => {
+          onSocketErrorRef.current?.(data);
+        });
+        sock.on("party:error", (data) => {
+          onSocketErrorRef.current?.(data);
+        });
+        sock.on("admin:error", (data) => {
+          onSocketErrorRef.current?.(data);
+        });
+
+        // ── Editor events ──
         sock.on("editor:tile-updated", (data) => {
           onEditorTileUpdatedRef.current?.(data);
         });
@@ -322,13 +372,41 @@ export function useSocket({
         }
       } catch (err) {
         console.error("[Socket] Connection failed:", err);
+        setSocketError("소켓 연결에 실패했습니다.");
       }
     }
 
     connect();
 
+    // ── 브라우저 가시성 처리 ──
+    function handleBeforeUnload() {
+      socketRef.current?.emit("leave:space", { spaceId });
+      disconnectSocket();
+    }
+
+    function handlePageHide() {
+      // 모바일 Safari 대응
+      socketRef.current?.emit("leave:space", { spaceId });
+      disconnectSocket();
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        console.log("[Socket] Page hidden — relying on server ping timeout");
+      } else {
+        console.log("[Socket] Page visible");
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       mounted = false;
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       socketRef.current?.emit("leave:space", { spaceId });
       disconnectSocket();
       setIsConnected(false);
@@ -431,6 +509,7 @@ export function useSocket({
 
   return {
     isConnected,
+    socketError,
     players,
     sendMovement,
     sendChat,
