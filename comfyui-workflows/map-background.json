@@ -1,0 +1,75 @@
+{
+  "_meta": {
+    "name": "Map Background Generator",
+    "description": "텍스트 프롬프트에서 맵 배경 이미지를 생성합니다",
+    "version": "1.0.0",
+    "assetType": "map",
+    "outputFormat": {
+      "width": 1024,
+      "height": 768
+    },
+    "parameters": {
+      "prompt": { "nodeId": "6", "field": "text", "type": "string" },
+      "seed": { "nodeId": "3", "field": "seed", "type": "number" },
+      "width": { "nodeId": "5", "field": "width", "type": "number", "default": 1024 },
+      "height": { "nodeId": "5", "field": "height", "type": "number", "default": 768 }
+    }
+  },
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 30,
+      "cfg": 7.5,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "normal",
+      "denoise": 1.0,
+      "model": ["4", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    }
+  },
+  "4": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sd_xl_base_1.0.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 768,
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "top-down view map background, pixel art style, office interior, clean and modern, game environment, seamless edges",
+      "clip": ["4", 1]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "blurry, low quality, watermark, text, realistic, photo, perspective view, isometric",
+      "clip": ["4", 1]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["4", 2]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "map_background",
+      "images": ["8", 0]
+    }
+  }
+}

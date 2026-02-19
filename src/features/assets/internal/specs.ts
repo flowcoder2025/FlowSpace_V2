@@ -1,0 +1,61 @@
+import type { AssetSpec, AssetType } from "./types";
+
+/** 에셋 유형별 규격 정의 */
+export const ASSET_SPECS: Record<AssetType, AssetSpec> = {
+  character: {
+    type: "character",
+    width: 512,
+    height: 256,
+    frameWidth: 64,
+    frameHeight: 64,
+    columns: 8,
+    rows: 4,
+    requiresTransparency: true,
+  },
+  tileset: {
+    type: "tileset",
+    width: 512,
+    height: 448,
+    frameWidth: 32,
+    frameHeight: 32,
+    columns: 16,
+    rows: 14,
+    requiresTransparency: false,
+  },
+  object: {
+    type: "object",
+    width: 128,
+    height: 128,
+    requiresTransparency: true,
+  },
+  map: {
+    type: "map",
+    width: 1024,
+    height: 768,
+    requiresTransparency: false,
+  },
+};
+
+/** 에셋 저장 경로 */
+export const ASSET_STORAGE_PATHS: Record<AssetType, string> = {
+  character: "public/assets/generated/characters",
+  tileset: "public/assets/generated/tilesets",
+  object: "public/assets/generated/objects",
+  map: "public/assets/generated/maps",
+};
+
+export const THUMBNAIL_PATH = "public/assets/generated/thumbnails";
+
+/** 에셋 파일명 생성 */
+export function generateAssetFilename(
+  type: AssetType,
+  name: string,
+  variant?: string
+): string {
+  const sanitized = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+  const suffix = variant || Date.now().toString(36);
+  return `${type}_${sanitized}_${suffix}.png`;
+}

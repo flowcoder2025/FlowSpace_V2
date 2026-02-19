@@ -1,0 +1,426 @@
+// FlowSpace - Prisma Schema
+// flow_metaverse 기반 + ComfyUI Asset Pipeline 확장
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// 1. User (NextAuth)
+// ============================================
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+
+  isSuperAdmin Boolean @default(false)
+
+  avatarConfig Json?
+
+  // Relations
+  accounts         Account[]
+  sessions         Session[]
+  spaces           Space[]
+  spaceEventLogs   SpaceEventLog[]
+  spaceMemberships SpaceMember[]
+  generatedAssets  GeneratedAsset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// 2. Account (NextAuth OAuth)
+// ============================================
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// ============================================
+// 3. Session (NextAuth)
+// ============================================
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================
+// 4. VerificationToken (NextAuth)
+// ============================================
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// 5. Template (맵 템플릿)
+// ============================================
+model Template {
+  id          String      @id @default(cuid())
+  key         TemplateKey @unique
+  name        String
+  description String?
+  version     String      @default("1.0.0")
+  assetsPath  String
+  previewUrl  String?
+  isActive    Boolean     @default(true)
+
+  spaces Space[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TemplateKey {
+  OFFICE
+  CLASSROOM
+  LOUNGE
+}
+
+// ============================================
+// 6. Space (가상 공간)
+// ============================================
+model Space {
+  id          String  @id @default(cuid())
+  name        String
+  description String? @db.Text
+  ownerId     String
+  templateId  String
+
+  accessType   SpaceAccessType @default(PUBLIC)
+  accessSecret String?
+  inviteCode   String          @unique @default(cuid())
+
+  logoUrl        String?
+  primaryColor   String?
+  loadingMessage String?
+
+  status   SpaceStatus @default(ACTIVE)
+  maxUsers Int         @default(50)
+
+  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  template Template @relation(fields: [templateId], references: [id])
+
+  eventLogs     SpaceEventLog[]
+  guestSessions GuestSession[]
+  members       SpaceMember[]
+  chatMessages  ChatMessage[]
+  mapObjects    MapObject[]
+  partyZones    PartyZone[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([ownerId])
+  @@index([inviteCode])
+  @@index([status])
+}
+
+enum SpaceAccessType {
+  PUBLIC
+  PRIVATE
+  PASSWORD
+}
+
+enum SpaceStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+// ============================================
+// 7. GuestSession (게스트 세션)
+// ============================================
+model GuestSession {
+  id       String @id @default(cuid())
+  spaceId  String
+  nickname String
+  avatar   String @default("default")
+
+  sessionToken String   @unique @default(cuid())
+  expiresAt    DateTime
+
+  space            Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  eventLogs        SpaceEventLog[]
+  spaceMemberships SpaceMember[]
+
+  createdAt DateTime @default(now())
+
+  @@index([spaceId])
+  @@index([sessionToken])
+  @@index([spaceId, createdAt])
+  @@index([spaceId, nickname])
+}
+
+// ============================================
+// 8. SpaceEventLog (이벤트 로그)
+// ============================================
+model SpaceEventLog {
+  id             String         @id @default(cuid())
+  spaceId        String
+  userId         String?
+  guestSessionId String?
+  eventType      SpaceEventType
+  payload        Json?
+
+  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  guestSession GuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([spaceId])
+  @@index([userId])
+  @@index([guestSessionId])
+  @@index([eventType])
+  @@index([createdAt(sort: Desc)])
+  @@index([spaceId, eventType, createdAt])
+}
+
+enum SpaceEventType {
+  ENTER
+  EXIT
+  INTERACTION
+  CHAT
+}
+
+// ============================================
+// 9. SpaceMember (공간 멤버십)
+// ============================================
+
+enum SpaceRole {
+  OWNER
+  STAFF
+  PARTICIPANT
+}
+
+enum ChatRestriction {
+  NONE
+  MUTED
+  BANNED
+}
+
+enum SenderType {
+  USER
+  GUEST
+}
+
+enum MessageType {
+  MESSAGE
+  WHISPER
+  PARTY
+  SYSTEM
+  ANNOUNCEMENT
+}
+
+model SpaceMember {
+  id             String  @id @default(cuid())
+  spaceId        String
+  userId         String?
+  guestSessionId String?
+
+  displayName      String?
+  role             SpaceRole       @default(PARTICIPANT)
+  restriction      ChatRestriction @default(NONE)
+  restrictedUntil  DateTime?
+  restrictedBy     String?
+  restrictedReason String?
+
+  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestSession GuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([spaceId, userId])
+  @@unique([spaceId, guestSessionId])
+  @@index([spaceId, role])
+  @@index([userId])
+  @@index([guestSessionId])
+}
+
+// ============================================
+// 10. MapObject (맵 오브젝트)
+// ============================================
+model MapObject {
+  id      String @id @default(cuid())
+  spaceId String
+  assetId String
+
+  positionX Int
+  positionY Int
+  rotation  Int @default(0)
+
+  linkedObjectId String?    @unique
+  linkedObject   MapObject? @relation("ObjectPair", fields: [linkedObjectId], references: [id], onDelete: SetNull)
+  linkedBy       MapObject? @relation("ObjectPair")
+
+  customData Json?
+
+  placedBy     String
+  placedByType SenderType @default(USER)
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId])
+  @@index([assetId])
+  @@index([linkedObjectId])
+}
+
+// ============================================
+// 11. ChatMessage (채팅 메시지)
+// ============================================
+model ChatMessage {
+  id         String     @id @default(cuid())
+  spaceId    String
+  senderId   String?
+  senderType SenderType
+  senderName String
+
+  content  String      @db.Text
+  type     MessageType @default(MESSAGE)
+  targetId String?
+
+  isDeleted Boolean   @default(false)
+  deletedBy String?
+  deletedAt DateTime?
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([spaceId, createdAt])
+  @@index([senderId])
+  @@index([type])
+}
+
+// ============================================
+// 12. PartyZone (파티 존)
+// ============================================
+model PartyZone {
+  id      String @id @default(cuid())
+  spaceId String
+  name    String
+
+  boundsX1 Int
+  boundsY1 Int
+  boundsX2 Int
+  boundsY2 Int
+
+  createdBy     String
+  createdByType SenderType @default(USER)
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId])
+}
+
+// ============================================
+// 13. GeneratedAsset (AI 생성 에셋) - 신규
+// ============================================
+model GeneratedAsset {
+  id     String @id @default(cuid())
+  userId String
+
+  type   AssetType
+  name   String
+  prompt String    @db.Text
+
+  workflow String
+  status   AssetStatus @default(PENDING)
+
+  metadata Json?
+
+  filePath      String?
+  thumbnailPath String?
+  fileSize      Int?
+
+  comfyuiJobId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+enum AssetType {
+  CHARACTER
+  TILESET
+  OBJECT
+  MAP
+}
+
+enum AssetStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// 14. AssetWorkflow (워크플로우 템플릿) - 신규
+// ============================================
+model AssetWorkflow {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+
+  template  Json
+  version   String    @default("1.0.0")
+  assetType AssetType
+  isActive  Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assetType])
+  @@index([isActive])
+}
