@@ -13,6 +13,7 @@ const SIDEBAR_ITEMS = [
   { label: "Members", segment: "/members" },
   { label: "Messages", segment: "/messages" },
   { label: "Logs", segment: "/logs" },
+  { label: "Media", segment: "/media" },
   { label: "Analytics", segment: "/analytics" },
   { label: "Settings", segment: "/settings" },
 ] as const;
