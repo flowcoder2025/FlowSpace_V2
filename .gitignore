@@ -48,3 +48,4 @@ public/assets/generated/
 # IDE
 .vscode/
 .idea/
+bin/

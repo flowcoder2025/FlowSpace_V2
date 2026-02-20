@@ -34,10 +34,11 @@ export function useChatStorage({ spaceId, messages }: UseChatStorageOptions): Us
 
     debounceTimerRef.current = setTimeout(() => {
       try {
-        // tempId 패턴 제외
+        // tempId 패턴·실패·로컬 시스템 메시지 제외
         const filtered = messages
           .filter((m) => !m.tempId?.startsWith("msg-") || m.id !== m.tempId)
           .filter((m) => !m.failed)
+          .filter((m) => !(m.type === "system" && m.userId === "system"))
           .slice(-MAX_MESSAGES);
 
         const data = {
@@ -80,7 +81,17 @@ export function useChatStorage({ spaceId, messages }: UseChatStorageOptions): Us
         return [];
       }
 
-      return data.messages || [];
+      const msgs = data.messages || [];
+      // 중복 id 제거 (마지막 메시지 유지)
+      const seen = new Set<string>();
+      const deduped: ChatMessage[] = [];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (!seen.has(msgs[i].id)) {
+          seen.add(msgs[i].id);
+          deduped.unshift(msgs[i]);
+        }
+      }
+      return deduped;
     } catch {
       return [];
     }

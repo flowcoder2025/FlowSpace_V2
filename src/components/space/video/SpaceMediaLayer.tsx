@@ -13,11 +13,19 @@ import { ParticipantPanel, type ViewMode } from "./ParticipantPanel";
 import { ScreenShareOverlay } from "./ScreenShare";
 import { cn } from "@/lib/utils";
 
+interface PlayerInfo {
+  userId: string;
+  nickname: string;
+}
+
 interface SpaceMediaLayerProps {
   spaceName: string;
   spotlightUsers: Set<string>;
   isRecording: boolean;
   recorderNickname?: string;
+  players?: PlayerInfo[];
+  currentUserId?: string;
+  currentNickname?: string;
 }
 
 export function SpaceMediaLayer({
@@ -25,6 +33,9 @@ export function SpaceMediaLayer({
   spotlightUsers,
   isRecording,
   recorderNickname,
+  players = [],
+  currentUserId,
+  currentNickname,
 }: SpaceMediaLayerProps) {
   const {
     participantTracks,
@@ -72,13 +83,10 @@ export function SpaceMediaLayer({
     }
   }, [activeScreenShare, dismissScreenShare]);
 
-  // Don't render if LiveKit not available and no participants
-  if (!isAvailable && participantTracks.size === 0) return null;
-
   return (
     <>
       {/* Status banners (stacked vertically to avoid overlap) */}
-      {(isRecording || mediaError) && (
+      {(isRecording || mediaError || !isAvailable) && (
         <div className="pointer-events-none absolute left-1/2 top-14 z-30 flex -translate-x-1/2 flex-col items-center gap-2">
           {isRecording && (
             <div className="flex items-center gap-2 rounded-full bg-red-600/90 px-4 py-1.5 text-white shadow-lg">
@@ -93,6 +101,11 @@ export function SpaceMediaLayer({
           {mediaError && (
             <div className="pointer-events-auto rounded-lg bg-red-900/90 px-4 py-2 text-sm text-white shadow-lg">
               {mediaError.message}
+            </div>
+          )}
+          {!isAvailable && !mediaError && (
+            <div className="rounded-lg bg-gray-800/90 px-4 py-2 text-sm text-gray-300 shadow-lg">
+              음성/영상 서버 미연결
             </div>
           )}
         </div>
@@ -110,7 +123,7 @@ export function SpaceMediaLayer({
       )}
 
       {/* Participant panel (sidebar) */}
-      {viewMode !== "hidden" && participantTracks.size > 0 && (
+      {viewMode !== "hidden" && (participantTracks.size > 0 || players.length > 0) && (
         <div
           className={cn(
             "absolute right-0 top-0 z-20",
@@ -122,6 +135,9 @@ export function SpaceMediaLayer({
             localParticipantId={localParticipantId}
             spaceName={spaceName}
             viewMode={viewMode}
+            players={players}
+            currentUserId={currentUserId}
+            currentNickname={currentNickname}
             onViewModeChange={setViewMode}
             spotlightUsers={spotlightUsers}
           />
@@ -129,22 +145,29 @@ export function SpaceMediaLayer({
       )}
 
       {/* Media controls (bottom center) */}
-      {isAvailable && (
-        <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
-          <div className="flex items-center gap-2 rounded-full bg-gray-900/90 px-4 py-2 shadow-lg backdrop-blur-sm">
+      <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
+        <div className={cn(
+          "flex items-center gap-2 rounded-full bg-gray-900/90 px-4 py-2 shadow-lg backdrop-blur-sm",
+          !isAvailable && "opacity-60"
+        )}>
             {/* Microphone toggle */}
             <button
               onClick={toggleMicrophone}
+              disabled={!isAvailable}
               className={cn(
                 "rounded-full p-2.5 transition-colors",
-                mediaState.isMicrophoneEnabled
-                  ? "bg-gray-700 text-white hover:bg-gray-600"
-                  : "bg-red-600 text-white hover:bg-red-500"
+                !isAvailable
+                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  : mediaState.isMicrophoneEnabled
+                    ? "bg-gray-700 text-white hover:bg-gray-600"
+                    : "bg-red-600 text-white hover:bg-red-500"
               )}
               title={
-                mediaState.isMicrophoneEnabled
-                  ? "마이크 끄기"
-                  : "마이크 켜기"
+                !isAvailable
+                  ? "서버 미연결"
+                  : mediaState.isMicrophoneEnabled
+                    ? "마이크 끄기"
+                    : "마이크 켜기"
               }
             >
               <svg
@@ -163,16 +186,21 @@ export function SpaceMediaLayer({
             {/* Camera toggle */}
             <button
               onClick={toggleCamera}
+              disabled={!isAvailable}
               className={cn(
                 "rounded-full p-2.5 transition-colors",
-                mediaState.isCameraEnabled
-                  ? "bg-gray-700 text-white hover:bg-gray-600"
-                  : "bg-red-600 text-white hover:bg-red-500"
+                !isAvailable
+                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  : mediaState.isCameraEnabled
+                    ? "bg-gray-700 text-white hover:bg-gray-600"
+                    : "bg-red-600 text-white hover:bg-red-500"
               )}
               title={
-                mediaState.isCameraEnabled
-                  ? "카메라 끄기"
-                  : "카메라 켜기"
+                !isAvailable
+                  ? "서버 미연결"
+                  : mediaState.isCameraEnabled
+                    ? "카메라 끄기"
+                    : "카메라 켜기"
               }
             >
               <svg
@@ -191,16 +219,21 @@ export function SpaceMediaLayer({
             {/* Screen share toggle */}
             <button
               onClick={() => toggleScreenShare()}
+              disabled={!isAvailable}
               className={cn(
                 "rounded-full p-2.5 transition-colors",
-                mediaState.isScreenShareEnabled
-                  ? "bg-blue-600 text-white hover:bg-blue-500"
-                  : "bg-gray-700 text-white hover:bg-gray-600"
+                !isAvailable
+                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  : mediaState.isScreenShareEnabled
+                    ? "bg-blue-600 text-white hover:bg-blue-500"
+                    : "bg-gray-700 text-white hover:bg-gray-600"
               )}
               title={
-                mediaState.isScreenShareEnabled
-                  ? "화면공유 중지"
-                  : "화면공유"
+                !isAvailable
+                  ? "서버 미연결"
+                  : mediaState.isScreenShareEnabled
+                    ? "화면공유 중지"
+                    : "화면공유"
               }
             >
               <svg
@@ -236,7 +269,6 @@ export function SpaceMediaLayer({
             )}
           </div>
         </div>
-      )}
     </>
   );
 }

@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import type { ChatMessage, ChatTab, ReplyTo } from "@/features/space/chat";
 import { filterMessagesByTab } from "@/features/space/chat";
 import type { ChatFontSize } from "@/features/space/chat";
 import { FONT_SIZE_STORAGE_KEY, CHAT_FONT_SIZE_ORDER } from "@/features/space/chat";
 import type { PlayerData } from "@/features/space/socket";
+import { useChatDrag } from "@/features/space/hooks";
 import { ChatTabs } from "./chat/chat-tabs";
 import { ChatMessageList } from "./chat/chat-message-list";
 import { ChatInputArea } from "./chat/chat-input-area";
@@ -24,11 +26,11 @@ interface ChatPanelProps {
   role?: "OWNER" | "STAFF" | "PARTICIPANT";
   currentPartyId?: string;
   currentPartyName?: string;
-  /** SSOT 닉네임 해석용 플레이어 목록 */
   players?: PlayerData[];
-  /** 소켓 에러 메시지 */
   socketError?: string | null;
 }
+
+const REACTIVATION_COOLDOWN = 150;
 
 export default function ChatPanel({
   messages,
@@ -47,9 +49,10 @@ export default function ChatPanel({
   players,
   socketError,
 }: ChatPanelProps) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isActive, setIsActive] = useState(false);
+  const lastDeactivateRef = useRef(0);
+  const { position, size, isDragging, isResizing, handleMoveStart, handleResizeStart } = useChatDrag();
 
-  // 폰트 크기 (localStorage 연동, lazy init)
   const [fontSize, setFontSizeState] = useState<ChatFontSize>(() => {
     try {
       if (typeof window === "undefined") return "medium";
@@ -57,20 +60,47 @@ export default function ChatPanel({
       if (saved && CHAT_FONT_SIZE_ORDER.includes(saved as ChatFontSize)) {
         return saved as ChatFontSize;
       }
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
     return "medium";
   });
 
   const setFontSize = useCallback((size: ChatFontSize) => {
     setFontSizeState(size);
-    try {
-      localStorage.setItem(FONT_SIZE_STORAGE_KEY, size);
-    } catch {
-      // ignore
-    }
+    try { localStorage.setItem(FONT_SIZE_STORAGE_KEY, size); } catch { /* ignore */ }
   }, []);
+
+  const activate = useCallback(() => {
+    if (Date.now() - lastDeactivateRef.current < REACTIVATION_COOLDOWN) return;
+    setIsActive(true);
+    onFocusChange(true);
+  }, [onFocusChange]);
+
+  const deactivate = useCallback(() => {
+    lastDeactivateRef.current = Date.now();
+    setIsActive(false);
+    onFocusChange(false);
+  }, [onFocusChange]);
+
+  // isActive를 ref로 추적 (stale closure 방지)
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+
+  // 전역 Enter 키로 채팅 활성화 (비활성화는 input 내부에서 처리)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+
+      if (e.key === "Enter" && !isActiveRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        activate();
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown, { capture: true });
+  }, [activate]);
 
   const filteredMessages = useMemo(
     () => filterMessagesByTab(messages, activeTab, currentUserId),
@@ -79,21 +109,16 @@ export default function ChatPanel({
 
   const isAdmin = role === "OWNER" || role === "STAFF";
 
-  // playersMap 생성 (SSOT)
   const playersMap = useMemo(() => {
     if (!players) return undefined;
     const map = new Map<string, PlayerData>();
-    for (const p of players) {
-      map.set(p.userId, p);
-    }
+    for (const p of players) map.set(p.userId, p);
     return map;
   }, [players]);
 
-  // 귓속말 히스토리 (메시지에서 추출, 최근 우선, 중복 제거)
   const whisperHistory = useMemo(() => {
     const targets: string[] = [];
     const seen = new Set<string>();
-    // 역순으로 탐색하여 최근 귓속말 대상 우선
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
       if (m.type !== "whisper") continue;
@@ -107,26 +132,47 @@ export default function ChatPanel({
     return targets;
   }, [messages, currentUserId]);
 
+  // 헤더(28) + 탭(28, 활성시만) + 입력(36, 활성시만) + 여유
+  const tabsHeight = isActive ? 28 : 0;
+  const inputHeight = isActive ? 36 : 0;
+  const messageAreaHeight = size.height - 28 - tabsHeight - inputHeight;
+
   return (
-    <div className="absolute bottom-4 left-4 z-40 w-96">
-      {/* 소켓 에러 배너 */}
-      {socketError && (
-        <div className="mb-1 rounded bg-red-900/80 px-3 py-1.5 text-xs text-red-200">
-          {socketError}
+    <div
+      style={{
+        position: "fixed",
+        left: position.x,
+        top: position.y,
+        width: size.width,
+        height: size.height,
+        zIndex: 50,
+        willChange: isDragging || isResizing ? "transform, width, height" : "auto",
+      }}
+    >
+      <div className="flex flex-col rounded-lg bg-black/40 backdrop-blur-sm border border-white/10 overflow-hidden h-full">
+        {/* 드래그 가능한 헤더 */}
+        <div
+          onMouseDown={handleMoveStart}
+          className={cn(
+            "h-7 flex items-center justify-between px-3 shrink-0 select-none bg-black/40 border-b border-white/5",
+            isDragging ? "cursor-grabbing" : "cursor-grab"
+          )}
+        >
+          <span className="text-[11px] text-white/70 font-medium">채팅</span>
+          <span className="text-[10px] text-white/40">
+            {isActive ? "Esc로 닫기" : "Enter로 입력"}
+          </span>
         </div>
-      )}
 
-      {/* Toggle button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="mb-1 rounded bg-gray-800/80 px-3 py-1.5 text-sm text-white hover:bg-gray-700/80"
-      >
-        Chat {!isOpen && messages.length > 0 && `(${messages.length})`}
-      </button>
+        {/* 소켓 에러 배너 */}
+        {socketError && (
+          <div className="px-3 py-1 bg-red-900/60 text-[10px] text-red-200 shrink-0">
+            {socketError}
+          </div>
+        )}
 
-      {isOpen && (
-        <div className="flex flex-col rounded bg-gray-800/90 overflow-hidden">
-          {/* Tabs */}
+        {/* Tabs (활성화 시만) */}
+        {isActive && (
           <ChatTabs
             activeTab={activeTab}
             onTabChange={onTabChange}
@@ -136,8 +182,13 @@ export default function ChatPanel({
             fontSize={fontSize}
             onFontSizeChange={setFontSize}
           />
+        )}
 
-          {/* Messages */}
+        {/* Messages */}
+        <div
+          className="flex-1 flex flex-col justify-end min-h-0 overflow-hidden"
+          style={{ height: Math.max(messageAreaHeight, 60) }}
+        >
           <ChatMessageList
             messages={filteredMessages}
             currentUserId={currentUserId}
@@ -150,8 +201,10 @@ export default function ChatPanel({
             playersMap={playersMap}
             fontSize={fontSize}
           />
+        </div>
 
-          {/* Input */}
+        {/* Input (활성화 시만) */}
+        {isActive && (
           <ChatInputArea
             onSend={onSend}
             onFocusChange={onFocusChange}
@@ -161,14 +214,31 @@ export default function ChatPanel({
             currentPartyName={currentPartyName}
             activeTab={activeTab}
             whisperHistory={whisperHistory}
+            autoFocus
+            onEscape={deactivate}
             placeholder={
               currentPartyId
                 ? `파티 메시지 (${currentPartyName || "Party"})...`
                 : "메시지 입력... (/닉네임 = 귓속말)"
             }
           />
-        </div>
-      )}
+        )}
+
+        {/* 리사이즈 핸들 */}
+        <div
+          onMouseDown={handleResizeStart}
+          className={cn(
+            "absolute bottom-0 right-0 w-4 h-4 cursor-se-resize rounded-br-lg",
+            isResizing && "bg-white/20"
+          )}
+          style={{
+            background: isResizing
+              ? "rgba(255,255,255,0.2)"
+              : "linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.15) 50%)",
+          }}
+          title="크기 조절"
+        />
+      </div>
     </div>
   );
 }

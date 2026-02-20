@@ -2,6 +2,7 @@
  * Space Hooks - Public API
  */
 
+export { useChatDrag } from "./internal/useChatDrag";
 export { useAudioSettings } from "./internal/useAudioSettings";
 export { useVideoSettings } from "./internal/useVideoSettings";
 export {

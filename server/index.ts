@@ -1,3 +1,6 @@
+import { config } from "dotenv";
+config({ quiet: true });
+
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { verifySocketToken } from "./middleware/auth";

@@ -10,7 +10,6 @@ import { LiveKitRoomProvider } from "@/features/space/livekit";
 import type { RecordingStatusData, SpotlightData, ProximityChangedData } from "@/features/space/socket";
 import GameCanvas from "@/components/space/game-canvas";
 import LoadingScreen from "@/components/space/loading-screen";
-import PlayerList from "@/components/space/player-list";
 import SpaceHud from "@/components/space/space-hud";
 import ChatPanel from "@/components/space/chat-panel";
 import { EditorToggleButton, EditorSidebar } from "@/components/space/editor";
@@ -32,7 +31,7 @@ interface SpaceClientProps {
   };
 }
 
-let chatMsgId = 0;
+let chatMsgId = Date.now();
 
 export default function SpaceClient({ space, user }: SpaceClientProps) {
   const { isLoading, isSceneReady, error, setSceneReady, setError, reset } = useGameStore();
@@ -438,14 +437,6 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
                 />
               }
             />
-            <PlayerList
-              players={players.map((p) => ({
-                id: p.userId,
-                nickname: p.nickname,
-              }))}
-              currentUserId={user.id}
-              currentNickname={user.nickname}
-            />
             <ChatPanel
               messages={messages}
               activeTab={activeTab}
@@ -468,6 +459,9 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
               spotlightUsers={spotlightUsers}
               isRecording={isRecording}
               recorderNickname={recorderNickname}
+              players={players}
+              currentUserId={user.id}
+              currentNickname={user.nickname}
             />
 
             {/* Editor Sidebar */}

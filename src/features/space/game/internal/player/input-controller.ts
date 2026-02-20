@@ -33,6 +33,29 @@ export class InputController {
   private onChatFocus = (payload: unknown) => {
     const { focused } = payload as { focused: boolean };
     this.chatFocused = focused;
+
+    const kb = this.scene.input.keyboard;
+    if (!kb) return;
+
+    if (focused) {
+      // 채팅 활성화: Phaser 키보드 비활성 + 모든 키 캡처 해제 (preventDefault 방지)
+      kb.enabled = false;
+      kb.clearCaptures();
+      kb.resetKeys();
+    } else {
+      // 채팅 비활성화: Phaser 키보드 활성 + WASD/방향키 캡처 복원
+      kb.enabled = true;
+      kb.addCapture([
+        Phaser.Input.Keyboard.KeyCodes.W,
+        Phaser.Input.Keyboard.KeyCodes.A,
+        Phaser.Input.Keyboard.KeyCodes.S,
+        Phaser.Input.Keyboard.KeyCodes.D,
+        Phaser.Input.Keyboard.KeyCodes.UP,
+        Phaser.Input.Keyboard.KeyCodes.DOWN,
+        Phaser.Input.Keyboard.KeyCodes.LEFT,
+        Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      ]);
+    }
   };
 
   private onEditorEnter = () => { this.editorMode = true; };

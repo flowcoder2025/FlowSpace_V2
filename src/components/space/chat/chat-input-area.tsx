@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from "react";
 import type { ReplyTo, ChatTab } from "@/features/space/chat";
 import { MAX_CONTENT_LENGTH } from "@/features/space/chat";
 
@@ -13,8 +13,11 @@ interface ChatInputAreaProps {
   currentPartyName?: string;
   placeholder?: string;
   activeTab?: ChatTab;
-  /** 귓속말 히스토리 (닉네임 목록) */
   whisperHistory?: string[];
+  /** 마운트 시 자동 포커스 */
+  autoFocus?: boolean;
+  /** Escape 키 콜백 */
+  onEscape?: () => void;
 }
 
 /** 탭별 입력 프롬프트 색상 */
@@ -36,18 +39,35 @@ export function ChatInputArea({
   placeholder = "메시지 입력...",
   activeTab = "all",
   whisperHistory = [],
+  autoFocus = false,
+  onEscape,
 }: ChatInputAreaProps) {
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [whisperIdx, setWhisperIdx] = useState(-1);
 
+  // autoFocus: 마운트 시 입력창 포커스
+  useEffect(() => {
+    if (autoFocus) {
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocus]);
+
+
   const handleSend = useCallback(() => {
     const trimmed = input.trim();
-    if (trimmed.length === 0) return;
+    if (trimmed.length === 0) {
+      // 빈 입력 + Enter → 비활성화
+      onEscape?.();
+      return;
+    }
     onSend(trimmed);
     setInput("");
     setWhisperIdx(-1);
-  }, [input, onSend]);
+    // 전송 후 비활성화 (레거시 패턴)
+    onEscape?.();
+  }, [input, onSend, onEscape]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -59,6 +79,7 @@ export function ChatInputArea({
       if (e.key === "Escape") {
         onCancelReply();
         inputRef.current?.blur();
+        onEscape?.();
         return;
       }
 
@@ -98,16 +119,16 @@ export function ChatInputArea({
     : null;
 
   return (
-    <div className="border-t border-gray-700">
+    <div className="border-t border-white/5">
       {/* 답장 표시 */}
       {replyTo && (
-        <div className="flex items-center justify-between px-2 py-1 bg-gray-700/50 text-xs text-gray-400">
+        <div className="flex items-center justify-between px-2 py-1 bg-primary/10 border-l-2 border-primary/60 text-[11px] text-primary">
           <span className="truncate">
             &#8617; {replyTo.senderNickname}: {replyPreview}
           </span>
           <button
             onClick={onCancelReply}
-            className="ml-1 text-gray-500 hover:text-gray-300 flex-shrink-0"
+            className="ml-1 text-white/40 hover:text-white/80 flex-shrink-0"
           >
             &#x2715;
           </button>
@@ -116,20 +137,19 @@ export function ChatInputArea({
 
       {/* 파티 모드 표시 */}
       {currentPartyId && (
-        <div className="px-2 py-0.5 bg-green-900/30 text-xs text-green-400">
+        <div className="px-2 py-0.5 bg-blue-500/10 text-[10px] text-blue-400">
           &#x1F3E0; {currentPartyName || "Party"} 채팅 중
         </div>
       )}
 
       {/* 입력 영역 */}
-      <div className="flex p-2 gap-2">
+      <div className="px-2 py-1.5">
         <input
           ref={inputRef}
           type="text"
           value={input}
           onChange={(e) => {
             setInput(e.target.value);
-            // / 시작이 아니면 히스토리 인덱스 리셋
             if (!e.target.value.startsWith("/")) {
               setWhisperIdx(-1);
             }
@@ -139,14 +159,8 @@ export function ChatInputArea({
           onBlur={() => onFocusChange(false)}
           placeholder={placeholder}
           maxLength={MAX_CONTENT_LENGTH}
-          className={`flex-1 rounded bg-gray-700 px-2 py-1 text-sm text-white placeholder-gray-500 outline-none focus:ring-1 ${ringColor}`}
+          className="w-full bg-transparent text-[12px] text-white outline-none placeholder:text-white/40"
         />
-        <button
-          onClick={handleSend}
-          className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-500"
-        >
-          전송
-        </button>
       </div>
     </div>
   );

@@ -66,10 +66,9 @@ export function ChatTabs({
   };
 
   return (
-    <div className="flex items-center border-b border-gray-700 px-1 overflow-x-auto">
-      <div className="flex flex-1">
+    <div className="flex items-center border-b border-white/5 px-2 py-1 gap-0.5 overflow-x-auto">
+      <div className="flex flex-1 gap-0.5">
         {TAB_CONFIG.map(({ key, label, emoji }) => {
-          // 파티탭은 파티존에 있을 때만 표시
           if (key === "party" && !currentPartyId) return null;
 
           const unread = key !== "all" ? (unreadCounts[key] || 0) : 0;
@@ -79,16 +78,16 @@ export function ChatTabs({
             <button
               key={key}
               onClick={() => onTabChange(key)}
-              className={`relative px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
+              className={`relative px-2 py-1 text-[10px] rounded whitespace-nowrap transition-colors ${
                 isActive
-                  ? "text-blue-400 border-b-2 border-blue-400"
-                  : "text-gray-400 hover:text-gray-300"
+                  ? "bg-white/15 text-white font-medium"
+                  : "text-white/60 hover:text-white/80"
               }`}
             >
               {emoji && <span className="mr-0.5">{emoji}</span>}
               {label}
               {unread > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                <span className="ml-1 inline-flex items-center justify-center min-w-[14px] h-[14px] text-[8px] font-bold text-white bg-red-500 rounded-full px-0.5">
                   {unread > 9 ? "9+" : unread}
                 </span>
               )}
@@ -103,7 +102,7 @@ export function ChatTabs({
           <button
             onClick={() => cycleFontSize("down")}
             disabled={fontSize === "small"}
-            className="text-[10px] text-gray-400 hover:text-white disabled:text-gray-600 px-1"
+            className="text-[10px] font-medium text-white/60 hover:text-white disabled:text-white/20 px-1"
             title="글자 작게"
           >
             A-
@@ -111,7 +110,7 @@ export function ChatTabs({
           <button
             onClick={() => cycleFontSize("up")}
             disabled={fontSize === "large"}
-            className="text-xs text-gray-400 hover:text-white disabled:text-gray-600 px-1"
+            className="text-[10px] font-medium text-white/60 hover:text-white disabled:text-white/20 px-1"
             title="글자 크게"
           >
             A+

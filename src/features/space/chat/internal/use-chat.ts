@@ -47,7 +47,7 @@ interface UseChatReturn {
   clearCache: () => void;
 }
 
-let messageIdCounter = 0;
+let messageIdCounter = Date.now();
 
 export function useChat({
   sendChat,
@@ -73,7 +73,8 @@ export function useChat({
 
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages((prev) => {
-      // 중복 방지 (tempId 매핑)
+      // 중복 방지 (id 또는 tempId)
+      if (prev.some((m) => m.id === msg.id)) return prev;
       if (msg.tempId) {
         const exists = prev.find((m) => m.tempId === msg.tempId);
         if (exists) return prev;
@@ -245,8 +246,12 @@ export function useChat({
     eventBridge.emit(GameEvents.CHAT_FOCUS, { focused });
   }, []);
 
-  // 마운트 시 캐시 로드 + 시스템 메시지
+  // 마운트 시 캐시 로드 + 시스템 메시지 (1회)
+  const initDoneRef = useRef(false);
   useEffect(() => {
+    if (initDoneRef.current) return;
+    initDoneRef.current = true;
+
     const cached = loadCachedMessages();
     if (cached.length > 0) {
       setMessages(cached);

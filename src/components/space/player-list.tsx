@@ -18,7 +18,7 @@ export default function PlayerList({ players, currentNickname }: PlayerListProps
   const totalCount = players.length + 1; // +1 for self
 
   return (
-    <div className="absolute right-4 top-14 z-40">
+    <div className="absolute right-4 top-14 z-10">
       {/* Toggle button */}
       <button
         onClick={() => setIsOpen(!isOpen)}

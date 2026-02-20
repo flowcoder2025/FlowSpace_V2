@@ -269,6 +269,12 @@ export function useSocket({
           setIsConnected(false);
         });
 
+        sock.on("connect_error", (err) => {
+          console.error("[Socket] Connect error:", err.message);
+          setSocketError(`소켓 연결 실패: ${err.message}`);
+          setIsConnected(false);
+        });
+
         // ── 재연결 모니터링 ──
         sock.io.on("reconnect_attempt", (attempt) => {
           console.log(`[Socket] Reconnect attempt #${attempt}`);
@@ -490,7 +496,12 @@ export function useSocket({
 
   const sendChat = useCallback(
     (content: string, type: "group" | "whisper" | "party", targetId?: string, replyTo?: { id: string; senderNickname: string; content: string }) => {
-      socketRef.current?.emit("chat:send", { content, type, targetId, replyTo });
+      const sock = socketRef.current;
+      if (!sock || !sock.connected) {
+        console.error("[Socket] sendChat failed: socket not connected", { hasSocket: !!sock, connected: sock?.connected });
+        return;
+      }
+      sock.emit("chat:send", { content, type, targetId, replyTo });
     },
     []
   );
