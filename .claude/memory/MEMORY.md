@@ -3,13 +3,13 @@
 ## Project Overview
 - **Name**: FlowSpace
 - **Type**: flow_metaverse 리팩토링 프로젝트
-- **Goal**: ComfyUI 기반 에셋 파이프라인 + 멀티에이전트 팀 시스템
+- **Goal**: ComfyUI 기반 에셋 파이프라인 + 메타버스 플랫폼
 - **Repo**: https://github.com/flowcoder2025/FlowSpace_V2.git
 
 ## Active Epic
 | Epic | 상태 | Phase 진행 | 마지막 업데이트 |
 |------|------|------------|-----------------|
-| (없음) | 다음: Phase 11 LiveKit | | 2026-02-20 |
+| (없음) | | | |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -18,10 +18,14 @@
 | Map Editor | 2026-02-19 | Phase 8 |
 | Admin Dashboard | 2026-02-19 | Phase 9 |
 | Chat Port (flow_metaverse → FlowSpace) | 2026-02-20 | Phase 10 (6 sub-phases) |
+| LiveKit 음성/화상 포팅 | 2026-02-20 | Phase 11 (통합+QA) |
 
 ## Architecture Decisions
-- 5개 도메인 에이전트 + 오케스트레이터 체제
-- Contract Governance (FlowHR 패턴 적용)
+- 6 도메인 rules (`.claude/rules/` path-based auto-load) — game-engine, asset-pipeline, communication, app, data-ownership, asset-spec
+- event-protocol → `.claude/reference/` (173줄, 인간용 레퍼런스)
+- 이전 `.claude/team/` 구조 → 공식 `.claude/rules/` 전환 완료 (2026-02-20)
+- DocOps 220줄 → doc-agent + Stop hook 전환 완료 (2026-02-20)
+- QA 프로세스: qa-agent (5-Gate 검증) + Stop hook 자동 제안 (2026-02-20)
 - EventBridge (React ↔ Phaser 통신)
 - Socket.io (Client ↔ Server 실시간)
 - Next.js 15 App Router + Prisma 6 + PostgreSQL (Supabase)
@@ -30,22 +34,6 @@
 - 백그라운드 에이전트 Write/Bash 권한 없음 → 오케스트레이터 직접 실행
 - 소켓 인증: `/api/socket/token` → jose JWT 발급 → 서버 검증
 - Admin Dashboard: requireSpaceAdmin 헬퍼 (OWNER/STAFF/superAdmin)
-
-## Team Structure
-| Agent | Domain | Status |
-|-------|--------|--------|
-| Game Engine | Phaser, Avatar, Tiles | Phase 5, 8 완료 |
-| Asset Pipeline | ComfyUI, Processing | Phase 1, 7 완료 |
-| Communication | Socket.io, Realtime | Phase 4, 6, 8, 10 완료 |
-| Frontend | Next.js, UI, Zustand | Phase 1~10 완료 |
-| Backend | API, Prisma, Auth | Phase 2~3, 9~10 완료 |
-
-## Domain Work Protocol (필수 - 반드시 준수)
-> **이전 세션에서 팀 프로토콜 미준수 발생. 다음 규칙 반드시 적용:**
-1. 도메인 작업 전 `personas/{domain}.md` + `contracts/{domain}.md` 읽기
-2. 관련 `shared/*.md` (event-protocol, data-ownership 등) 확인
-3. 작업 시 "🔧 [Agent명] 역할로 작업" 명시
-4. 완료 시 컨트랙트 준수 사항 보고
 
 ## Completed Work
 
@@ -71,22 +59,35 @@
 - 9건 패치 (Critical 2, High 3, Medium 3, Low 1)
 - 11파일 수정 (tsc ✅ lint ✅)
 
-## Next Steps (Phase 11~)
-1. Phase 11: LiveKit 음성/화상
-2. 배포 준비
-3. ⚠️ `npx next build` 확인 필요 (dev 서버 종료 후 실행)
+## 에이전트 시스템 리팩토링 (2026-02-20) — ✅ 검증 완료
+- rules auto-load: 6개 파일 YAML paths 포맷 정확 ✅
+- Stop hooks: 3-레벨 중첩 + prompt 타입 + ok/reason 스키마 정확 ✅
+- agents 스폰: frontmatter 필드 유효 + 시스템 프롬프트 포함 ✅
+
+## Next Steps
+1. ~~에이전트 시스템 검증~~ ✅ (2026-02-20)
+2. ~~Phase 11: LiveKit 음성/화상/화면공유/녹화~~ ✅ 통합 완료 (2026-02-20)
+3. Phase 11 실사용 테스트 (LiveKit 서버 + 브라우저 2개)
+4. 배포 준비
+5. ⚠️ `npx next build` 확인 필요 (dev 서버 종료 후 실행)
 
 ## Supabase DB 연결 정보
 - Host: `aws-1-ap-southeast-2.pooler.supabase.com`
 - Ref: `afdfkpxsfuyccdvrkqwu`
 - Direct URL이 IPv6만 반환 → Session Pooler(:5432) 사용
 
-## Key References (flow_metaverse)
-- EventBridge: `src/features/space/game/events.ts`
+## Key References
+- EventBridge: `src/features/space/game/events/` (types.ts + event-bridge.ts)
+- Game Manager: `src/features/space/game/internal/game-manager.ts`
+- MainScene: `src/features/space/game/internal/scenes/main-scene.ts`
+- Avatar: `src/features/space/avatar/internal/` (config, sprite-generator)
+- Socket types: `src/features/space/socket/internal/types.ts`
+- Socket Bridge: `src/features/space/bridge/internal/use-socket-bridge.ts`
 - AssetRegistry: `src/config/asset-registry.ts`
-- Avatar: `src/features/space/avatar/config.ts`
-- MainScene: `src/features/space/game/scenes/MainScene.ts`
-- Socket types: `src/features/space/socket/types.ts`
+- Auth helpers: `src/lib/auth-helpers.ts`
+- Prisma: `prisma/schema.prisma` (13 models)
+- Domain rules: `.claude/rules/` (path-based auto-load, 6 files)
+- Event protocol: `.claude/reference/event-protocol.md` (human reference)
 
 ## Technical Notes
 - npm install 완료, node_modules 존재

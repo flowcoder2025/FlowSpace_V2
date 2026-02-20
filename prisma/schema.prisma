@@ -138,12 +138,13 @@ model Space {
   owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   template Template @relation(fields: [templateId], references: [id])
 
-  eventLogs     SpaceEventLog[]
-  guestSessions GuestSession[]
-  members       SpaceMember[]
-  chatMessages  ChatMessage[]
-  mapObjects    MapObject[]
-  partyZones    PartyZone[]
+  eventLogs       SpaceEventLog[]
+  guestSessions   GuestSession[]
+  members         SpaceMember[]
+  chatMessages    ChatMessage[]
+  mapObjects      MapObject[]
+  partyZones      PartyZone[]
+  spotlightGrants SpotlightGrant[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -201,6 +202,8 @@ model SpaceEventLog {
   eventType      SpaceEventType
   payload        Json?
 
+  participantId String?
+
   space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   guestSession GuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
@@ -221,6 +224,10 @@ enum SpaceEventType {
   INTERACTION
   CHAT
   ADMIN_ACTION
+  VIDEO_START
+  VIDEO_END
+  SCREEN_SHARE_START
+  SCREEN_SHARE_END
 }
 
 // ============================================
@@ -433,5 +440,29 @@ model AssetWorkflow {
   updatedAt DateTime @updatedAt
 
   @@index([assetType])
+  @@index([isActive])
+}
+
+// ============================================
+// 15. SpotlightGrant (스포트라이트 권한)
+// ============================================
+model SpotlightGrant {
+  id             String  @id @default(cuid())
+  spaceId        String
+  userId         String?
+  guestSessionId String?
+
+  grantedBy String
+  expiresAt DateTime?
+  isActive  Boolean   @default(false)
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId])
+  @@index([spaceId, userId])
+  @@index([spaceId, guestSessionId])
   @@index([isActive])
 }

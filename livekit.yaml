@@ -1,0 +1,27 @@
+# LiveKit Development Server Configuration
+port: 7880
+rtc:
+  port_range_start: 50000
+  port_range_end: 60000
+  tcp_port: 7881
+  use_external_ip: false
+
+keys:
+  devkey: devsecret
+
+# Room settings - 빠른 연결 해제 감지
+room:
+  # 빈 방이 닫히기까지 대기 시간 (초)
+  empty_timeout: 60
+  # 참가자 연결 해제 후 제거까지 대기 시간 (초) - 기본값 10초에서 2초로 단축
+  departure_timeout: 2
+
+# Webhook configuration (usage metering)
+# Production에서는 Vercel 도메인으로 설정 필요
+webhook:
+  urls:
+    - http://localhost:3000/api/livekit/webhook
+  api_key: devkey
+
+# Development mode settings
+log_level: info

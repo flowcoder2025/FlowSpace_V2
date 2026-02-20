@@ -7,7 +7,7 @@
 ## Active Epics
 | Epic | 상태 | Phase 진행 | 마지막 업데이트 |
 |------|------|------------|-----------------|
-| (없음 - 다음: Phase 11 LiveKit 또는 기타) | | | |
+| (없음 — 다음: build 테스트 또는 배포 준비) | | | |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -16,6 +16,7 @@
 | [map-editor](./map-editor/README.md) | 2026-02-19 | 1 (Phase 8) |
 | [admin-dashboard](./admin-dashboard/README.md) | 2026-02-19 | 1 (Phase 9) |
 | [chat-port](./chat-port/README.md) | 2026-02-20 | 6 (Phase 10) |
+| [livekit-voicevideo](./livekit-voicevideo/README.md) | 2026-02-20 | 1 (Phase 11) |
 
 ## File Structure
 ```
@@ -39,7 +40,10 @@ specs/
 ├── admin-dashboard/
 │   ├── README.md
 │   └── 09-admin-dashboard.md
-└── chat-port/
+├── chat-port/
+│   ├── README.md
+│   └── 10-chat-port.md
+└── livekit-voicevideo/
     ├── README.md
-    └── 10-chat-port.md
+    └── 11-livekit-integration.md
 ```

@@ -6,12 +6,15 @@ import { eventBridge, GameEvents } from "@/features/space/game";
 import { useSocketBridge } from "@/features/space/bridge";
 import { useChat, type ChatMessage } from "@/features/space/chat";
 import { useEditor, type StoredMapData, type EditorMapObject } from "@/features/space/editor";
+import { LiveKitRoomProvider } from "@/features/space/livekit";
+import type { RecordingStatusData, SpotlightData, ProximityChangedData } from "@/features/space/socket";
 import GameCanvas from "@/components/space/game-canvas";
 import LoadingScreen from "@/components/space/loading-screen";
 import PlayerList from "@/components/space/player-list";
 import SpaceHud from "@/components/space/space-hud";
 import ChatPanel from "@/components/space/chat-panel";
 import { EditorToggleButton, EditorSidebar } from "@/components/space/editor";
+import { SpaceMediaLayer } from "@/components/space/video/SpaceMediaLayer";
 
 interface SpaceClientProps {
   space: {
@@ -35,6 +38,11 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
   const { isLoading, isSceneReady, error, setSceneReady, setError, reset } = useGameStore();
   const [mapData, setMapData] = useState<StoredMapData | null>(null);
   const [mapObjects, setMapObjects] = useState<EditorMapObject[]>([]);
+
+  // Media state (from socket events)
+  const [isRecording, setIsRecording] = useState(false);
+  const [recorderNickname, setRecorderNickname] = useState<string>();
+  const [spotlightUsers, setSpotlightUsers] = useState<Set<string>>(new Set());
 
   // 맵 데이터 로드
   useEffect(() => {
@@ -139,7 +147,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
     ) => void;
   };
 
-  // Socket callbacks
+  // Socket callbacks — Chat
   const onChatMessage = useCallback(
     (data: {
       id?: string;
@@ -238,6 +246,20 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
     [addMessage]
   );
 
+  const onMemberUnmuted = useCallback(
+    (data: { nickname: string; unmutedBy: string }) => {
+      addMessage({
+        id: `sys-${++chatMsgId}`,
+        userId: "system",
+        nickname: "System",
+        content: `${data.nickname}님의 뮤트가 ${data.unmutedBy}에 의해 해제되었습니다.`,
+        type: "system",
+        timestamp: new Date().toISOString(),
+      });
+    },
+    [addMessage]
+  );
+
   const onMemberKicked = useCallback(
     (data: { nickname: string; kickedBy: string }) => {
       addMessage({
@@ -266,6 +288,50 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
     [addMessage]
   );
 
+  // Socket callbacks — Media
+  const onRecordingStarted = useCallback((data: RecordingStatusData) => {
+    setIsRecording(data.isRecording);
+    setRecorderNickname(data.recorderNickname);
+  }, []);
+
+  const onRecordingStopped = useCallback((_: RecordingStatusData) => {
+    void _;
+    setIsRecording(false);
+    setRecorderNickname(undefined);
+  }, []);
+
+  const onSpotlightActivated = useCallback((data: SpotlightData) => {
+    setSpotlightUsers((prev) => new Set(prev).add(data.participantId));
+  }, []);
+
+  const onSpotlightDeactivated = useCallback((data: SpotlightData) => {
+    setSpotlightUsers((prev) => {
+      const next = new Set(prev);
+      next.delete(data.participantId);
+      return next;
+    });
+  }, []);
+
+  const onProximityChanged = useCallback((_: ProximityChangedData) => {
+    void _;
+    // Proximity 상태는 LiveKit useProximitySubscription에서 직접 관리
+  }, []);
+
+  const onSocketError = useCallback(
+    (data: { code: string; message: string }) => {
+      console.warn(`[Socket] Error (${data.code}): ${data.message}`);
+      addMessage({
+        id: `sys-${++chatMsgId}`,
+        userId: "system",
+        nickname: "System",
+        content: data.message,
+        type: "system",
+        timestamp: new Date().toISOString(),
+      });
+    },
+    [addMessage]
+  );
+
   const {
     isConnected, socketError, players, sendChat, sendWhisper,
     sendReactionToggle, sendAdminCommand,
@@ -282,8 +348,15 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
     onMessageDeleted,
     onReactionUpdated,
     onMemberMuted,
+    onMemberUnmuted,
     onMemberKicked,
     onAnnouncement,
+    onRecordingStarted,
+    onRecordingStopped,
+    onSpotlightActivated,
+    onSpotlightDeactivated,
+    onProximityChanged,
+    onSocketError,
   });
 
   // Ref 업데이트
@@ -328,102 +401,116 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-gray-900">
-      {/* Phaser Canvas */}
-      <GameCanvas
-        spaceId={space.id}
-        userId={user.id}
-        nickname={user.nickname}
-        avatar={user.avatar}
-        mapData={mapData}
-      />
+    <LiveKitRoomProvider
+      spaceId={space.id}
+      participantId={user.id}
+      participantName={user.nickname}
+    >
+      <div className="relative h-screen w-screen overflow-hidden bg-gray-900">
+        {/* Phaser Canvas */}
+        <GameCanvas
+          spaceId={space.id}
+          userId={user.id}
+          nickname={user.nickname}
+          avatar={user.avatar}
+          mapData={mapData}
+        />
 
-      {/* Loading Overlay */}
-      {isLoading && <LoadingScreen spaceName={space.name} />}
+        {/* Loading Overlay */}
+        {isLoading && <LoadingScreen spaceName={space.name} />}
 
-      {/* HUD (씬 준비 후 표시) */}
-      {isSceneReady && (
-        <>
-          <SpaceHud
-            spaceName={space.name}
-            isConnected={isConnected}
-            playerCount={players.length + 1}
-            editorSlot={
-              <EditorToggleButton
-                isEditorMode={editor.isEditorMode}
-                canEdit={editor.canEdit}
-                onToggle={() =>
-                  editor.isEditorMode
-                    ? editor.exitEditor()
-                    : editor.enterEditor()
-                }
-              />
-            }
-          />
-          <PlayerList
-            players={players.map((p) => ({
-              id: p.userId,
-              nickname: p.nickname,
-            }))}
-            currentUserId={user.id}
-            currentNickname={user.nickname}
-          />
-          <ChatPanel
-            messages={messages}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            onSend={sendMessage}
-            onFocusChange={setChatFocused}
-            onReply={setReplyTo}
-            onReactionToggle={toggleReaction}
-            onDeleteMessage={deleteMessage}
-            replyTo={replyTo}
-            currentUserId={user.id}
-            role={user.role}
-            players={players}
-            socketError={socketError}
-          />
-
-          {/* Editor Sidebar */}
-          {editor.isEditorMode && (
-            <EditorSidebar
-              activeTool={editor.activeTool}
-              activeLayer={editor.activeLayer}
-              selectedTileIndex={editor.selectedTileIndex}
-              selectedObjectType={editor.selectedObjectType}
-              selectedObject={
-                editor.selectedObjectId
-                  ? editor.mapObjects.find(
-                      (o) => o.id === editor.selectedObjectId
-                    ) ?? null
-                  : null
+        {/* HUD (씬 준비 후 표시) */}
+        {isSceneReady && (
+          <>
+            <SpaceHud
+              spaceName={space.name}
+              isConnected={isConnected}
+              playerCount={players.length + 1}
+              editorSlot={
+                <EditorToggleButton
+                  isEditorMode={editor.isEditorMode}
+                  canEdit={editor.canEdit}
+                  onToggle={() =>
+                    editor.isEditorMode
+                      ? editor.exitEditor()
+                      : editor.enterEditor()
+                  }
+                />
               }
-              paletteTab={editor.paletteTab}
-              layerVisibility={editor.layerVisibility}
-              isDirty={editor.isDirty}
-              isSaving={editor.isSaving}
-              onToolChange={editor.setTool}
-              onLayerChange={editor.setLayer}
-              onTileSelect={editor.setTile}
-              onObjectTypeSelect={editor.setObjectType}
-              onToggleLayerVisibility={editor.toggleLayerVisibility}
-              onPaletteTabChange={editor.setPaletteTab}
-              onSave={editor.saveTiles}
-              onDeleteObject={editor.deleteObject}
-              onLinkPortal={(sourceId) => {
-                // 간단한 포탈 링킹: 다음 포탈 선택 대기 모드
-                const portals = editor.mapObjects.filter(
-                  (o) =>
-                    o.objectType === "portal" && o.id !== sourceId
-                );
-                if (portals.length > 0) {
-                  editor.linkPortal(sourceId, portals[0].id);
-                }
-              }}
             />
-          )}
-        </>
-      )}
-    </div>
+            <PlayerList
+              players={players.map((p) => ({
+                id: p.userId,
+                nickname: p.nickname,
+              }))}
+              currentUserId={user.id}
+              currentNickname={user.nickname}
+            />
+            <ChatPanel
+              messages={messages}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onSend={sendMessage}
+              onFocusChange={setChatFocused}
+              onReply={setReplyTo}
+              onReactionToggle={toggleReaction}
+              onDeleteMessage={deleteMessage}
+              replyTo={replyTo}
+              currentUserId={user.id}
+              role={user.role}
+              players={players}
+              socketError={socketError}
+            />
+
+            {/* LiveKit Media Layer */}
+            <SpaceMediaLayer
+              spaceName={space.name}
+              spotlightUsers={spotlightUsers}
+              isRecording={isRecording}
+              recorderNickname={recorderNickname}
+            />
+
+            {/* Editor Sidebar */}
+            {editor.isEditorMode && (
+              <EditorSidebar
+                activeTool={editor.activeTool}
+                activeLayer={editor.activeLayer}
+                selectedTileIndex={editor.selectedTileIndex}
+                selectedObjectType={editor.selectedObjectType}
+                selectedObject={
+                  editor.selectedObjectId
+                    ? editor.mapObjects.find(
+                        (o) => o.id === editor.selectedObjectId
+                      ) ?? null
+                    : null
+                }
+                paletteTab={editor.paletteTab}
+                layerVisibility={editor.layerVisibility}
+                isDirty={editor.isDirty}
+                isSaving={editor.isSaving}
+                onToolChange={editor.setTool}
+                onLayerChange={editor.setLayer}
+                onTileSelect={editor.setTile}
+                onObjectTypeSelect={editor.setObjectType}
+                onToggleLayerVisibility={editor.toggleLayerVisibility}
+                onPaletteTabChange={editor.setPaletteTab}
+                onSave={editor.saveTiles}
+                onDeleteObject={editor.deleteObject}
+                onLinkPortal={(sourceId) => {
+                  // 간단한 포탈 링킹: 다음 포탈 선택 대기 모드
+                  const portals = editor.mapObjects.filter(
+                    (o) =>
+                      o.objectType === "portal" && o.id !== sourceId
+                  );
+                  if (portals.length > 0) {
+                    editor.linkPortal(sourceId, portals[0].id);
+                  }
+                }}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </LiveKitRoomProvider>
   );
 }

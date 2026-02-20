@@ -90,6 +90,13 @@ export interface ClientToServerEvents {
     positionY: number;
   }) => void;
   "editor:object-delete": (data: { id: string }) => void;
+
+  // Media
+  "recording:start": () => void;
+  "recording:stop": () => void;
+  "spotlight:activate": () => void;
+  "spotlight:deactivate": () => void;
+  "proximity:set": (data: { enabled: boolean }) => void;
 }
 
 /** Server → Client 이벤트 */
@@ -202,11 +209,40 @@ export interface ServerToClientEvents {
     id: string;
   }) => void;
 
+  // Media
+  "recording:started": (data: {
+    isRecording: boolean;
+    recorderId: string;
+    recorderNickname: string;
+    startedAt: number;
+  }) => void;
+  "recording:stopped": (data: {
+    isRecording: boolean;
+    recorderId: string;
+    recorderNickname: string;
+    startedAt: number;
+  }) => void;
+  "spotlight:activated": (data: {
+    participantId: string;
+    nickname: string;
+    isActive: boolean;
+  }) => void;
+  "spotlight:deactivated": (data: {
+    participantId: string;
+    nickname: string;
+    isActive: boolean;
+  }) => void;
+  "proximity:changed": (data: {
+    enabled: boolean;
+    changedBy: string;
+  }) => void;
+
   // Error events (세분화)
   "chat:error": (data: { code: string; message: string }) => void;
   "whisper:error": (data: { code: string; message: string }) => void;
   "party:error": (data: { code: string; message: string }) => void;
   "admin:error": (data: { code: string; message: string }) => void;
+  "media:error": (data: { code: string; message: string }) => void;
 
   // Whisper optimistic update support
   "whisper:messageIdUpdate": (data: { tempId: string; realId: string }) => void;

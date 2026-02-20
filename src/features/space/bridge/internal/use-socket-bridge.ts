@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { eventBridge, GameEvents, type PlayerPosition } from "@/features/space/game";
-import { useSocket, type PlayerData } from "@/features/space/socket";
+import { useSocket, type PlayerData, type RecordingStatusData, type SpotlightData, type ProximityChangedData } from "@/features/space/socket";
 
 interface ChatMessageData {
   id?: string;
@@ -45,6 +45,13 @@ interface UseSocketBridgeOptions {
   onEditorObjectPlaced?: (data: { userId: string; id: string; objectType: string; positionX: number; positionY: number; label?: string }) => void;
   onEditorObjectMoved?: (data: { userId: string; id: string; positionX: number; positionY: number }) => void;
   onEditorObjectDeleted?: (data: { userId: string; id: string }) => void;
+  // Media events
+  onRecordingStarted?: (data: RecordingStatusData) => void;
+  onRecordingStopped?: (data: RecordingStatusData) => void;
+  onSpotlightActivated?: (data: SpotlightData) => void;
+  onSpotlightDeactivated?: (data: SpotlightData) => void;
+  onProximityChanged?: (data: ProximityChangedData) => void;
+  onSocketError?: (data: { code: string; message: string }) => void;
 }
 
 interface UseSocketBridgeReturn {
@@ -62,6 +69,12 @@ interface UseSocketBridgeReturn {
   sendEditorObjectPlace: (data: { id: string; objectType: string; positionX: number; positionY: number; label?: string }) => void;
   sendEditorObjectMove: (data: { id: string; positionX: number; positionY: number }) => void;
   sendEditorObjectDelete: (data: { id: string }) => void;
+  // Media emitters
+  sendRecordingStart: () => void;
+  sendRecordingStop: () => void;
+  sendSpotlightActivate: () => void;
+  sendSpotlightDeactivate: () => void;
+  sendProximitySet: (enabled: boolean) => void;
 }
 
 export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridgeReturn {
@@ -72,6 +85,9 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
     onReactionUpdated, onPartyMessage,
     onMemberMuted, onMemberUnmuted, onMemberKicked, onAnnouncement,
     onEditorTileUpdated, onEditorObjectPlaced, onEditorObjectMoved, onEditorObjectDeleted,
+    onRecordingStarted, onRecordingStopped,
+    onSpotlightActivated, onSpotlightDeactivated, onProximityChanged,
+    onSocketError,
   } = options;
 
   const {
@@ -80,6 +96,8 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
     joinParty, leaveParty, sendPartyMessage,
     sendEditorTileUpdate, sendEditorObjectPlace,
     sendEditorObjectMove, sendEditorObjectDelete,
+    sendRecordingStart, sendRecordingStop,
+    sendSpotlightActivate, sendSpotlightDeactivate, sendProximitySet,
   } = useSocket({
     spaceId, userId, nickname, avatar,
     onChatMessage, onWhisperReceive, onWhisperSent,
@@ -87,6 +105,9 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
     onReactionUpdated, onPartyMessage,
     onMemberMuted, onMemberUnmuted, onMemberKicked, onAnnouncement,
     onEditorTileUpdated, onEditorObjectPlaced, onEditorObjectMoved, onEditorObjectDeleted,
+    onRecordingStarted, onRecordingStopped,
+    onSpotlightActivated, onSpotlightDeactivated, onProximityChanged,
+    onSocketError,
   });
 
   const prevPlayersRef = useRef<Map<string, PlayerData>>(new Map());
@@ -159,5 +180,7 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
     joinParty, leaveParty, sendPartyMessage,
     sendEditorTileUpdate, sendEditorObjectPlace,
     sendEditorObjectMove, sendEditorObjectDelete,
+    sendRecordingStart, sendRecordingStop,
+    sendSpotlightActivate, sendSpotlightDeactivate, sendProximitySet,
   };
 }

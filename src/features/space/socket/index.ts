@@ -8,3 +8,8 @@ export type {
   MovementData,
   SocketData,
 } from "./internal/types";
+export type {
+  RecordingStatusData,
+  SpotlightData,
+  ProximityChangedData,
+} from "./internal/use-socket";

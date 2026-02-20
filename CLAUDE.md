@@ -18,32 +18,6 @@
 - [ ] **하드코딩 금지**: 상수는 `constants/`로 분리
 - [ ] **UTF-8**: 모든 파일 UTF-8 (BOM 없음)
 
-## 팀 프로토콜 체크리스트 (필수 - 스킵 금지)
-
-> **도메인 작업 시작 전 반드시 해당 에이전트의 문서를 읽어야 함**
-
-- [ ] **페르소나 확인**: `.claude/team/personas/{domain}.md` 읽기
-- [ ] **컨트랙트 확인**: `.claude/team/contracts/{domain}.md` 읽기
-- [ ] **공유 문서 확인**: 관련 `shared/*.md` 읽기 (event-protocol, data-ownership 등)
-- [ ] **역할 명시**: 작업 시 "🔧 [Agent명] 역할로 작업" 사용자에게 알리기
-- [ ] **컨트랙트 준수 보고**: 작업 완료 시 어떤 규칙을 준수했는지 명시
-
-### 도메인 → 에이전트 매핑
-| 작업 경로 | Agent | persona | contract |
-|-----------|-------|---------|----------|
-| `src/features/space/game/`, `src/features/space/avatar/` | Game Engine | `game-engine.md` | `game-engine.md` |
-| `src/features/assets/`, `src/lib/comfyui/` | Asset Pipeline | `asset-pipeline.md` | `asset-pipeline.md` |
-| `src/features/space/socket/`, `server/` | Communication | `communication.md` | `communication.md` |
-| `src/app/`, `src/components/`, `src/stores/` | Frontend | `frontend.md` | `frontend.md` |
-| `src/app/api/`, `prisma/`, `src/lib/` | Backend | `backend.md` | `backend.md` |
-
-### 교차 도메인 작업 시
-- 두 도메인 이상 걸치는 작업 → **양쪽 컨트랙트 모두 확인**
-- shared/ 문서 변경 필요 시 → 변경 사항 명시 후 업데이트
-
-## 위반 시
-**이 체크리스트를 확인하지 않고 작업 시작 시, 사용자에게 경고 후 체크리스트 확인**
-
 ---
 
 # Project Rules

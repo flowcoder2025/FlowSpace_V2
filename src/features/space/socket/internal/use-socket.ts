@@ -80,6 +80,25 @@ interface SocketErrorData {
   message: string;
 }
 
+// Media event data types
+export interface RecordingStatusData {
+  isRecording: boolean;
+  recorderId: string;
+  recorderNickname: string;
+  startedAt: number;
+}
+
+export interface SpotlightData {
+  participantId: string;
+  nickname: string;
+  isActive: boolean;
+}
+
+export interface ProximityChangedData {
+  enabled: boolean;
+  changedBy: string;
+}
+
 interface UseSocketOptions {
   spaceId: string;
   userId: string;
@@ -102,6 +121,12 @@ interface UseSocketOptions {
   onEditorObjectMoved?: (data: EditorObjectMovedData) => void;
   onEditorObjectDeleted?: (data: EditorObjectDeletedData) => void;
   onSocketError?: (data: SocketErrorData) => void;
+  // Media events
+  onRecordingStarted?: (data: RecordingStatusData) => void;
+  onRecordingStopped?: (data: RecordingStatusData) => void;
+  onSpotlightActivated?: (data: SpotlightData) => void;
+  onSpotlightDeactivated?: (data: SpotlightData) => void;
+  onProximityChanged?: (data: ProximityChangedData) => void;
 }
 
 interface UseSocketReturn {
@@ -120,6 +145,12 @@ interface UseSocketReturn {
   sendEditorObjectPlace: (data: { id: string; objectType: string; positionX: number; positionY: number; label?: string }) => void;
   sendEditorObjectMove: (data: { id: string; positionX: number; positionY: number }) => void;
   sendEditorObjectDelete: (data: { id: string }) => void;
+  // Media emitters
+  sendRecordingStart: () => void;
+  sendRecordingStop: () => void;
+  sendSpotlightActivate: () => void;
+  sendSpotlightDeactivate: () => void;
+  sendProximitySet: (enabled: boolean) => void;
 }
 
 export function useSocket({
@@ -144,6 +175,11 @@ export function useSocket({
   onEditorObjectMoved,
   onEditorObjectDeleted,
   onSocketError,
+  onRecordingStarted,
+  onRecordingStopped,
+  onSpotlightActivated,
+  onSpotlightDeactivated,
+  onProximityChanged,
 }: UseSocketOptions): UseSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [socketError, setSocketError] = useState<string | null>(null);
@@ -170,6 +206,11 @@ export function useSocket({
   const onEditorObjectMovedRef = useRef(onEditorObjectMoved);
   const onEditorObjectDeletedRef = useRef(onEditorObjectDeleted);
   const onSocketErrorRef = useRef(onSocketError);
+  const onRecordingStartedRef = useRef(onRecordingStarted);
+  const onRecordingStoppedRef = useRef(onRecordingStopped);
+  const onSpotlightActivatedRef = useRef(onSpotlightActivated);
+  const onSpotlightDeactivatedRef = useRef(onSpotlightDeactivated);
+  const onProximityChangedRef = useRef(onProximityChanged);
 
   useEffect(() => {
     onChatMessageRef.current = onChatMessage;
@@ -189,12 +230,19 @@ export function useSocket({
     onEditorObjectMovedRef.current = onEditorObjectMoved;
     onEditorObjectDeletedRef.current = onEditorObjectDeleted;
     onSocketErrorRef.current = onSocketError;
+    onRecordingStartedRef.current = onRecordingStarted;
+    onRecordingStoppedRef.current = onRecordingStopped;
+    onSpotlightActivatedRef.current = onSpotlightActivated;
+    onSpotlightDeactivatedRef.current = onSpotlightDeactivated;
+    onProximityChangedRef.current = onProximityChanged;
   }, [
     onChatMessage, onWhisperReceive, onWhisperSent, onMessageIdUpdate,
     onMessageFailed, onMessageDeleted, onReactionUpdated, onPartyMessage,
     onMemberMuted, onMemberUnmuted, onMemberKicked, onAnnouncement,
     onEditorTileUpdated, onEditorObjectPlaced, onEditorObjectMoved, onEditorObjectDeleted,
     onSocketError,
+    onRecordingStarted, onRecordingStopped,
+    onSpotlightActivated, onSpotlightDeactivated, onProximityChanged,
   ]);
 
   useEffect(() => {
@@ -363,6 +411,26 @@ export function useSocket({
           onEditorObjectDeletedRef.current?.(data);
         });
 
+        // ── Media events ──
+        sock.on("recording:started", (data) => {
+          onRecordingStartedRef.current?.(data);
+        });
+        sock.on("recording:stopped", (data) => {
+          onRecordingStoppedRef.current?.(data);
+        });
+        sock.on("spotlight:activated", (data) => {
+          onSpotlightActivatedRef.current?.(data);
+        });
+        sock.on("spotlight:deactivated", (data) => {
+          onSpotlightDeactivatedRef.current?.(data);
+        });
+        sock.on("proximity:changed", (data) => {
+          onProximityChangedRef.current?.(data);
+        });
+        sock.on("media:error", (data) => {
+          onSocketErrorRef.current?.(data);
+        });
+
         sock.on("error", ({ message }) => {
           console.error("[Socket] Error:", message);
         });
@@ -507,6 +575,27 @@ export function useSocket({
     []
   );
 
+  // Media emitters
+  const sendRecordingStart = useCallback(() => {
+    socketRef.current?.emit("recording:start");
+  }, []);
+
+  const sendRecordingStop = useCallback(() => {
+    socketRef.current?.emit("recording:stop");
+  }, []);
+
+  const sendSpotlightActivate = useCallback(() => {
+    socketRef.current?.emit("spotlight:activate");
+  }, []);
+
+  const sendSpotlightDeactivate = useCallback(() => {
+    socketRef.current?.emit("spotlight:deactivate");
+  }, []);
+
+  const sendProximitySet = useCallback((enabled: boolean) => {
+    socketRef.current?.emit("proximity:set", { enabled });
+  }, []);
+
   return {
     isConnected,
     socketError,
@@ -523,5 +612,10 @@ export function useSocket({
     sendEditorObjectPlace,
     sendEditorObjectMove,
     sendEditorObjectDelete,
+    sendRecordingStart,
+    sendRecordingStop,
+    sendSpotlightActivate,
+    sendSpotlightDeactivate,
+    sendProximitySet,
   };
 }
