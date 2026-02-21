@@ -1,13 +1,13 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `bc862ca`
-- Last Review Date: 2026-02-20
+- Last Reviewed Commit: `2593b74`
+- Last Review Date: 2026-02-21
 
 ## Active Epics
 | Epic | 상태 | Phase 진행 | 마지막 업데이트 |
 |------|------|------------|-----------------|
-| (없음 — 다음: build 테스트 또는 배포 준비) | | | |
+| (없음 — 다음: 프로덕션 배포 또는 기능 확장) | | | |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -17,6 +17,11 @@
 | [admin-dashboard](./admin-dashboard/README.md) | 2026-02-19 | 1 (Phase 9) |
 | [chat-port](./chat-port/README.md) | 2026-02-20 | 6 (Phase 10) |
 | [livekit-voicevideo](./livekit-voicevideo/README.md) | 2026-02-20 | 1 (Phase 11) |
+
+## Ad-hoc Work (2026-02-21)
+- 배포 준비: Dockerfile, docker-compose, CI, Vitest, Prisma migrate
+- 실사용 버그 수정: 소켓 인증, Prisma PgBouncer, 채팅 id 충돌, Phaser 키보드
+- 채팅 레거시 스타일 포팅: 드래그/리사이즈, Enter 활성화, 반투명 배경
 
 ## File Structure
 ```

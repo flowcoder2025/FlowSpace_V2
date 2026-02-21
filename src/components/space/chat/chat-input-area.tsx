@@ -20,14 +20,6 @@ interface ChatInputAreaProps {
   onEscape?: () => void;
 }
 
-/** 탭별 입력 프롬프트 색상 */
-const TAB_RING_COLOR: Record<string, string> = {
-  all: "focus:ring-blue-500",
-  whisper: "focus:ring-purple-500",
-  party: "focus:ring-green-500",
-  system: "focus:ring-yellow-500",
-  links: "focus:ring-blue-500",
-};
 
 export function ChatInputArea({
   onSend,
@@ -106,10 +98,8 @@ export function ChatInputArea({
         }
       }
     },
-    [handleSend, onCancelReply, input, whisperHistory, whisperIdx]
+    [handleSend, onCancelReply, onEscape, input, whisperHistory, whisperIdx]
   );
-
-  const ringColor = TAB_RING_COLOR[activeTab] || TAB_RING_COLOR.all;
 
   /** 답장 미리보기 (30자 제한) */
   const replyPreview = replyTo

@@ -83,7 +83,9 @@ export default function ChatPanel({
 
   // isActive를 ref로 추적 (stale closure 방지)
   const isActiveRef = useRef(isActive);
-  isActiveRef.current = isActive;
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
   // 전역 Enter 키로 채팅 활성화 (비활성화는 input 내부에서 처리)
   useEffect(() => {
