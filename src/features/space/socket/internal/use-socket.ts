@@ -145,6 +145,8 @@ interface UseSocketReturn {
   sendEditorObjectPlace: (data: { id: string; objectType: string; positionX: number; positionY: number; label?: string }) => void;
   sendEditorObjectMove: (data: { id: string; positionX: number; positionY: number }) => void;
   sendEditorObjectDelete: (data: { id: string }) => void;
+  // Avatar
+  sendAvatarUpdate: (avatar: string) => void;
   // Media emitters
   sendRecordingStart: () => void;
   sendRecordingStop: () => void;
@@ -334,6 +336,14 @@ export function useSocket({
             });
           }
           syncPlayers();
+        });
+
+        sock.on("player:avatar-updated", ({ userId: updatedId, avatar: newAvatar }) => {
+          const player = playersMapRef.current.get(updatedId);
+          if (player) {
+            player.avatar = newAvatar;
+            syncPlayers();
+          }
         });
 
         // ── Chat events ──
@@ -586,6 +596,11 @@ export function useSocket({
     []
   );
 
+  // Avatar emitter
+  const sendAvatarUpdate = useCallback((avatar: string) => {
+    socketRef.current?.emit("avatar:update", { avatar });
+  }, []);
+
   // Media emitters
   const sendRecordingStart = useCallback(() => {
     socketRef.current?.emit("recording:start");
@@ -623,6 +638,7 @@ export function useSocket({
     sendEditorObjectPlace,
     sendEditorObjectMove,
     sendEditorObjectDelete,
+    sendAvatarUpdate,
     sendRecordingStart,
     sendRecordingStop,
     sendSpotlightActivate,

@@ -8,8 +8,13 @@
 import { eventBridge, GameEvents, type RemotePlayerData } from "../../events";
 import { RemotePlayerSprite, type RemotePlayerInfo } from "./remote-player-sprite";
 
+interface AvatarUpdateData {
+  userId: string;
+  avatar: string;
+}
+
 interface PendingEvent {
-  type: "joined" | "moved" | "left";
+  type: "joined" | "moved" | "left" | "avatarUpdated";
   data: unknown;
 }
 
@@ -43,10 +48,19 @@ export class RemotePlayerManager {
     this.handleLeft(userId);
   };
 
+  private onRemoteAvatarUpdated = (payload: unknown) => {
+    if (!this.ready) {
+      this.pendingEvents.push({ type: "avatarUpdated", data: payload });
+      return;
+    }
+    this.handleAvatarUpdated(payload as AvatarUpdateData);
+  };
+
   constructor(private scene: Phaser.Scene) {
     eventBridge.on(GameEvents.REMOTE_PLAYER_JOINED, this.onRemoteJoined);
     eventBridge.on(GameEvents.REMOTE_PLAYER_MOVED, this.onRemoteMoved);
     eventBridge.on(GameEvents.REMOTE_PLAYER_LEFT, this.onRemoteLeft);
+    eventBridge.on(GameEvents.REMOTE_PLAYER_AVATAR_UPDATED, this.onRemoteAvatarUpdated);
 
     // 씬 준비 후 pending 이벤트 처리
     this.setReady();
@@ -66,6 +80,9 @@ export class RemotePlayerManager {
         case "left":
           this.handleLeft((event.data as { userId: string }).userId);
           break;
+        case "avatarUpdated":
+          this.handleAvatarUpdated(event.data as AvatarUpdateData);
+          break;
       }
     }
     this.pendingEvents = [];
@@ -78,11 +95,19 @@ export class RemotePlayerManager {
     }
   }
 
+  private handleAvatarUpdated(data: AvatarUpdateData): void {
+    const player = this.players.get(data.userId);
+    if (player) {
+      player.updateAvatar(data.avatar);
+    }
+  }
+
   /** 리소스 정리 */
   destroy(): void {
     eventBridge.off(GameEvents.REMOTE_PLAYER_JOINED, this.onRemoteJoined);
     eventBridge.off(GameEvents.REMOTE_PLAYER_MOVED, this.onRemoteMoved);
     eventBridge.off(GameEvents.REMOTE_PLAYER_LEFT, this.onRemoteLeft);
+    eventBridge.off(GameEvents.REMOTE_PLAYER_AVATAR_UPDATED, this.onRemoteAvatarUpdated);
 
     for (const player of this.players.values()) {
       player.destroy();

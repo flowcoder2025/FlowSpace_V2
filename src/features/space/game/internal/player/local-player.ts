@@ -6,7 +6,7 @@
 
 import { PLAYER_SPEED, PLAYER_WIDTH, PLAYER_HEIGHT, DEPTH } from "@/constants/game-constants";
 import { eventBridge, GameEvents } from "../../events";
-import { parseAvatarString, generateAvatarSprite, DIRECTION_FRAMES, IDLE_FRAMES } from "@/features/space/avatar";
+import { parseAvatarString, generateAvatarSpriteFromConfig, DIRECTION_FRAMES, IDLE_FRAMES } from "@/features/space/avatar";
 import type { Direction } from "@/features/space/avatar";
 import type { MovementInput } from "./input-controller";
 
@@ -32,23 +32,17 @@ export class LocalPlayer {
 
     // 아바타 텍스처 생성
     const avatarConfig = parseAvatarString(options.avatar);
-    let textureKey: string;
-
-    if (avatarConfig.type === "classic") {
-      textureKey = generateAvatarSprite(scene, avatarConfig);
-    } else {
-      textureKey = avatarConfig.textureKey;
-    }
+    const textureKey = generateAvatarSpriteFromConfig(scene, avatarConfig);
 
     // 스프라이트 생성
     this.sprite = scene.physics.add.sprite(options.x, options.y, textureKey, 0);
     this.sprite.setDepth(DEPTH.PLAYER);
     this.sprite.setCollideWorldBounds(true);
     this.sprite.setSize(PLAYER_WIDTH - 4, PLAYER_HEIGHT - 4);
-    this.sprite.setOffset(2, 2);
+    this.sprite.setOffset(2, 4);
 
     // 닉네임 텍스트
-    this.nameText = scene.add.text(options.x, options.y - 20, options.nickname, {
+    this.nameText = scene.add.text(options.x, options.y - 28, options.nickname, {
       fontSize: "11px",
       color: "#ffffff",
       fontFamily: "monospace",
@@ -85,7 +79,7 @@ export class LocalPlayer {
     }
 
     // 닉네임 위치 업데이트
-    this.nameText.setPosition(this.sprite.x, this.sprite.y - 20);
+    this.nameText.setPosition(this.sprite.x, this.sprite.y - 28);
 
     // PLAYER_MOVED 이벤트 발행 (쓰로틀)
     if (isMoving) {
@@ -123,6 +117,30 @@ export class LocalPlayer {
         });
       }
     }
+  }
+
+  /** 런타임 아바타 변경 */
+  updateAvatar(avatarString: string): void {
+    const config = parseAvatarString(avatarString);
+    const newKey = generateAvatarSpriteFromConfig(this.scene, config);
+    const pos = { x: this.sprite.x, y: this.sprite.y };
+
+    // 기존 애니메이션 제거
+    const directions: Direction[] = ["down", "left", "right", "up"];
+    for (const dir of directions) {
+      const key = `player-walk-${dir}`;
+      if (this.scene.anims.exists(key)) {
+        this.scene.anims.remove(key);
+      }
+    }
+
+    // 텍스처 교체
+    this.sprite.setTexture(newKey);
+    this.sprite.setPosition(pos.x, pos.y);
+
+    // 새 애니메이션 생성
+    this.createAnimations(newKey);
+    this.sprite.setFrame(IDLE_FRAMES[this.currentDirection]);
   }
 
   /** 이동 이벤트 발행 (쓰로틀) */

@@ -58,6 +58,7 @@ interface UseSocketBridgeReturn {
   isConnected: boolean;
   socketError: string | null;
   players: PlayerData[];
+  sendAvatarUpdate: (avatar: string) => void;
   sendChat: (content: string, type: "group" | "whisper" | "party", targetId?: string) => void;
   sendWhisper: (targetNickname: string, content: string) => void;
   sendReactionToggle: (messageId: string, reactionType: "thumbsup" | "heart" | "check") => void;
@@ -92,7 +93,7 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
 
   const {
     isConnected, socketError, players, sendMovement, sendChat,
-    sendWhisper, sendReactionToggle, sendAdminCommand,
+    sendWhisper, sendReactionToggle, sendAdminCommand, sendAvatarUpdate,
     joinParty, leaveParty, sendPartyMessage,
     sendEditorTileUpdate, sendEditorObjectPlace,
     sendEditorObjectMove, sendEditorObjectDelete,
@@ -149,8 +150,15 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
           avatar: player.avatar,
         });
       } else {
-        // 위치 변경 (moved)
         const prev = prevMap.get(id)!;
+        // 아바타 변경
+        if (prev.avatar !== player.avatar) {
+          eventBridge.emit(GameEvents.REMOTE_PLAYER_AVATAR_UPDATED, {
+            userId: player.userId,
+            avatar: player.avatar,
+          });
+        }
+        // 위치 변경 (moved)
         if (prev.position.x !== player.position.x || prev.position.y !== player.position.y) {
           eventBridge.emit(GameEvents.REMOTE_PLAYER_MOVED, {
             userId: player.userId,
@@ -175,7 +183,7 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
   }, [players]);
 
   return {
-    isConnected, socketError, players, sendChat,
+    isConnected, socketError, players, sendAvatarUpdate, sendChat,
     sendWhisper, sendReactionToggle, sendAdminCommand,
     joinParty, leaveParty, sendPartyMessage,
     sendEditorTileUpdate, sendEditorObjectPlace,

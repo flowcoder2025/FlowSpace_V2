@@ -79,6 +79,12 @@ export class MainScene extends Phaser.Scene {
     this.tilemapResult = createTilemapSystem(this, externalLayers);
   }
 
+  /** 로컬 플레이어 아바타 업데이트 핸들러 */
+  private onLocalAvatarUpdated = (payload: unknown) => {
+    const { avatar } = payload as { avatar: string };
+    this.localPlayer?.updateAvatar(avatar);
+  };
+
   /** 로컬 플레이어 생성 */
   private initPlayer(): void {
     const userId = this.registry.get("userId") as string;
@@ -98,6 +104,9 @@ export class MainScene extends Phaser.Scene {
     });
 
     this.inputController = new InputController(this);
+
+    // 아바타 변경 이벤트 수신
+    eventBridge.on(GameEvents.PLAYER_AVATAR_UPDATED, this.onLocalAvatarUpdated);
   }
 
   /** 원격 플레이어 매니저 초기화 */
@@ -137,6 +146,7 @@ export class MainScene extends Phaser.Scene {
 
   /** 씬 종료 시 정리 */
   shutdown(): void {
+    eventBridge.off(GameEvents.PLAYER_AVATAR_UPDATED, this.onLocalAvatarUpdated);
     this.editorSystem?.destroy();
     this.remotePlayerManager?.destroy();
     this.objectManager?.destroy();

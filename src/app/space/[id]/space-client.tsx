@@ -14,6 +14,7 @@ import SpaceHud from "@/components/space/space-hud";
 import ChatPanel from "@/components/space/chat-panel";
 import { EditorToggleButton, EditorSidebar } from "@/components/space/editor";
 import { SpaceMediaLayer } from "@/components/space/video/SpaceMediaLayer";
+import { AvatarEditorModal } from "@/components/space/avatar-editor-modal";
 
 interface SpaceClientProps {
   space: {
@@ -37,6 +38,10 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
   const { isLoading, isSceneReady, error, setSceneReady, setError, reset } = useGameStore();
   const [mapData, setMapData] = useState<StoredMapData | null>(null);
   const [mapObjects, setMapObjects] = useState<EditorMapObject[]>([]);
+
+  // Avatar editor modal
+  const [showAvatarEditor, setShowAvatarEditor] = useState(false);
+  const [currentAvatar, setCurrentAvatar] = useState(user.avatar);
 
   // Media state (from socket events)
   const [isRecording, setIsRecording] = useState(false);
@@ -333,7 +338,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
 
   const {
     isConnected, socketError, players, sendChat, sendWhisper,
-    sendReactionToggle, sendAdminCommand,
+    sendReactionToggle, sendAdminCommand, sendAvatarUpdate,
   } = useSocketBridge({
     spaceId: space.id,
     userId: user.id,
@@ -453,6 +458,15 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
               socketError={socketError}
             />
 
+            {/* Avatar Edit Button */}
+            <button
+              type="button"
+              onClick={() => setShowAvatarEditor(true)}
+              className="absolute left-4 top-14 z-50 rounded-lg bg-gray-800/80 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700/90"
+            >
+              Edit Avatar
+            </button>
+
             {/* LiveKit Media Layer */}
             <SpaceMediaLayer
               spaceName={space.name}
@@ -503,6 +517,20 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
               />
             )}
           </>
+        )}
+        {/* Avatar Editor Modal */}
+        {showAvatarEditor && (
+          <AvatarEditorModal
+            currentAvatar={currentAvatar}
+            onSave={(avatarString) => {
+              setCurrentAvatar(avatarString);
+              // 소켓으로 다른 유저에게 브로드캐스트
+              sendAvatarUpdate(avatarString);
+              // 로컬 플레이어 스프라이트 업데이트
+              eventBridge.emit(GameEvents.PLAYER_AVATAR_UPDATED, { avatar: avatarString });
+            }}
+            onClose={() => setShowAvatarEditor(false)}
+          />
         )}
       </div>
     </LiveKitRoomProvider>

@@ -91,6 +91,9 @@ export interface ClientToServerEvents {
   }) => void;
   "editor:object-delete": (data: { id: string }) => void;
 
+  // Avatar
+  "avatar:update": (data: { avatar: string }) => void;
+
   // Media
   "recording:start": () => void;
   "recording:stop": () => void;
@@ -181,6 +184,9 @@ export interface ServerToClientEvents {
     announcer: string;
     timestamp: string;
   }) => void;
+
+  // Avatar
+  "player:avatar-updated": (data: { userId: string; avatar: string }) => void;
 
   // Editor
   "editor:tile-updated": (data: {

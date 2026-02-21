@@ -10,6 +10,7 @@ import { handleChat } from "./handlers/chat";
 import { handleParty } from "./handlers/party";
 import { handleEditor } from "./handlers/editor";
 import { handleMedia } from "./handlers/media";
+import { handleAvatar } from "./handlers/avatar";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -57,6 +58,7 @@ io.on("connection", (socket) => {
   handleParty(io, socket);
   handleEditor(io, socket);
   handleMedia(io, socket);
+  handleAvatar(io, socket);
 
   socket.on("disconnect", (reason) => {
     console.log(

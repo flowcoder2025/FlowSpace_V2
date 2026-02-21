@@ -5,7 +5,7 @@
  */
 
 import { DEPTH } from "@/constants/game-constants";
-import { parseAvatarString, generateAvatarSprite, DIRECTION_FRAMES, IDLE_FRAMES } from "@/features/space/avatar";
+import { parseAvatarString, generateAvatarSpriteFromConfig, DIRECTION_FRAMES, IDLE_FRAMES } from "@/features/space/avatar";
 import type { Direction } from "@/features/space/avatar";
 
 const LERP_DURATION = 150; // ms
@@ -35,20 +35,14 @@ export class RemotePlayerSprite {
 
     // 아바타 텍스처 생성
     const avatarConfig = parseAvatarString(info.avatar);
-    let textureKey: string;
-
-    if (avatarConfig.type === "classic") {
-      textureKey = generateAvatarSprite(scene, avatarConfig);
-    } else {
-      textureKey = avatarConfig.textureKey;
-    }
+    const textureKey = generateAvatarSpriteFromConfig(scene, avatarConfig);
 
     // 스프라이트 생성 (물리 없음 - 보간 이동)
     this.sprite = scene.add.sprite(info.x, info.y, textureKey, 0);
     this.sprite.setDepth(DEPTH.PLAYER);
 
     // 닉네임
-    this.nameText = scene.add.text(info.x, info.y - 20, info.nickname, {
+    this.nameText = scene.add.text(info.x, info.y - 28, info.nickname, {
       fontSize: "11px",
       color: "#ffffff",
       fontFamily: "monospace",
@@ -99,7 +93,7 @@ export class RemotePlayerSprite {
 
     this.scene.tweens.add({
       targets: this.nameText,
-      y: y - 20,
+      y: y - 28,
       duration: LERP_DURATION,
       ease: "Linear",
       onComplete: () => {
@@ -114,8 +108,30 @@ export class RemotePlayerSprite {
   update(): void {
     // 닉네임 위치 동기화 (tween이 아닐 때)
     if (!this.isMoving) {
-      this.nameText.setPosition(this.sprite.x, this.sprite.y - 20);
+      this.nameText.setPosition(this.sprite.x, this.sprite.y - 28);
     }
+  }
+
+  /** 런타임 아바타 변경 */
+  updateAvatar(avatarString: string): void {
+    const config = parseAvatarString(avatarString);
+    const newKey = generateAvatarSpriteFromConfig(this.scene, config);
+
+    // 기존 애니메이션 제거
+    const directions: Direction[] = ["down", "left", "right", "up"];
+    for (const dir of directions) {
+      const key = `remote-walk-${this.userId}-${dir}`;
+      if (this.scene.anims.exists(key)) {
+        this.scene.anims.remove(key);
+      }
+    }
+
+    // 텍스처 교체
+    this.sprite.setTexture(newKey);
+
+    // 새 애니메이션 생성
+    this.createAnimations(newKey);
+    this.sprite.setFrame(IDLE_FRAMES[this.currentDirection]);
   }
 
   /** 리소스 정리 */

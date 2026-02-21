@@ -18,6 +18,10 @@ export const GameEvents = {
   REMOTE_PLAYER_MOVED: "remote:player:moved",
   REMOTE_PLAYER_JOINED: "remote:player:joined",
   REMOTE_PLAYER_LEFT: "remote:player:left",
+  REMOTE_PLAYER_AVATAR_UPDATED: "remote:player:avatar:updated",
+
+  // Local player avatar update (→ socket bridge)
+  PLAYER_AVATAR_UPDATED: "player:avatar:updated",
 
   // UI events
   CHAT_FOCUS: "chat:focus",
