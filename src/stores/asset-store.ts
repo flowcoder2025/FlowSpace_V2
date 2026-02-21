@@ -21,6 +21,7 @@ interface AssetStore {
   isLoading: boolean;
   typeFilter: AssetTypeFilter;
   statusFilter: AssetStatusFilter;
+  selectedAssetId: string | null;
   setAssets: (assets: AssetItem[]) => void;
   addAsset: (asset: AssetItem) => void;
   updateAsset: (id: string, updates: Partial<AssetItem>) => void;
@@ -28,6 +29,7 @@ interface AssetStore {
   setLoading: (loading: boolean) => void;
   setTypeFilter: (filter: AssetTypeFilter) => void;
   setStatusFilter: (filter: AssetStatusFilter) => void;
+  setSelectedAssetId: (id: string | null) => void;
 }
 
 export const useAssetStore = create<AssetStore>((set) => ({
@@ -35,6 +37,7 @@ export const useAssetStore = create<AssetStore>((set) => ({
   isLoading: false,
   typeFilter: "all",
   statusFilter: "all",
+  selectedAssetId: null,
 
   setAssets: (assets) => set({ assets }),
 
@@ -54,4 +57,5 @@ export const useAssetStore = create<AssetStore>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
   setTypeFilter: (typeFilter) => set({ typeFilter }),
   setStatusFilter: (statusFilter) => set({ statusFilter }),
+  setSelectedAssetId: (selectedAssetId) => set({ selectedAssetId }),
 }));

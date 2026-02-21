@@ -60,10 +60,10 @@ export const PROMPT_PREFIXES: Record<AssetType, string> = {
   character:
     "pixel art character sprite sheet, 8 frames walk cycle, 4 directions (down, left, right, up), 64x64 pixel per frame, 8x4 grid layout, transparent background, game asset, top-down RPG style, ",
   tileset:
-    "pixel art tileset, 32x32 pixel tiles, 16x14 grid layout, top-down RPG style, game asset, consistent style, ",
+    "16-bit pixel art tileset sprite sheet, top-down view, 32x32 pixel tiles arranged in a grid, retro RPG game asset, flat 2D, no perspective, no shadows, clean pixel edges, consistent color palette, ",
   object:
-    "pixel art game object, transparent background, centered, game asset, top-down view, ",
-  map: "top-down view map background, pixel art style, game environment, ",
+    "16-bit pixel art game object sprite, top-down view, transparent background, centered, flat 2D, retro RPG style, clean pixel edges, ",
+  map: "16-bit pixel art top-down game map, flat 2D overhead view, retro RPG style, clean pixel art, no perspective, no 3D, ",
 };
 
 /** Seamless 타일 프롬프트 프리픽스 */
@@ -73,10 +73,10 @@ export const SEAMLESS_PROMPT_PREFIX =
 /** 에셋 유형별 기본 네거티브 프롬프트 */
 export const DEFAULT_NEGATIVE_PROMPTS: Record<AssetType, string> = {
   character:
-    "blurry, low quality, watermark, text, realistic, photo, 3d render, deformed, ugly",
+    "blurry, low quality, watermark, text, realistic, photorealistic, 3d render, deformed, ugly",
   tileset:
-    "blurry, low quality, watermark, text, realistic, photo, 3d render, inconsistent style",
+    "blurry, low quality, watermark, text, realistic, photorealistic, 3d render, perspective, vanishing point, photograph, high resolution, shadows, lighting effects",
   object:
-    "blurry, low quality, watermark, text, realistic, photo, 3d render, complex background",
-  map: "blurry, low quality, watermark, text, realistic, photo, perspective view, isometric",
+    "blurry, low quality, watermark, text, realistic, photorealistic, 3d render, perspective, photograph, complex background, shadows",
+  map: "blurry, low quality, watermark, text, realistic, photorealistic, 3d render, perspective view, isometric, photograph, vanishing point, shadows, lighting effects",
 };
