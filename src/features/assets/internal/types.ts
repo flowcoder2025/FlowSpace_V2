@@ -20,6 +20,32 @@ export interface CreateAssetParams {
   seed?: number;
   width?: number;
   height?: number;
+  /** 네거티브 프롬프트 (미지정 시 유형별 기본값 사용) */
+  negativePrompt?: string;
+  /** KSampler steps (미지정 시 프리셋 또는 워크플로우 기본값) */
+  steps?: number;
+  /** CFG Scale (미지정 시 프리셋 또는 워크플로우 기본값) */
+  cfgScale?: number;
+  /** Sampler 이름 (euler, dpmpp_2m 등) */
+  samplerName?: string;
+  /** Scheduler (normal, karras 등) */
+  scheduler?: string;
+  /** 품질 프리셋 (draft/standard/high) - 개별 값보다 우선 */
+  qualityPreset?: string;
+  /** 배경 제거 여부 (character/object 기본 true) */
+  removeBackground?: boolean;
+  /** 배경 제거 색상 허용 오차 (0-255, 기본 30) */
+  bgRemovalTolerance?: number;
+  /** Seamless 타일링 (tileset 전용) */
+  seamless?: boolean;
+  /** ControlNet 사용 여부 (character 전용) */
+  useControlNet?: boolean;
+  /** ControlNet 모델 이름 */
+  controlNetModel?: string;
+  /** ControlNet 강도 (0-1) */
+  controlNetStrength?: number;
+  /** 포즈 참조 이미지 경로 */
+  poseImage?: string;
 }
 
 /** 에셋 규격 정의 */

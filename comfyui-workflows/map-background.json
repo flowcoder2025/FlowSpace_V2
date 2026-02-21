@@ -10,7 +10,12 @@
     },
     "parameters": {
       "prompt": { "nodeId": "6", "field": "text", "type": "string" },
+      "negative_prompt": { "nodeId": "7", "field": "text", "type": "string" },
       "seed": { "nodeId": "3", "field": "seed", "type": "number" },
+      "steps": { "nodeId": "3", "field": "steps", "type": "number", "default": 30 },
+      "cfg": { "nodeId": "3", "field": "cfg", "type": "number", "default": 7.5 },
+      "sampler_name": { "nodeId": "3", "field": "sampler_name", "type": "string", "default": "euler_ancestral" },
+      "scheduler": { "nodeId": "3", "field": "scheduler", "type": "string", "default": "normal" },
       "width": { "nodeId": "5", "field": "width", "type": "number", "default": 768 },
       "height": { "nodeId": "5", "field": "height", "type": "number", "default": 576 }
     }

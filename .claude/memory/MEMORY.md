@@ -19,6 +19,8 @@
 | Admin Dashboard | 2026-02-19 | Phase 9 |
 | Chat Port (flow_metaverse → FlowSpace) | 2026-02-20 | Phase 10 (6 sub-phases) |
 | LiveKit 음성/화상 포팅 | 2026-02-20 | Phase 11 (통합+QA) |
+| 파츠 조합 캐릭터 시스템 | 2026-02-21 | Phase 1~3 (Core+UI+인게임) |
+| ComfyUI 파이프라인 개선 | 2026-02-22 | Phase 1~4 (프롬프트+배경제거+Seamless+ControlNet) |
 
 ## Architecture Decisions
 - 6 도메인 rules (`.claude/rules/` path-based auto-load)
@@ -35,10 +37,12 @@
 - 배포: Dockerfile (standalone) + docker-compose + GitHub Actions CI
 
 ## Next Steps
-1. 에디터 명령어 연동 (chat-parser editor_command → 맵 에디터)
-2. 브라우저 알림 (Notification API)
-3. 모바일 반응형
-4. 프로덕션 배포 (Vercel/Docker)
+1. **마이너 보강**: seed 데이터 parts 포맷, E2E 검증, 레거시 폴백 확인
+2. ComfyUI 추가 개선 (LoRA 지원, Flux.1 모델, 실시간 프리뷰)
+3. 에디터 명령어 연동 (chat-parser editor_command → 맵 에디터)
+4. 브라우저 알림 (Notification API)
+5. 모바일 반응형
+6. 프로덕션 배포 (Vercel/Docker)
 
 ## Supabase DB 연결 정보
 - Host: `aws-1-ap-southeast-2.pooler.supabase.com`
@@ -70,6 +74,17 @@
 - 개발서버: `npm run dev:all` (Next.js 3000 + Socket.io 3001 + LiveKit 7880)
 - LiveKit 바이너리: `bin/livekit-server.exe` v1.9.11 (gitignore, 수동 설치)
 - Playwright: 프로젝트 devDependency로 설치됨 (E2E 디버깅용)
+
+## Avatar System (Parts)
+- **해상도**: 32x48 (4x4 spritesheet = 128x192)
+- **레이어 순서**: body → bottom → top → eyes → hair → accessory
+- **조합**: 3×6×4×6×4×5 = 8,640 기본 조합 (색상 무한)
+- **포맷**: `"parts:body_01:FFC0A0|hair_03:FF0000|eyes_02|top_05:2196F3|bottom_02:333366|acc_none"`
+- **공존**: classic: / custom: / parts: (하위 호환)
+- **DB**: User.avatarConfig (Json?) — `{ avatarString: "parts:..." }`
+- **에디터**: `src/components/avatar/` (React 독립, Phaser 불필요)
+- **런타임 스왑**: `updateAvatar(avatarString)` — texture 교체 + animation 재생성
+- **소켓**: `avatar:update` → `player:avatar-updated` 브로드캐스트
 
 ## Lessons (프로젝트 로컬)
 - tsx(cross-env)로 실행하는 소켓 서버는 .env 자동 로드 안 함 → `import { config } from "dotenv"` 필수

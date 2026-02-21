@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "name": "Character Sprite Generator",
-    "description": "Pixel Art Diffusion XL로 4방향 캐릭터 스프라이트시트를 생성합니다",
-    "version": "2.0.0",
+    "name": "Character Sprite Generator (ControlNet)",
+    "description": "ControlNet 포즈 가이드를 사용하여 4방향 캐릭터 스프라이트시트를 생성합니다",
+    "version": "1.0.0",
     "assetType": "character",
     "outputFormat": {
       "width": 1024,
@@ -19,7 +19,10 @@
       "sampler_name": { "nodeId": "3", "field": "sampler_name", "type": "string", "default": "euler_ancestral" },
       "scheduler": { "nodeId": "3", "field": "scheduler", "type": "string", "default": "normal" },
       "width": { "nodeId": "5", "field": "width", "type": "number", "default": 1024 },
-      "height": { "nodeId": "5", "field": "height", "type": "number", "default": 512 }
+      "height": { "nodeId": "5", "field": "height", "type": "number", "default": 512 },
+      "controlnet_model": { "nodeId": "10", "field": "control_net_name", "type": "string", "default": "control_v11p_sd15_openpose.pth" },
+      "controlnet_strength": { "nodeId": "11", "field": "strength", "type": "number", "default": 0.8 },
+      "pose_image": { "nodeId": "12", "field": "image", "type": "string", "default": "pose-4dir-spritesheet.png" }
     }
   },
   "3": {
@@ -32,8 +35,8 @@
       "scheduler": "normal",
       "denoise": 1.0,
       "model": ["4", 0],
-      "positive": ["6", 0],
-      "negative": ["7", 0],
+      "positive": ["11", 0],
+      "negative": ["11", 1],
       "latent_image": ["5", 0]
     }
   },
@@ -75,8 +78,30 @@
   "9": {
     "class_type": "SaveImage",
     "inputs": {
-      "filename_prefix": "character_sprite",
+      "filename_prefix": "character_controlnet",
       "images": ["8", 0]
+    }
+  },
+  "10": {
+    "class_type": "ControlNetLoader",
+    "inputs": {
+      "control_net_name": "control_v11p_sd15_openpose.pth"
+    }
+  },
+  "11": {
+    "class_type": "ControlNetApply",
+    "inputs": {
+      "conditioning": ["6", 0],
+      "control_net": ["10", 0],
+      "image": ["12", 0],
+      "strength": 0.8
+    }
+  },
+  "12": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "pose-4dir-spritesheet.png",
+      "upload": "image"
     }
   }
 }

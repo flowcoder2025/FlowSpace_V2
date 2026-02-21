@@ -59,6 +59,19 @@ export async function POST(request: Request) {
       seed: body.seed,
       width: body.width,
       height: body.height,
+      negativePrompt: body.negativePrompt,
+      steps: body.steps,
+      cfgScale: body.cfgScale,
+      samplerName: body.samplerName,
+      scheduler: body.scheduler,
+      qualityPreset: body.qualityPreset,
+      removeBackground: body.removeBackground,
+      bgRemovalTolerance: body.bgRemovalTolerance,
+      seamless: body.seamless,
+      useControlNet: body.useControlNet,
+      controlNetModel: body.controlNetModel,
+      controlNetStrength: body.controlNetStrength,
+      poseImage: body.poseImage,
     })
       .then(async (metadata) => {
         await prisma.generatedAsset.update({

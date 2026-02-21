@@ -1,33 +1,35 @@
 {
   "_meta": {
-    "name": "Object Item Generator",
-    "description": "DreamShaper 8로 오브젝트/아이템 이미지를 생성합니다",
+    "name": "Tileset Seamless Generator",
+    "description": "Seamless 타일링에 최적화된 타일셋을 생성합니다",
     "version": "1.0.0",
-    "assetType": "object",
+    "assetType": "tileset",
     "outputFormat": {
       "width": 512,
-      "height": 512
+      "height": 448,
+      "grid": "16x14",
+      "tileSize": "32x32"
     },
     "parameters": {
       "prompt": { "nodeId": "6", "field": "text", "type": "string" },
       "negative_prompt": { "nodeId": "7", "field": "text", "type": "string" },
       "seed": { "nodeId": "3", "field": "seed", "type": "number" },
-      "steps": { "nodeId": "3", "field": "steps", "type": "number", "default": 30 },
-      "cfg": { "nodeId": "3", "field": "cfg", "type": "number", "default": 7.5 },
-      "sampler_name": { "nodeId": "3", "field": "sampler_name", "type": "string", "default": "euler_ancestral" },
-      "scheduler": { "nodeId": "3", "field": "scheduler", "type": "string", "default": "normal" },
+      "steps": { "nodeId": "3", "field": "steps", "type": "number", "default": 35 },
+      "cfg": { "nodeId": "3", "field": "cfg", "type": "number", "default": 8 },
+      "sampler_name": { "nodeId": "3", "field": "sampler_name", "type": "string", "default": "dpmpp_2m" },
+      "scheduler": { "nodeId": "3", "field": "scheduler", "type": "string", "default": "karras" },
       "width": { "nodeId": "5", "field": "width", "type": "number", "default": 512 },
-      "height": { "nodeId": "5", "field": "height", "type": "number", "default": 512 }
+      "height": { "nodeId": "5", "field": "height", "type": "number", "default": 448 }
     }
   },
   "3": {
     "class_type": "KSampler",
     "inputs": {
       "seed": 0,
-      "steps": 30,
-      "cfg": 7.5,
-      "sampler_name": "euler_ancestral",
-      "scheduler": "normal",
+      "steps": 35,
+      "cfg": 8,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
       "denoise": 1.0,
       "model": ["4", 0],
       "positive": ["6", 0],
@@ -45,21 +47,21 @@
     "class_type": "EmptyLatentImage",
     "inputs": {
       "width": 512,
-      "height": 512,
+      "height": 448,
       "batch_size": 1
     }
   },
   "6": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "pixel art game object, item icon, transparent background, clean edges, game asset, top-down RPG style",
+      "text": "pixel art tileset, seamless tiles, 32x32 pixel tiles, 16x14 grid layout, top-down RPG style, tileable pattern, repeating texture, consistent style, game asset",
       "clip": ["4", 1]
     }
   },
   "7": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "blurry, low quality, watermark, text, realistic, photo, 3d render, complex background",
+      "text": "blurry, low quality, watermark, text, realistic, photo, 3d render, inconsistent style, visible seams, edge artifacts",
       "clip": ["4", 1]
     }
   },
@@ -73,7 +75,7 @@
   "9": {
     "class_type": "SaveImage",
     "inputs": {
-      "filename_prefix": "object_item",
+      "filename_prefix": "tileset_seamless",
       "images": ["8", 0]
     }
   }

@@ -15,7 +15,10 @@ async function main() {
       email: "test@flowspace.dev",
       name: "Test User",
       password,
-      avatarConfig: { color: "#3B82F6" },
+      avatarConfig: {
+        avatarString:
+          "parts:body_01:f5d0a9|hair_01:2a1a0a|eyes_01|top_01:4060c0|bottom_01:304080|acc_none",
+      },
     },
   });
   console.log(`  User: ${testUser.email} (id: ${testUser.id})`);
@@ -29,7 +32,10 @@ async function main() {
       name: "Admin",
       password,
       isSuperAdmin: true,
-      avatarConfig: { color: "#EF4444" },
+      avatarConfig: {
+        avatarString:
+          "parts:body_02:e8b88a|hair_03:c08040|eyes_02|top_03:c04040|bottom_02:404040|acc_01",
+      },
     },
   });
   console.log(`  Admin: ${adminUser.email} (id: ${adminUser.id})`);

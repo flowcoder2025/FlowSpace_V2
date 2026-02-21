@@ -5,12 +5,14 @@ import type { AssetType, WorkflowMeta } from "./types";
 
 const WORKFLOW_DIR = join(process.cwd(), "comfyui-workflows");
 
-/** 워크플로우 파일명 매핑 */
-const WORKFLOW_FILES: Record<AssetType, string> = {
+/** 워크플로우 파일명 매핑 (기본 + variant) */
+const WORKFLOW_FILES: Record<string, string> = {
   character: "character-sprite.json",
   tileset: "tileset-grid.json",
   object: "object-item.json",
   map: "map-background.json",
+  "tileset-seamless": "tileset-seamless.json",
+  "character-controlnet": "character-controlnet.json",
 };
 
 interface WorkflowFile {
@@ -18,11 +20,13 @@ interface WorkflowFile {
   [nodeId: string]: unknown;
 }
 
-/** 워크플로우 템플릿 로드 */
+/** 워크플로우 템플릿 로드 (variant 지원) */
 export async function loadWorkflowTemplate(
-  type: AssetType
+  type: AssetType,
+  variant?: string
 ): Promise<{ meta: WorkflowMeta; workflow: ComfyUIWorkflow }> {
-  const filename = WORKFLOW_FILES[type];
+  const key = variant ? `${type}-${variant}` : type;
+  const filename = WORKFLOW_FILES[key] || WORKFLOW_FILES[type];
   const filePath = join(WORKFLOW_DIR, filename);
   const content = await readFile(filePath, "utf-8");
   const parsed = JSON.parse(content) as WorkflowFile;

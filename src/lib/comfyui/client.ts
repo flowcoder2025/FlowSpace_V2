@@ -217,6 +217,24 @@ export class ComfyUIClient {
     );
   }
 
+  /** ComfyUI 오브젝트 정보 조회 (노드/모델 목록) */
+  async getObjectInfo(): Promise<Record<string, unknown>> {
+    const effectiveMode = await this.resolveEffectiveMode();
+    if (effectiveMode === "mock") {
+      return {};
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/object_info`);
+      if (!response.ok) {
+        return {};
+      }
+      return (await response.json()) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+
   /** 에셋 생성 (high-level API) */
   async generateAsset(
     params: GenerateAssetParams,

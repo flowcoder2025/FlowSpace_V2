@@ -29,7 +29,6 @@ export function ChatInputArea({
   currentPartyId,
   currentPartyName,
   placeholder = "메시지 입력...",
-  activeTab = "all",
   whisperHistory = [],
   autoFocus = false,
   onEscape,
