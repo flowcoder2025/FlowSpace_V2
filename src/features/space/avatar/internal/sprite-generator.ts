@@ -1,17 +1,18 @@
 /**
  * Sprite Generator - Canvas API 프로시저럴 캐릭터 생성
  *
- * 4x4 그리드 (24x32 per frame = 96x128 총 크기)
+ * 4x4 그리드 (32x48 per frame = 128x192 총 크기)
  * 행: down, left, right, up
  * 열: 4프레임 걷기 애니메이션
  */
 
 import { PLAYER_WIDTH, PLAYER_HEIGHT, SPRITE_COLS, SPRITE_ROWS } from "@/constants/game-constants";
-import type { ClassicAvatarConfig } from "./avatar-types";
+import type { AvatarConfig, ClassicAvatarConfig } from "./avatar-types";
 import { getTextureKey } from "./avatar-config";
+import { generatePartsSprite } from "./parts/parts-compositor";
 
-const SHEET_WIDTH = PLAYER_WIDTH * SPRITE_COLS; // 96
-const SHEET_HEIGHT = PLAYER_HEIGHT * SPRITE_ROWS; // 128
+const SHEET_WIDTH = PLAYER_WIDTH * SPRITE_COLS; // 128
+const SHEET_HEIGHT = PLAYER_HEIGHT * SPRITE_ROWS; // 192
 
 /** 걷기 애니메이션 오프셋 (프레임별 세로 이동) */
 const WALK_OFFSETS = [0, -1, 0, -1];
@@ -25,7 +26,7 @@ interface DrawContext {
   frame: number; // 0-3
 }
 
-/** 단일 프레임 그리기 */
+/** 단일 프레임 그리기 (32x48 해상도) */
 function drawCharacterFrame(dc: DrawContext): void {
   const { ctx, x, y, config, direction, frame } = dc;
   const yOff = WALK_OFFSETS[frame];
@@ -34,72 +35,72 @@ function drawCharacterFrame(dc: DrawContext): void {
   const isStep = frame === 1 || frame === 3;
   const legOffset = isStep ? (frame === 1 ? -1 : 1) : 0;
 
-  // Body (바지)
+  // Body (바지 영역)
   ctx.fillStyle = config.pantsColor;
-  ctx.fillRect(x + 6, y + 20 + yOff, 12, 10);
+  ctx.fillRect(x + 8, y + 30 + yOff, 16, 14);
 
   // Legs
   ctx.fillStyle = config.pantsColor;
-  ctx.fillRect(x + 6 + legOffset, y + 26 + yOff, 5, 6);
-  ctx.fillRect(x + 13 - legOffset, y + 26 + yOff, 5, 6);
+  ctx.fillRect(x + 8 + legOffset, y + 38 + yOff, 7, 10);
+  ctx.fillRect(x + 17 - legOffset, y + 38 + yOff, 7, 10);
 
   // Shoes
   ctx.fillStyle = "#2a2a2a";
-  ctx.fillRect(x + 6 + legOffset, y + 30 + yOff, 5, 2);
-  ctx.fillRect(x + 13 - legOffset, y + 30 + yOff, 5, 2);
+  ctx.fillRect(x + 8 + legOffset, y + 45 + yOff, 7, 3);
+  ctx.fillRect(x + 17 - legOffset, y + 45 + yOff, 7, 3);
 
   // Torso (셔츠)
   ctx.fillStyle = config.shirtColor;
-  ctx.fillRect(x + 5, y + 12 + yOff, 14, 10);
+  ctx.fillRect(x + 7, y + 18 + yOff, 18, 14);
 
   // Arms
   if (direction === 1) {
     // left - 오른팔만 보임
-    ctx.fillRect(x + 17, y + 13 + yOff, 4, 8);
+    ctx.fillRect(x + 23, y + 19 + yOff, 5, 11);
   } else if (direction === 2) {
     // right - 왼팔만 보임
-    ctx.fillRect(x + 3, y + 13 + yOff, 4, 8);
+    ctx.fillRect(x + 4, y + 19 + yOff, 5, 11);
   } else {
     // front/back - 양팔
-    ctx.fillRect(x + 2, y + 13 + yOff, 4, 8);
-    ctx.fillRect(x + 18, y + 13 + yOff, 4, 8);
+    ctx.fillRect(x + 3, y + 19 + yOff, 5, 11);
+    ctx.fillRect(x + 24, y + 19 + yOff, 5, 11);
   }
 
   // Head
   ctx.fillStyle = config.skinColor;
-  ctx.fillRect(x + 6, y + 2 + yOff, 12, 12);
+  ctx.fillRect(x + 8, y + 3 + yOff, 16, 16);
 
   // Hair
   ctx.fillStyle = config.hairColor;
   if (direction === 0) {
     // down (front) - 이마+측면
-    ctx.fillRect(x + 5, y + 1 + yOff, 14, 4);
-    ctx.fillRect(x + 5, y + 3 + yOff, 2, 4);
-    ctx.fillRect(x + 17, y + 3 + yOff, 2, 4);
+    ctx.fillRect(x + 7, y + 1 + yOff, 18, 6);
+    ctx.fillRect(x + 7, y + 5 + yOff, 3, 6);
+    ctx.fillRect(x + 22, y + 5 + yOff, 3, 6);
   } else if (direction === 3) {
     // up (back) - 전체 머리카락
-    ctx.fillRect(x + 5, y + 1 + yOff, 14, 10);
+    ctx.fillRect(x + 7, y + 1 + yOff, 18, 14);
   } else {
     // side
-    ctx.fillRect(x + 5, y + 1 + yOff, 14, 4);
+    ctx.fillRect(x + 7, y + 1 + yOff, 18, 6);
     if (direction === 1) {
-      ctx.fillRect(x + 15, y + 3 + yOff, 4, 6);
+      ctx.fillRect(x + 20, y + 5 + yOff, 5, 8);
     } else {
-      ctx.fillRect(x + 5, y + 3 + yOff, 4, 6);
+      ctx.fillRect(x + 7, y + 5 + yOff, 5, 8);
     }
   }
 
-  // Eyes (front only)
+  // Eyes (front/side only)
   if (direction === 0) {
     ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(x + 8, y + 7 + yOff, 2, 2);
-    ctx.fillRect(x + 14, y + 7 + yOff, 2, 2);
+    ctx.fillRect(x + 11, y + 10 + yOff, 3, 3);
+    ctx.fillRect(x + 18, y + 10 + yOff, 3, 3);
   } else if (direction === 1) {
     ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(x + 8, y + 7 + yOff, 2, 2);
+    ctx.fillRect(x + 11, y + 10 + yOff, 3, 3);
   } else if (direction === 2) {
     ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(x + 14, y + 7 + yOff, 2, 2);
+    ctx.fillRect(x + 18, y + 10 + yOff, 3, 3);
   }
 }
 
@@ -145,4 +146,23 @@ export function generateAvatarSprite(
   );
 
   return key;
+}
+
+/**
+ * 통합 아바타 스프라이트 생성 (classic/parts 모두 처리)
+ *
+ * @returns textureKey
+ */
+export function generateAvatarSpriteFromConfig(
+  scene: Phaser.Scene,
+  config: AvatarConfig,
+): string {
+  if (config.type === "parts") {
+    return generatePartsSprite(scene, config);
+  }
+  if (config.type === "classic") {
+    return generateAvatarSprite(scene, config);
+  }
+  // custom - textureKey는 이미 로드됨
+  return config.textureKey;
 }

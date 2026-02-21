@@ -1,5 +1,7 @@
 /** 아바타 타입 정의 */
 
+import type { PartsAvatarConfig } from "./parts/parts-types";
+
 /** Classic 아바타 (프로시저럴 생성) */
 export interface ClassicAvatarConfig {
   type: "classic";
@@ -15,7 +17,9 @@ export interface CustomAvatarConfig {
   textureKey: string;
 }
 
-export type AvatarConfig = ClassicAvatarConfig | CustomAvatarConfig;
+export type { PartsAvatarConfig };
+
+export type AvatarConfig = ClassicAvatarConfig | CustomAvatarConfig | PartsAvatarConfig;
 
 /** 방향별 애니메이션 프레임 매핑 (4x4 스프라이트시트) */
 export const DIRECTION_FRAMES = {

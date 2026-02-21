@@ -11,8 +11,8 @@ export const MAP_HEIGHT = MAP_ROWS * TILE_SIZE;
 
 // Player
 export const PLAYER_SPEED = 160;
-export const PLAYER_WIDTH = 24;
-export const PLAYER_HEIGHT = 32;
+export const PLAYER_WIDTH = 32;
+export const PLAYER_HEIGHT = 48;
 export const DIAGONAL_FACTOR = 0.707;
 
 // Sprite

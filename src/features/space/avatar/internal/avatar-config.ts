@@ -1,10 +1,12 @@
 /**
- * Avatar Config - Classic/Custom 아바타 설정 및 파싱
+ * Avatar Config - Classic/Custom/Parts 아바타 설정 및 파싱
  *
- * 8색 팔레트 기반 프로시저럴 아바타 시스템
+ * 8색 팔레트 기반 프로시저럴 아바타 시스템 + 파츠 조합 시스템
  */
 
 import type { AvatarConfig, ClassicAvatarConfig } from "./avatar-types";
+import type { PartsAvatarConfig } from "./parts/parts-types";
+import { parsePartsString, getPartsTextureKey } from "./parts/parts-string";
 
 /** 기본 8색 팔레트 */
 export const SKIN_COLORS = [
@@ -27,7 +29,18 @@ export const PANTS_COLORS = [
   "#306030", "#505050", "#202020", "#606080",
 ] as const;
 
-/** 기본 아바타 설정 */
+/** 기본 아바타 설정 (Parts 기본값) */
+export const DEFAULT_PARTS_AVATAR: PartsAvatarConfig = {
+  type: "parts",
+  body: { partId: "body_01", color: "#f5d0a9" },
+  hair: { partId: "hair_01", color: "#2a1a0a" },
+  eyes: { partId: "eyes_01" },
+  top: { partId: "top_01", color: "#4060c0" },
+  bottom: { partId: "bottom_01", color: "#304080" },
+  accessory: { partId: "acc_none" },
+};
+
+/** Classic 기본 아바타 (하위 호환) */
 export const DEFAULT_AVATAR: ClassicAvatarConfig = {
   type: "classic",
   skinColor: SKIN_COLORS[0],
@@ -41,14 +54,26 @@ export const DEFAULT_AVATAR: ClassicAvatarConfig = {
  *
  * 형식: "classic:skin,hair,shirt,pants" (인덱스)
  * 또는 "custom:textureKey"
+ * 또는 "parts:body_01:FFC0A0|hair_03:FF0000|eyes_02|top_05:2196F3|bottom_02:333366|acc_none"
  * 또는 "default"
  */
 export function parseAvatarString(avatarStr: string): AvatarConfig {
   if (!avatarStr || avatarStr === "default") {
-    return DEFAULT_AVATAR;
+    return DEFAULT_PARTS_AVATAR;
   }
 
-  const [type, data] = avatarStr.split(":");
+  const colonIdx = avatarStr.indexOf(":");
+  if (colonIdx === -1) {
+    // userId 해시 기반 자동 생성
+    return generateFromHash(avatarStr);
+  }
+
+  const type = avatarStr.substring(0, colonIdx);
+  const data = avatarStr.substring(colonIdx + 1);
+
+  if (type === "parts" && data) {
+    return parsePartsString(data);
+  }
 
   if (type === "custom" && data) {
     return { type: "custom", textureKey: data };
@@ -90,6 +115,9 @@ function generateFromHash(str: string): ClassicAvatarConfig {
 export function getTextureKey(config: AvatarConfig): string {
   if (config.type === "custom") {
     return config.textureKey;
+  }
+  if (config.type === "parts") {
+    return getPartsTextureKey(config);
   }
   return `avatar_${config.skinColor}_${config.hairColor}_${config.shirtColor}_${config.pantsColor}`;
 }
