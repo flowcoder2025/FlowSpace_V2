@@ -36,7 +36,7 @@ export function ColorPicker({ value, onChange, label }: ColorPickerProps) {
         {/* 커스텀 색상 */}
         <label
           className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-[10px] text-gray-400 hover:border-gray-400"
-          title="Custom color"
+          title="직접 색상 선택"
         >
           +
           <input

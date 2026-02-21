@@ -10,9 +10,9 @@ export default function AssetStudioPage() {
           href={ROUTES.ASSETS}
           className="text-sm text-gray-500 hover:text-gray-700"
         >
-          &larr; Back to Assets
+          &larr; 에셋 목록으로
         </Link>
-        <h1 className="text-2xl font-bold mt-2">Asset Studio</h1>
+        <h1 className="text-2xl font-bold mt-2">에셋 스튜디오</h1>
         <p className="text-gray-600 mt-1">
           ComfyUI를 사용하여 게임 에셋을 생성하고 관리합니다
         </p>

@@ -5,17 +5,37 @@ import { useAssetStore } from "@/stores/asset-store";
 import { GenerationProgress } from "./generation-progress";
 
 const ASSET_TYPES = [
-  { value: "character", label: "Character Sprite", description: "4방향 캐릭터 스프라이트시트 (8x4 grid, 64x64)" },
-  { value: "tileset", label: "Tileset", description: "타일맵 타일셋 (16x14 grid, 32x32)" },
-  { value: "object", label: "Object", description: "오브젝트 스프라이트 (max 128x128)" },
-  { value: "map", label: "Map Background", description: "맵 배경 이미지 (기본 1024x768)" },
+  {
+    value: "character",
+    label: "캐릭터 스프라이트",
+    description: "4방향 걷기 애니메이션 (8x4 그리드, 64x64px)",
+    tooltip: "4방향(상/하/좌/우) 걷기 모션이 포함된 캐릭터 스프라이트시트를 생성합니다.",
+  },
+  {
+    value: "tileset",
+    label: "타일셋",
+    description: "맵 타일셋 (16x14 그리드, 32x32px)",
+    tooltip: "맵 에디터에서 사용할 타일셋 이미지를 생성합니다.",
+  },
+  {
+    value: "object",
+    label: "오브젝트",
+    description: "게임 오브젝트 (최대 128x128px)",
+    tooltip: "맵에 배치할 수 있는 단일 오브젝트를 생성합니다.",
+  },
+  {
+    value: "map",
+    label: "맵 배경",
+    description: "배경 이미지 (기본 1024x768px)",
+    tooltip: "스페이스의 배경으로 사용할 전체 맵 이미지를 생성합니다.",
+  },
 ] as const;
 
 const QUALITY_PRESETS = [
-  { value: "", label: "Default", description: "워크플로우 기본값" },
-  { value: "draft", label: "Draft", description: "빠른 미리보기 (15 steps)" },
-  { value: "standard", label: "Standard", description: "기본 품질 (25 steps)" },
-  { value: "high", label: "High", description: "최고 품질 (40 steps)" },
+  { value: "", label: "기본값", description: "워크플로우 기본 설정 사용" },
+  { value: "draft", label: "초안", description: "빠른 미리보기 (15 스텝)" },
+  { value: "standard", label: "표준", description: "기본 품질 (25 스텝)" },
+  { value: "high", label: "고품질", description: "최고 품질 (40 스텝)" },
 ] as const;
 
 const SAMPLER_OPTIONS = [
@@ -139,7 +159,7 @@ export function AssetGenerateForm() {
 
         if (!response.ok) {
           const data = await response.json();
-          throw new Error(data.error || "Batch generation failed");
+          throw new Error(data.error || "배치 생성 실패");
         }
 
         const data = await response.json();
@@ -175,7 +195,7 @@ export function AssetGenerateForm() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Generation failed");
+        throw new Error(data.error || "생성 실패");
       }
 
       const data = await response.json();
@@ -193,7 +213,7 @@ export function AssetGenerateForm() {
       setName("");
       setPrompt("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
     } finally {
       setIsSubmitting(false);
     }
@@ -208,10 +228,10 @@ export function AssetGenerateForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Asset Type Selection */}
+      {/* 에셋 유형 선택 */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Asset Type
+          에셋 유형
         </label>
         <div className="grid grid-cols-2 gap-3">
           {ASSET_TYPES.map((t) => (
@@ -219,6 +239,7 @@ export function AssetGenerateForm() {
               key={t.value}
               type="button"
               onClick={() => setType(t.value)}
+              title={t.tooltip}
               className={`p-3 rounded-lg border text-left transition-colors ${
                 type === t.value
                   ? "border-blue-500 bg-blue-50 text-blue-700"
@@ -232,14 +253,14 @@ export function AssetGenerateForm() {
         </div>
       </div>
 
-      {/* Workflow Selection */}
+      {/* 워크플로우 선택 */}
       {filteredWorkflows.length > 0 && (
         <div>
           <label
             htmlFor="workflow-select"
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            Workflow
+            워크플로우
           </label>
           <select
             id="workflow-select"
@@ -247,7 +268,7 @@ export function AssetGenerateForm() {
             onChange={(e) => setWorkflow(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           >
-            <option value="">Default</option>
+            <option value="">기본값</option>
             {filteredWorkflows.map((w) => (
               <option key={w.id} value={w.name}>
                 {w.name}
@@ -257,47 +278,52 @@ export function AssetGenerateForm() {
         </div>
       )}
 
-      {/* Name */}
+      {/* 이름 */}
       <div>
         <label
           htmlFor="asset-name"
           className="block text-sm font-medium text-gray-700 mb-1"
         >
-          Name
+          이름
+          <span className="ml-1 text-gray-400 font-normal" title="에셋의 식별 이름입니다. 영문 소문자와 밑줄(_)을 사용하세요.">(?)</span>
         </label>
         <input
           id="asset-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g., office_worker, forest_tiles"
+          placeholder="예: office_worker, forest_tiles"
           required
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      {/* Prompt */}
+      {/* 프롬프트 */}
       <div>
         <label
           htmlFor="asset-prompt"
           className="block text-sm font-medium text-gray-700 mb-1"
         >
-          Prompt
+          프롬프트
+          <span className="ml-1 text-gray-400 font-normal" title="생성할 에셋의 외형을 영어로 설명합니다. 상세할수록 결과물이 정확합니다.">(?)</span>
         </label>
         <textarea
           id="asset-prompt"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe the asset you want to generate..."
+          placeholder="생성할 에셋의 외형을 영어로 설명하세요..."
           required
           rows={4}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
         />
       </div>
 
-      {/* Quality Preset */}
+      {/* 품질 프리셋 */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Quality</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          품질
+          <span className="ml-1 text-gray-400 font-normal" title="생성 품질을 선택합니다. 높을수록 정교하지만 시간이 더 걸립니다.">(?)</span>
+        </label>
         <div className="flex gap-2">
           {QUALITY_PRESETS.map((q) => (
             <button
@@ -317,27 +343,27 @@ export function AssetGenerateForm() {
         </div>
       </div>
 
-      {/* Advanced Parameters */}
+      {/* 고급 설정 */}
       <details className="text-sm">
         <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
-          Advanced Parameters
+          고급 설정
         </summary>
         <div className="mt-2 space-y-3">
-          {/* Background Removal (character/object) */}
+          {/* 배경 제거 */}
           {(type === "character" || type === "object") && (
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" title="생성된 이미지에서 배경을 자동으로 투명 처리합니다.">
                 <input
                   type="checkbox"
                   checked={removeBg}
                   onChange={(e) => setRemoveBg(e.target.checked)}
                   className="rounded border-gray-300"
                 />
-                Remove Background
+                배경 제거
               </label>
               {removeBg && (
                 <div className="flex items-center gap-1">
-                  <label htmlFor="form-bg-tol" className="text-xs text-gray-500">Tolerance:</label>
+                  <label htmlFor="form-bg-tol" className="text-xs text-gray-500">허용치:</label>
                   <input
                     id="form-bg-tol"
                     type="range"
@@ -353,23 +379,23 @@ export function AssetGenerateForm() {
             </div>
           )}
 
-          {/* Seamless Tiling (tileset) */}
+          {/* 심리스 타일링 */}
           {type === "tileset" && (
-            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" title="타일 경계가 자연스럽게 이어지도록 생성합니다.">
               <input
                 type="checkbox"
                 checked={seamless}
                 onChange={(e) => setSeamless(e.target.checked)}
                 className="rounded border-gray-300"
               />
-              Seamless Tiling (타일 경계 이음매 없음)
+              심리스 타일링 (타일 경계 이음매 없음)
             </label>
           )}
 
-          {/* ControlNet (character) */}
+          {/* ControlNet */}
           {type === "character" && (
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" title="포즈 참조 이미지를 사용하여 캐릭터의 자세를 제어합니다. ComfyUI에 ControlNet 모델이 설치되어 있어야 합니다.">
                 <input
                   type="checkbox"
                   checked={useControlNet}
@@ -377,14 +403,14 @@ export function AssetGenerateForm() {
                   disabled={!controlNetAvailable}
                   className="rounded border-gray-300"
                 />
-                ControlNet Pose Guide
+                ControlNet 포즈 가이드
                 {!controlNetAvailable && (
-                  <span className="text-gray-400">(미설치)</span>
+                  <span className="text-amber-500" title="ComfyUI에 ControlNet 모델이 감지되지 않았습니다. ComfyUI Manager에서 설치하세요.">(설정 필요)</span>
                 )}
               </label>
               {useControlNet && controlNetAvailable && (
                 <div className="flex items-center gap-2 ml-5">
-                  <label htmlFor="form-cn-strength" className="text-xs text-gray-500">Strength:</label>
+                  <label htmlFor="form-cn-strength" className="text-xs text-gray-500">강도:</label>
                   <input
                     id="form-cn-strength"
                     type="range"
@@ -401,10 +427,10 @@ export function AssetGenerateForm() {
             </div>
           )}
 
-          {/* Negative Prompt */}
+          {/* 네거티브 프롬프트 */}
           <div>
-            <label htmlFor="form-neg-prompt" className="block text-xs text-gray-500 mb-1">
-              Negative Prompt
+            <label htmlFor="form-neg-prompt" className="block text-xs text-gray-500 mb-1" title="생성 결과에서 제외하고 싶은 요소를 설명합니다.">
+              네거티브 프롬프트
             </label>
             <textarea
               id="form-neg-prompt"
@@ -416,31 +442,31 @@ export function AssetGenerateForm() {
             />
           </div>
 
-          {/* Sampler / Scheduler */}
+          {/* 샘플러 / 스케줄러 */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label htmlFor="form-sampler" className="block text-xs text-gray-500">Sampler</label>
+              <label htmlFor="form-sampler" className="block text-xs text-gray-500" title="이미지 생성에 사용할 샘플링 알고리즘입니다.">샘플러</label>
               <select
                 id="form-sampler"
                 value={samplerName}
                 onChange={(e) => setSamplerName(e.target.value)}
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
               >
-                <option value="">Default</option>
+                <option value="">기본값</option>
                 {SAMPLER_OPTIONS.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="form-scheduler" className="block text-xs text-gray-500">Scheduler</label>
+              <label htmlFor="form-scheduler" className="block text-xs text-gray-500" title="노이즈 제거 스케줄 방식입니다.">스케줄러</label>
               <select
                 id="form-scheduler"
                 value={scheduler}
                 onChange={(e) => setScheduler(e.target.value)}
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
               >
-                <option value="">Default</option>
+                <option value="">기본값</option>
                 {SCHEDULER_OPTIONS.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
@@ -448,10 +474,10 @@ export function AssetGenerateForm() {
             </div>
           </div>
 
-          {/* Steps / CFG */}
+          {/* 스텝 / CFG */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label htmlFor="form-steps" className="block text-xs text-gray-500">Steps</label>
+              <label htmlFor="form-steps" className="block text-xs text-gray-500" title="생성 반복 횟수입니다. 높을수록 정교하지만 느립니다.">스텝</label>
               <input
                 id="form-steps"
                 type="number"
@@ -459,12 +485,12 @@ export function AssetGenerateForm() {
                 max={100}
                 value={steps}
                 onChange={(e) => setSteps(e.target.value)}
-                placeholder="Auto"
+                placeholder="자동"
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
               />
             </div>
             <div>
-              <label htmlFor="form-cfg" className="block text-xs text-gray-500">CFG Scale</label>
+              <label htmlFor="form-cfg" className="block text-xs text-gray-500" title="프롬프트 충실도입니다. 보통 5~10이 적합합니다.">CFG 스케일</label>
               <input
                 id="form-cfg"
                 type="number"
@@ -473,7 +499,7 @@ export function AssetGenerateForm() {
                 step={0.5}
                 value={cfgScale}
                 onChange={(e) => setCfgScale(e.target.value)}
-                placeholder="Auto"
+                placeholder="자동"
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
               />
             </div>
@@ -481,11 +507,11 @@ export function AssetGenerateForm() {
         </div>
       </details>
 
-      {/* Batch Items */}
+      {/* 배치 목록 */}
       {batchItems.length > 0 && (
         <div className="border border-gray-200 rounded-md p-3">
           <p className="text-sm font-medium text-gray-700 mb-2">
-            Batch Queue ({batchItems.length} items)
+            배치 대기열 ({batchItems.length}개)
           </p>
           {batchItems.map((item, i) => (
             <div key={i} className="flex items-center justify-between text-sm py-1">
@@ -497,21 +523,21 @@ export function AssetGenerateForm() {
                 onClick={() => setBatchItems((prev) => prev.filter((_, idx) => idx !== i))}
                 className="text-red-500 hover:text-red-700 text-xs"
               >
-                Remove
+                삭제
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Error */}
+      {/* 에러 */}
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
           {error}
         </div>
       )}
 
-      {/* Progress */}
+      {/* 진행률 */}
       {activeAssetId && (
         <GenerationProgress
           assetId={activeAssetId}
@@ -519,7 +545,7 @@ export function AssetGenerateForm() {
         />
       )}
 
-      {/* Actions */}
+      {/* 액션 */}
       <div className="flex gap-2">
         <button
           type="button"
@@ -527,7 +553,7 @@ export function AssetGenerateForm() {
           disabled={!name || !prompt}
           className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
         >
-          + Add to Batch
+          + 배치에 추가
         </button>
         <button
           type="submit"
@@ -535,10 +561,10 @@ export function AssetGenerateForm() {
           className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isSubmitting
-            ? "Generating..."
+            ? "생성 중..."
             : batchItems.length > 0
-              ? `Generate Batch (${batchItems.length + 1})`
-              : "Generate Asset"}
+              ? `배치 생성 (${batchItems.length + 1}개)`
+              : "에셋 생성"}
         </button>
       </div>
     </form>

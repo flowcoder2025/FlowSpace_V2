@@ -15,12 +15,13 @@ interface EditorStore {
   activeLayer: EditorLayerName;
   selectedTileIndex: number;
   selectedObjectType: string | null;
+  selectedAssetId: string | null;
   tileData: Record<string, number[][]> | null;
   isDirty: boolean;
   isSaving: boolean;
   mapObjects: EditorMapObject[];
   selectedObjectId: string | null;
-  paletteTab: "tiles" | "objects";
+  paletteTab: "tiles" | "objects" | "assets";
   layerVisibility: Record<EditorLayerName, boolean>;
 
   // Actions
@@ -31,6 +32,7 @@ interface EditorStore {
   setActiveLayer: (layer: EditorLayerName) => void;
   setSelectedTileIndex: (index: number) => void;
   setSelectedObjectType: (type: string | null) => void;
+  setSelectedAssetId: (id: string | null) => void;
   setTileData: (data: Record<string, number[][]>) => void;
   updateLayerTile: (layer: string, row: number, col: number, tileIndex: number) => void;
   setDirty: (dirty: boolean) => void;
@@ -40,7 +42,7 @@ interface EditorStore {
   updateMapObject: (id: string, updates: Partial<EditorMapObject>) => void;
   removeMapObject: (id: string) => void;
   setSelectedObjectId: (id: string | null) => void;
-  setPaletteTab: (tab: "tiles" | "objects") => void;
+  setPaletteTab: (tab: "tiles" | "objects" | "assets") => void;
   toggleLayerVisibility: (layer: EditorLayerName) => void;
   reset: () => void;
 }
@@ -62,6 +64,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   activeLayer: "ground",
   selectedTileIndex: 0,
   selectedObjectType: null,
+  selectedAssetId: null,
   tileData: null,
   isDirty: false,
   isSaving: false,
@@ -87,7 +90,8 @@ export const useEditorStore = create<EditorStore>((set) => ({
     }),
   setActiveLayer: (activeLayer) => set({ activeLayer }),
   setSelectedTileIndex: (selectedTileIndex) => set({ selectedTileIndex }),
-  setSelectedObjectType: (selectedObjectType) => set({ selectedObjectType }),
+  setSelectedObjectType: (selectedObjectType) => set({ selectedObjectType, selectedAssetId: null }),
+  setSelectedAssetId: (selectedAssetId) => set({ selectedAssetId }),
   setTileData: (tileData) => set({ tileData }),
   updateLayerTile: (layer, row, col, tileIndex) =>
     set((state) => {
@@ -133,6 +137,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       activeLayer: "ground",
       selectedTileIndex: 0,
       selectedObjectType: null,
+      selectedAssetId: null,
       tileData: null,
       isDirty: false,
       isSaving: false,

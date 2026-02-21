@@ -9,10 +9,10 @@ interface ObjectPaletteProps {
 }
 
 const CATEGORIES: { key: ObjectCategory | "all"; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "interactive", label: "Interactive" },
-  { key: "furniture", label: "Furniture" },
-  { key: "decoration", label: "Decoration" },
+  { key: "all", label: "전체" },
+  { key: "interactive", label: "상호작용" },
+  { key: "furniture", label: "가구" },
+  { key: "decoration", label: "장식" },
 ];
 
 export default function ObjectPalette({

@@ -11,10 +11,10 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  CHARACTER: "Character",
-  TILESET: "Tileset",
-  OBJECT: "Object",
-  MAP: "Map",
+  CHARACTER: "캐릭터",
+  TILESET: "타일셋",
+  OBJECT: "오브젝트",
+  MAP: "맵",
 };
 
 export function AssetList() {
@@ -53,8 +53,8 @@ export function AssetList() {
   if (assets.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
-        <p className="text-lg">No assets found</p>
-        <p className="text-sm mt-1">Generate your first asset to get started</p>
+        <p className="text-lg">에셋이 없습니다</p>
+        <p className="text-sm mt-1">첫 번째 에셋을 생성해보세요</p>
       </div>
     );
   }
@@ -75,7 +75,7 @@ export function AssetList() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <span className="text-gray-400 text-sm">No preview</span>
+              <span className="text-gray-400 text-sm">미리보기 없음</span>
             )}
           </div>
 

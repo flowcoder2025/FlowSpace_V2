@@ -138,6 +138,21 @@ export function useEditor({ spaceId, canEdit }: UseEditorOptions) {
     [store]
   );
 
+  // 에셋 선택 (Assets 탭에서 생성된 에셋 선택)
+  const setAssetSelection = useCallback(
+    (assetId: string | null, objectType: string) => {
+      store.setSelectedAssetId(assetId);
+      if (assetId) {
+        store.setSelectedObjectType(objectType);
+        store.setActiveTool("object-place");
+        eventBridge.emit(GameEvents.EDITOR_TOOL_CHANGE, { tool: "object-place" });
+      } else {
+        store.setSelectedObjectType(null);
+      }
+    },
+    [store]
+  );
+
   // 타일 저장
   const saveTiles = useCallback(async () => {
     if (!store.tileData || !store.isDirty) return;
@@ -164,10 +179,13 @@ export function useEditor({ spaceId, canEdit }: UseEditorOptions) {
       objectType: string;
       positionX: number;
       positionY: number;
+      assetId?: string;
       label?: string;
       width?: number;
       height?: number;
     }) => {
+      // Assets 탭에서 선택된 에셋이 있으면 자동으로 assetId 포함
+      const assetId = obj.assetId ?? store.selectedAssetId ?? undefined;
       const tempId = `temp-${Date.now()}`;
       const tempObj: EditorMapObject = {
         id: tempId,
@@ -175,6 +193,7 @@ export function useEditor({ spaceId, canEdit }: UseEditorOptions) {
         objectType: obj.objectType,
         positionX: obj.positionX,
         positionY: obj.positionY,
+        assetId: assetId ?? null,
         label: obj.label,
         rotation: 0,
         width: obj.width ?? 1,
@@ -186,7 +205,7 @@ export function useEditor({ spaceId, canEdit }: UseEditorOptions) {
         const res = await fetch(`/api/spaces/${spaceId}/map/objects`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(obj),
+          body: JSON.stringify({ ...obj, assetId }),
         });
         if (res.ok) {
           const saved = (await res.json()) as EditorMapObject;
@@ -255,6 +274,7 @@ export function useEditor({ spaceId, canEdit }: UseEditorOptions) {
     activeLayer: store.activeLayer,
     selectedTileIndex: store.selectedTileIndex,
     selectedObjectType: store.selectedObjectType,
+    selectedAssetId: store.selectedAssetId,
     tileData: store.tileData,
     isDirty: store.isDirty,
     isSaving: store.isSaving,
@@ -271,6 +291,7 @@ export function useEditor({ spaceId, canEdit }: UseEditorOptions) {
     setTile,
     toggleLayerVisibility,
     setObjectType,
+    setAssetSelection,
     setPaletteTab: store.setPaletteTab,
     saveTiles,
     placeObject,

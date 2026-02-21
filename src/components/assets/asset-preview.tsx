@@ -65,7 +65,7 @@ export function AssetPreview({ src, alt = "Generated Asset" }: AssetPreviewProps
           download
           className="text-xs text-blue-400 hover:text-blue-300"
         >
-          Download
+          다운로드
         </a>
       </div>
     </div>

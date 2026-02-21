@@ -485,6 +485,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
                 activeLayer={editor.activeLayer}
                 selectedTileIndex={editor.selectedTileIndex}
                 selectedObjectType={editor.selectedObjectType}
+                selectedAssetId={editor.selectedAssetId}
                 selectedObject={
                   editor.selectedObjectId
                     ? editor.mapObjects.find(
@@ -500,6 +501,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
                 onLayerChange={editor.setLayer}
                 onTileSelect={editor.setTile}
                 onObjectTypeSelect={editor.setObjectType}
+                onAssetSelect={editor.setAssetSelection}
                 onToggleLayerVisibility={editor.toggleLayerVisibility}
                 onPaletteTabChange={editor.setPaletteTab}
                 onSave={editor.saveTiles}

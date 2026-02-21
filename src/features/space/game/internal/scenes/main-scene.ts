@@ -14,6 +14,8 @@ import { RemotePlayerManager } from "../remote/remote-player-manager";
 import { CameraController } from "../camera/camera-controller";
 import { ObjectManager } from "../objects/object-manager";
 import { EditorSystem } from "@/features/space/editor/internal/editor-system";
+import { createLoadableAssets, loadAssetsInScene } from "../asset-loader";
+import type { AssetGeneratedPayload } from "../../events";
 
 export class MainScene extends Phaser.Scene {
   tilemapResult!: TilemapResult;
@@ -85,6 +87,20 @@ export class MainScene extends Phaser.Scene {
     this.localPlayer?.updateAvatar(avatar);
   };
 
+  /** 에셋 생성 완료 → Phaser 런타임 텍스처 로드 */
+  private onAssetGenerated = (payload: unknown) => {
+    const data = payload as AssetGeneratedPayload;
+    const filePath = data.metadata?.filePath as string | undefined;
+    if (!filePath) return;
+
+    const loadable = createLoadableAssets([
+      { id: data.assetId, type: data.type, filePath, metadata: data.metadata },
+    ]);
+
+    loadAssetsInScene(this, loadable);
+    this.load.start();
+  };
+
   /** 로컬 플레이어 생성 */
   private initPlayer(): void {
     const userId = this.registry.get("userId") as string;
@@ -107,6 +123,9 @@ export class MainScene extends Phaser.Scene {
 
     // 아바타 변경 이벤트 수신
     eventBridge.on(GameEvents.PLAYER_AVATAR_UPDATED, this.onLocalAvatarUpdated);
+
+    // 에셋 생성 완료 이벤트 수신 (런타임 동적 로드)
+    eventBridge.on(GameEvents.ASSET_GENERATED, this.onAssetGenerated);
   }
 
   /** 원격 플레이어 매니저 초기화 */
@@ -147,6 +166,7 @@ export class MainScene extends Phaser.Scene {
   /** 씬 종료 시 정리 */
   shutdown(): void {
     eventBridge.off(GameEvents.PLAYER_AVATAR_UPDATED, this.onLocalAvatarUpdated);
+    eventBridge.off(GameEvents.ASSET_GENERATED, this.onAssetGenerated);
     this.editorSystem?.destroy();
     this.remotePlayerManager?.destroy();
     this.objectManager?.destroy();

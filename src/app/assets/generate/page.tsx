@@ -11,16 +11,16 @@ export default function AssetGeneratePage() {
             href={ROUTES.ASSETS}
             className="text-sm text-gray-500 hover:text-gray-700"
           >
-            &larr; Back to Assets
+            &larr; 에셋 목록으로
           </Link>
           <Link
             href={ROUTES.ASSETS_STUDIO}
             className="text-sm text-blue-500 hover:text-blue-700"
           >
-            Studio &rarr;
+            스튜디오 &rarr;
           </Link>
         </div>
-        <h1 className="text-2xl font-bold mt-2">Generate Asset</h1>
+        <h1 className="text-2xl font-bold mt-2">에셋 생성</h1>
         <p className="text-gray-600 mt-1">
           ComfyUI를 사용하여 게임 에셋을 생성합니다
         </p>

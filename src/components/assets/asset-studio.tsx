@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { PromptEditor, type GenerateParams } from "./prompt-editor";
 import { AssetPreview } from "./asset-preview";
 import { GenerationProgress } from "./generation-progress";
+import { loadAssetToPhaser } from "@/features/assets/internal/game-loader";
 
 interface AssetHistoryItem {
   id: string;
@@ -71,13 +72,18 @@ export function AssetStudio() {
           : h
       )
     );
+
+    // Phaser 런타임에 에셋 로드 (게임이 실행 중이면 즉시 반영)
+    loadAssetToPhaser(asset.id).catch(() => {
+      // 게임이 아직 시작되지 않았을 수 있음 — 무시
+    });
   }, []);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* 좌측: 에디터 */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Generate</h2>
+        <h2 className="text-lg font-semibold">생성</h2>
         <PromptEditor onGenerate={handleGenerate} isGenerating={isGenerating} />
 
         {error && (
@@ -94,14 +100,14 @@ export function AssetStudio() {
 
       {/* 우측: 미리보기 */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Preview</h2>
+        <h2 className="text-lg font-semibold">미리보기</h2>
         <AssetPreview src={previewSrc} />
       </div>
 
       {/* 하단: 히스토리 그리드 */}
       {history.length > 0 && (
         <div className="lg:col-span-2">
-          <h2 className="text-lg font-semibold mb-3">History</h2>
+          <h2 className="text-lg font-semibold mb-3">생성 기록</h2>
           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
             {history.map((item) => (
               <button

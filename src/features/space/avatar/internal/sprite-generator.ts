@@ -8,11 +8,15 @@
 
 import { PLAYER_WIDTH, PLAYER_HEIGHT, SPRITE_COLS, SPRITE_ROWS } from "@/constants/game-constants";
 import type { AvatarConfig, ClassicAvatarConfig } from "./avatar-types";
-import { getTextureKey } from "./avatar-config";
+import { getTextureKey, DEFAULT_PARTS_AVATAR } from "./avatar-config";
 import { generatePartsSprite } from "./parts/parts-compositor";
+import { eventBridge, GameEvents } from "../../game/events";
 
 const SHEET_WIDTH = PLAYER_WIDTH * SPRITE_COLS; // 128
 const SHEET_HEIGHT = PLAYER_HEIGHT * SPRITE_ROWS; // 192
+
+/** 현재 로딩 중인 custom 텍스처 키 (중복 로드 방지) */
+const loadingCustomKeys = new Set<string>();
 
 /** 걷기 애니메이션 오프셋 (프레임별 세로 이동) */
 const WALK_OFFSETS = [0, -1, 0, -1];
@@ -149,7 +153,7 @@ export function generateAvatarSprite(
 }
 
 /**
- * 통합 아바타 스프라이트 생성 (classic/parts 모두 처리)
+ * 통합 아바타 스프라이트 생성 (classic/parts/custom 모두 처리)
  *
  * @returns textureKey
  */
@@ -163,6 +167,101 @@ export function generateAvatarSpriteFromConfig(
   if (config.type === "classic") {
     return generateAvatarSprite(scene, config);
   }
-  // custom - textureKey는 이미 로드됨
-  return config.textureKey;
+  // custom — 텍스처가 이미 등록되어 있으면 바로 반환
+  if (scene.textures.exists(config.textureKey)) {
+    return config.textureKey;
+  }
+  // 텍스처 미등록 → 비동기 로드 시작, 기본 아바타를 fallback으로 반환
+  loadCustomAvatarTexture(scene, config.textureKey);
+  return generatePartsSprite(scene, DEFAULT_PARTS_AVATAR);
+}
+
+/**
+ * Custom 아바타 텍스처를 비동기로 로드하여 Phaser에 등록
+ *
+ * 원본 에셋(128x128 프레임, 8열)을 게임 아바타(32x48 프레임, 4x4 grid)로 변환
+ */
+function loadCustomAvatarTexture(scene: Phaser.Scene, textureKey: string): void {
+  if (loadingCustomKeys.has(textureKey)) return;
+  loadingCustomKeys.add(textureKey);
+
+  // textureKey 형태: "character_{assetId}"
+  const assetId = textureKey.replace("character_", "");
+
+  fetch(`/api/assets/${assetId}`)
+    .then((res) => {
+      if (!res.ok) throw new Error("Asset not found");
+      return res.json();
+    })
+    .then((asset: { filePath?: string; metadata?: Record<string, unknown> }) => {
+      if (!asset.filePath) throw new Error("No file path");
+      return loadImageAsCanvas(asset.filePath).then((srcCanvas) => ({
+        srcCanvas,
+        metadata: asset.metadata,
+      }));
+    })
+    .then(({ srcCanvas, metadata }) => {
+      const srcFrameW = (metadata?.frameWidth as number) || 128;
+      const srcFrameH = (metadata?.frameHeight as number) || 128;
+      const srcCols = Math.floor(srcCanvas.width / srcFrameW);
+
+      // 원본에서 4방향 x 4프레임 추출 → 32x48로 리사이즈
+      const destCanvas = document.createElement("canvas");
+      destCanvas.width = SHEET_WIDTH;   // 128
+      destCanvas.height = SHEET_HEIGHT; // 192
+      const ctx = destCanvas.getContext("2d");
+      if (!ctx) return;
+
+      // 방향 매핑: down(row0), left(row1), right(row2), up(row3)
+      for (let dir = 0; dir < SPRITE_ROWS; dir++) {
+        for (let frame = 0; frame < SPRITE_COLS; frame++) {
+          const srcIdx = dir * srcCols + frame;
+          const srcRow = Math.floor(srcIdx / srcCols);
+          const srcCol = srcIdx % srcCols;
+
+          ctx.drawImage(
+            srcCanvas,
+            srcCol * srcFrameW, srcRow * srcFrameH, srcFrameW, srcFrameH,
+            frame * PLAYER_WIDTH, dir * PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT,
+          );
+        }
+      }
+
+      // Phaser 텍스처 등록
+      if (!scene.textures.exists(textureKey)) {
+        scene.textures.addSpriteSheet(
+          textureKey,
+          destCanvas as unknown as HTMLImageElement,
+          { frameWidth: PLAYER_WIDTH, frameHeight: PLAYER_HEIGHT },
+        );
+      }
+
+      // EventBridge로 아바타 업데이트 재트리거
+      eventBridge.emit(GameEvents.PLAYER_AVATAR_UPDATED, {
+        avatar: `custom:${textureKey}`,
+      });
+    })
+    .catch(() => {})
+    .finally(() => {
+      loadingCustomKeys.delete(textureKey);
+    });
+}
+
+/** 이미지 URL을 Canvas로 로드 */
+function loadImageAsCanvas(url: string): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context unavailable"));
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas);
+    };
+    img.onerror = () => reject(new Error("Image load failed"));
+    img.src = url;
+  });
 }

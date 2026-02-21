@@ -6,7 +6,7 @@ export default function AssetsPage() {
     <main className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold">Assets</h1>
+          <h1 className="text-2xl font-bold">에셋</h1>
           <p className="text-gray-600 mt-1">
             AI 생성 에셋 관리
           </p>
@@ -15,7 +15,7 @@ export default function AssetsPage() {
           href="/assets/generate"
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
-          Generate New
+          새로 생성
         </Link>
       </div>
       <AssetList />
