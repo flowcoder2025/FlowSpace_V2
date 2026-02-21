@@ -36,12 +36,16 @@ export default async function SpacePage({ params }: PageProps) {
   // 유저 정보
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, image: true },
+    select: { id: true, name: true, image: true, avatarConfig: true },
   });
 
   if (!user) {
     redirect("/login");
   }
+
+  // avatarConfig에서 avatarString 추출, 없으면 userId 해시 폴백
+  const avatarConfig = user.avatarConfig as Record<string, unknown> | null;
+  const avatarString = (avatarConfig?.avatarString as string) ?? user.image ?? "default";
 
   return (
     <SpaceClient
@@ -55,7 +59,7 @@ export default async function SpacePage({ params }: PageProps) {
       user={{
         id: user.id,
         nickname: user.name ?? "Anonymous",
-        avatar: user.image ?? "default",
+        avatar: avatarString,
       }}
     />
   );

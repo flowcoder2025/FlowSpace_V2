@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import type { PartsAvatarConfig } from "@/features/space/avatar";
+import { DEFAULT_PARTS_AVATAR, buildPartsAvatarString } from "@/features/space/avatar";
+import { CharacterEditor } from "@/components/avatar";
 
 interface OnboardingFormProps {
   userId: string;
@@ -9,26 +12,19 @@ interface OnboardingFormProps {
   currentImage: string;
 }
 
-const AVATAR_COLORS = [
-  "#EF4444",
-  "#F97316",
-  "#EAB308",
-  "#22C55E",
-  "#3B82F6",
-  "#8B5CF6",
-  "#EC4899",
-  "#6B7280",
-];
-
 export function OnboardingForm({
   currentName,
   currentImage,
 }: OnboardingFormProps) {
   const router = useRouter();
   const [name, setName] = useState(currentName);
-  const [selectedColor, setSelectedColor] = useState(AVATAR_COLORS[4]);
+  const [avatarConfig, setAvatarConfig] = useState<PartsAvatarConfig>(DEFAULT_PARTS_AVATAR);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const handleAvatarChange = useCallback((config: PartsAvatarConfig) => {
+    setAvatarConfig(config);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,12 +32,14 @@ export function OnboardingForm({
     setLoading(true);
 
     try {
+      const avatarString = buildPartsAvatarString(avatarConfig);
+
       const res = await fetch("/api/users/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name || undefined,
-          avatarConfig: { color: selectedColor },
+          avatarConfig: { avatarString },
         }),
       });
 
@@ -63,41 +61,26 @@ export function OnboardingForm({
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Avatar Preview */}
-        <div className="flex flex-col items-center gap-3">
-          {currentImage ? (
+        {/* Profile Image (OAuth) */}
+        {currentImage && (
+          <div className="flex justify-center">
             <img
               src={currentImage}
               alt="Profile"
-              className="h-20 w-20 rounded-full"
+              className="h-16 w-16 rounded-full"
             />
-          ) : (
-            <div
-              className="flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold text-white"
-              style={{ backgroundColor: selectedColor }}
-            >
-              {name ? name[0].toUpperCase() : "?"}
-            </div>
-          )}
+          </div>
+        )}
 
-          {/* Color Picker */}
-          {!currentImage && (
-            <div className="flex gap-2">
-              {AVATAR_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setSelectedColor(color)}
-                  className={`h-8 w-8 rounded-full transition-transform ${
-                    selectedColor === color
-                      ? "scale-110 ring-2 ring-offset-2 ring-blue-500"
-                      : "hover:scale-105"
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-          )}
+        {/* Character Editor */}
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Customize Your Character
+          </label>
+          <CharacterEditor
+            initialConfig={avatarConfig}
+            onChange={handleAvatarChange}
+          />
         </div>
 
         {/* Name */}

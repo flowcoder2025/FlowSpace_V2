@@ -30,6 +30,16 @@ export async function GET() {
   return NextResponse.json(user);
 }
 
+/** avatarConfig 검증 */
+function validateAvatarConfig(config: unknown): config is { avatarString?: string; color?: string } {
+  if (typeof config !== "object" || config === null) return false;
+  const obj = config as Record<string, unknown>;
+  // avatarString (parts/classic/custom) 또는 color (레거시) 허용
+  if (obj.avatarString !== undefined && typeof obj.avatarString !== "string") return false;
+  if (obj.color !== undefined && typeof obj.color !== "string") return false;
+  return true;
+}
+
 /** PATCH /api/users/me - 프로필 수정 */
 export async function PATCH(request: Request) {
   const session = await auth();
@@ -45,7 +55,16 @@ export async function PATCH(request: Request) {
 
   const data: Record<string, unknown> = {};
   if (body.name !== undefined) data.name = body.name;
-  if (body.avatarConfig !== undefined) data.avatarConfig = body.avatarConfig;
+
+  if (body.avatarConfig !== undefined) {
+    if (!validateAvatarConfig(body.avatarConfig)) {
+      return NextResponse.json(
+        { error: "Invalid avatar config" },
+        { status: 400 },
+      );
+    }
+    data.avatarConfig = body.avatarConfig;
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
