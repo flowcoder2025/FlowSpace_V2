@@ -36,13 +36,19 @@
 - DB: Supabase Transaction Pooler + `pgbouncer=true` (prepared statement 호환)
 - 배포: Dockerfile (standalone) + docker-compose + GitHub Actions CI
 
-## Next Steps
-1. **마이너 보강**: seed 데이터 parts 포맷, E2E 검증, 레거시 폴백 확인
-2. ComfyUI 추가 개선 (LoRA 지원, Flux.1 모델, 실시간 프리뷰)
-3. 에디터 명령어 연동 (chat-parser editor_command → 맵 에디터)
-4. 브라우저 알림 (Notification API)
-5. 모바일 반응형
-6. 프로덕션 배포 (Vercel/Docker)
+## Next Steps (긴급 — 연동 누락 수정)
+1. **인게임 아바타 에디터 버튼 추가** — space-client.tsx HUD에 버튼 1개
+2. **에셋→Phaser 연동** — loadAssetToPhaser 호출 + ASSET_GENERATED 리스너
+3. **맵 에디터에서 생성 에셋 사용** — 타일셋/오브젝트 선택/배치
+4. **생성 캐릭터 → 아바타 적용** — 커스텀 스프라이트를 아바타로
+5. processor.ts DEBUG 로그 제거
+
+## Next Steps (일반)
+1. ComfyUI 추가 개선 (LoRA 지원, Flux.1 모델, 실시간 프리뷰)
+2. 에디터 명령어 연동 (chat-parser editor_command → 맵 에디터)
+3. 브라우저 알림 (Notification API)
+4. 모바일 반응형
+5. 프로덕션 배포 (Vercel/Docker)
 
 ## Supabase DB 연결 정보
 - Host: `aws-1-ap-southeast-2.pooler.supabase.com`

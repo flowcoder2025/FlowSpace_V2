@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     "node_modules/**",
     "comfyui-workflows/**",
     "server/**",
+    "scripts/**",
   ]),
 ])
 
