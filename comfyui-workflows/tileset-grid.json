@@ -35,7 +35,7 @@
   "4": {
     "class_type": "CheckpointLoaderSimple",
     "inputs": {
-      "ckpt_name": "sd_xl_base_1.0.safetensors"
+      "ckpt_name": "DreamShaper_8_pruned.safetensors"
     }
   },
   "5": {

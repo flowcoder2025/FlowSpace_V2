@@ -4,10 +4,10 @@ import type { AssetSpec, AssetType } from "./types";
 export const ASSET_SPECS: Record<AssetType, AssetSpec> = {
   character: {
     type: "character",
-    width: 512,
-    height: 256,
-    frameWidth: 64,
-    frameHeight: 64,
+    width: 1024,
+    height: 512,
+    frameWidth: 128,
+    frameHeight: 128,
     columns: 8,
     rows: 4,
     requiresTransparency: true,
@@ -24,14 +24,14 @@ export const ASSET_SPECS: Record<AssetType, AssetSpec> = {
   },
   object: {
     type: "object",
-    width: 128,
-    height: 128,
+    width: 512,
+    height: 512,
     requiresTransparency: true,
   },
   map: {
     type: "map",
-    width: 1024,
-    height: 768,
+    width: 768,
+    height: 576,
     requiresTransparency: false,
   },
 };

@@ -1,6 +1,6 @@
 import type { ComfyUIConfig, ComfyUIMode } from "./types";
 
-const DEFAULT_COMFYUI_URL = "http://localhost:8188";
+const DEFAULT_COMFYUI_URL = "http://localhost:8001";
 
 export function getComfyUIConfig(): ComfyUIConfig {
   const baseUrl = process.env.COMFYUI_URL || DEFAULT_COMFYUI_URL;

@@ -1,19 +1,17 @@
 {
   "_meta": {
-    "name": "Character Sprite Generator",
-    "description": "Pixel Art Diffusion XL로 4방향 캐릭터 스프라이트시트를 생성합니다",
-    "version": "2.0.0",
-    "assetType": "character",
+    "name": "Object Item Generator",
+    "description": "DreamShaper 8로 오브젝트/아이템 이미지를 생성합니다",
+    "version": "1.0.0",
+    "assetType": "object",
     "outputFormat": {
-      "width": 1024,
-      "height": 512,
-      "grid": "8x4",
-      "frameSize": "128x128"
+      "width": 512,
+      "height": 512
     },
     "parameters": {
       "prompt": { "nodeId": "6", "field": "text", "type": "string" },
       "seed": { "nodeId": "3", "field": "seed", "type": "number" },
-      "width": { "nodeId": "5", "field": "width", "type": "number", "default": 1024 },
+      "width": { "nodeId": "5", "field": "width", "type": "number", "default": 512 },
       "height": { "nodeId": "5", "field": "height", "type": "number", "default": 512 }
     }
   },
@@ -21,8 +19,8 @@
     "class_type": "KSampler",
     "inputs": {
       "seed": 0,
-      "steps": 35,
-      "cfg": 7,
+      "steps": 30,
+      "cfg": 7.5,
       "sampler_name": "euler_ancestral",
       "scheduler": "normal",
       "denoise": 1.0,
@@ -35,13 +33,13 @@
   "4": {
     "class_type": "CheckpointLoaderSimple",
     "inputs": {
-      "ckpt_name": "pixelArtDiffusionXL_spriteShaper.safetensors"
+      "ckpt_name": "DreamShaper_8_pruned.safetensors"
     }
   },
   "5": {
     "class_type": "EmptyLatentImage",
     "inputs": {
-      "width": 1024,
+      "width": 512,
       "height": 512,
       "batch_size": 1
     }
@@ -49,14 +47,14 @@
   "6": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "pixel art character sprite sheet, 8 frames walk cycle, 4 directions (down, left, right, up), 128x128 pixel per frame, 8x4 grid layout, transparent background, game asset, top-down RPG style",
+      "text": "pixel art game object, item icon, transparent background, clean edges, game asset, top-down RPG style",
       "clip": ["4", 1]
     }
   },
   "7": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "blurry, low quality, watermark, text, realistic, photo, 3d render, deformed, ugly",
+      "text": "blurry, low quality, watermark, text, realistic, photo, 3d render, complex background",
       "clip": ["4", 1]
     }
   },
@@ -70,7 +68,7 @@
   "9": {
     "class_type": "SaveImage",
     "inputs": {
-      "filename_prefix": "character_sprite",
+      "filename_prefix": "object_item",
       "images": ["8", 0]
     }
   }

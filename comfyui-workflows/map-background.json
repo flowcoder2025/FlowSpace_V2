@@ -5,14 +5,14 @@
     "version": "1.0.0",
     "assetType": "map",
     "outputFormat": {
-      "width": 1024,
-      "height": 768
+      "width": 768,
+      "height": 576
     },
     "parameters": {
       "prompt": { "nodeId": "6", "field": "text", "type": "string" },
       "seed": { "nodeId": "3", "field": "seed", "type": "number" },
-      "width": { "nodeId": "5", "field": "width", "type": "number", "default": 1024 },
-      "height": { "nodeId": "5", "field": "height", "type": "number", "default": 768 }
+      "width": { "nodeId": "5", "field": "width", "type": "number", "default": 768 },
+      "height": { "nodeId": "5", "field": "height", "type": "number", "default": 576 }
     }
   },
   "3": {
@@ -33,14 +33,14 @@
   "4": {
     "class_type": "CheckpointLoaderSimple",
     "inputs": {
-      "ckpt_name": "sd_xl_base_1.0.safetensors"
+      "ckpt_name": "DreamShaper_8_pruned.safetensors"
     }
   },
   "5": {
     "class_type": "EmptyLatentImage",
     "inputs": {
-      "width": 1024,
-      "height": 768,
+      "width": 768,
+      "height": 576,
       "batch_size": 1
     }
   },

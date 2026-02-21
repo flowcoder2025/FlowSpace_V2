@@ -9,7 +9,7 @@ const WORKFLOW_DIR = join(process.cwd(), "comfyui-workflows");
 const WORKFLOW_FILES: Record<AssetType, string> = {
   character: "character-sprite.json",
   tileset: "tileset-grid.json",
-  object: "character-sprite.json", // object는 character 워크플로우 커스텀
+  object: "object-item.json",
   map: "map-background.json",
 };
 

@@ -123,6 +123,7 @@ export interface HistoryEntry {
   status: {
     status_str: string;
     completed: boolean;
+    messages?: Array<[string, Record<string, unknown>]>;
   };
 }
 

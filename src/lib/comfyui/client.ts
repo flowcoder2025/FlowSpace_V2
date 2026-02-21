@@ -191,8 +191,21 @@ export class ComfyUIClient {
     while (Date.now() - startTime < maxWait) {
       const history = await this.getHistory(promptId);
 
-      if (history && history.status.completed) {
-        return history;
+      if (history) {
+        // 에러 감지: status_str === 'error' 시 즉시 실패
+        if (history.status.status_str === "error") {
+          const errorDetails = history.status.messages
+            ?.map(([type, data]) => `${type}: ${JSON.stringify(data)}`)
+            .join("; ") || "unknown error";
+          throw new ComfyUIError(
+            `ComfyUI execution failed for prompt ${promptId}: ${errorDetails}`,
+            "UNKNOWN"
+          );
+        }
+
+        if (history.status.completed) {
+          return history;
+        }
       }
 
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
