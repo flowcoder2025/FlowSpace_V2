@@ -21,6 +21,7 @@
 | LiveKit 음성/화상 포팅 | 2026-02-20 | Phase 11 (통합+QA) |
 | 파츠 조합 캐릭터 시스템 | 2026-02-21 | Phase 1~3 (Core+UI+인게임) |
 | ComfyUI 파이프라인 개선 | 2026-02-22 | Phase 1~4 (프롬프트+배경제거+Seamless+ControlNet) |
+| 에셋-게임 연동 | 2026-02-22 | Phase 1 (연동 수정+한글화+ControlNet 설치) |
 
 ## Architecture Decisions
 - 6 도메인 rules (`.claude/rules/` path-based auto-load)
@@ -35,13 +36,6 @@
 - Phaser 키보드 캡처: chatFocused 시 clearCaptures/addCapture 토글
 - DB: Supabase Transaction Pooler + `pgbouncer=true` (prepared statement 호환)
 - 배포: Dockerfile (standalone) + docker-compose + GitHub Actions CI
-
-## Next Steps (긴급 — 연동 누락 수정)
-1. **인게임 아바타 에디터 버튼 추가** — space-client.tsx HUD에 버튼 1개
-2. **에셋→Phaser 연동** — loadAssetToPhaser 호출 + ASSET_GENERATED 리스너
-3. **맵 에디터에서 생성 에셋 사용** — 타일셋/오브젝트 선택/배치
-4. **생성 캐릭터 → 아바타 적용** — 커스텀 스프라이트를 아바타로
-5. processor.ts DEBUG 로그 제거
 
 ## Next Steps (일반)
 1. ComfyUI 추가 개선 (LoRA 지원, Flux.1 모델, 실시간 프리뷰)

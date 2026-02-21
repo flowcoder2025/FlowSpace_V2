@@ -7,7 +7,7 @@
 ## Active Epics
 | Epic | 상태 | Phase 진행 | 마지막 업데이트 |
 |------|------|------------|-----------------|
-| (없음 — 다음: 마이너 보강 or ComfyUI 파이프라인) | | | |
+| (없음) | | | |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -18,6 +18,7 @@
 | [chat-port](./chat-port/README.md) | 2026-02-20 | 6 (Phase 10) |
 | [livekit-voicevideo](./livekit-voicevideo/README.md) | 2026-02-20 | 1 (Phase 11) |
 | [parts-avatar-system](./parts-avatar-system/README.md) | 2026-02-21 | 3 (Phase 1~3) |
+| [asset-integration](./asset-integration/README.md) | 2026-02-22 | 1 (연동 수정) |
 
 ## Ad-hoc Work (2026-02-21)
 - 배포 준비: Dockerfile, docker-compose, CI, Vitest, Prisma migrate
@@ -53,9 +54,12 @@ specs/
 ├── livekit-voicevideo/
 │   ├── README.md
 │   └── 11-livekit-integration.md
-└── parts-avatar-system/
+├── parts-avatar-system/
+│   ├── README.md
+│   ├── 01-core-engine.md
+│   ├── 02-customization-ui.md
+│   └── 03-ingame-integration.md
+└── asset-integration/
     ├── README.md
-    ├── 01-core-engine.md
-    ├── 02-customization-ui.md
-    └── 03-ingame-integration.md
+    └── 01-integration-fix.md
 ```
