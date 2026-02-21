@@ -9,13 +9,26 @@ import {
   generateAssetFilename,
 } from "./specs";
 import { validateAssetMetadata } from "./validator";
-import { removeBackground, blendTileEdges } from "./post-processor";
+import {
+  removeBackground,
+  alignCharacterFrames,
+  blendTileEdges,
+  resizeFrame,
+  composeSpriteSheet,
+  normalizeDirectionFrames,
+} from "./post-processor";
 import { checkComfyUICapabilities } from "./capability-checker";
+import { ensurePosesUploaded, getPoseImageRef } from "./pose-manager";
 import {
   PROMPT_PREFIXES,
   DEFAULT_NEGATIVE_PROMPTS,
   QUALITY_PRESETS,
   SEAMLESS_PROMPT_PREFIX,
+  CHARACTER_GENERATION_DEFAULTS,
+  CHIBI_PROMPT_PREFIX,
+  CHIBI_DIRECTION_PROMPTS,
+  CHIBI_NEGATIVE_PROMPT,
+  CHIBI_GENERATION_DEFAULTS,
 } from "./constants";
 import type { QualityPreset } from "./constants";
 import type { CreateAssetParams, GeneratedAssetMetadata } from "./types";
@@ -24,6 +37,11 @@ import type { CreateAssetParams, GeneratedAssetMetadata } from "./types";
 export async function processAssetGeneration(
   params: CreateAssetParams
 ): Promise<GeneratedAssetMetadata> {
+  // 치비 스타일 분기
+  if (params.type === "character" && params.useChibiStyle) {
+    return processChibiCharacterGeneration(params);
+  }
+
   const startTime = Date.now();
   const spec = ASSET_SPECS[params.type];
 
@@ -74,6 +92,16 @@ export async function processAssetGeneration(
     }
     if (params.poseImage) {
       workflowParams.pose_image = params.poseImage;
+    }
+  }
+
+  // 캐릭터 전용 결정론적 샘플러 기본값 적용
+  if (params.type === "character" && !params.samplerName) {
+    workflowParams.sampler_name = CHARACTER_GENERATION_DEFAULTS.samplerName;
+    workflowParams.scheduler = CHARACTER_GENERATION_DEFAULTS.scheduler;
+    if (!params.steps && !preset) {
+      workflowParams.steps = CHARACTER_GENERATION_DEFAULTS.steps;
+      workflowParams.cfg = CHARACTER_GENERATION_DEFAULTS.cfgScale;
     }
   }
 
@@ -134,7 +162,28 @@ export async function processAssetGeneration(
     }
   }
 
-  // 3b. Seamless 타일 엣지 블렌딩 (tileset + seamless)
+  // 3b. 캐릭터 프레임 정렬 (character only)
+  if (
+    params.type === "character" &&
+    imageData.length > 0 &&
+    spec.frameWidth &&
+    spec.frameHeight &&
+    spec.columns &&
+    spec.rows
+  ) {
+    try {
+      imageData = await alignCharacterFrames(Buffer.from(imageData), {
+        frameWidth: spec.frameWidth,
+        frameHeight: spec.frameHeight,
+        columns: spec.columns,
+        rows: spec.rows,
+      });
+    } catch (err) {
+      console.warn("[AssetProcessor] 프레임 정렬 실패, 원본 사용:", err);
+    }
+  }
+
+  // 3c. Seamless 타일 엣지 블렌딩 (tileset + seamless)
   if (params.seamless && params.type === "tileset" && imageData.length > 0 && spec.frameWidth && spec.frameHeight && spec.columns && spec.rows) {
     try {
       imageData = await blendTileEdges(
@@ -204,6 +253,199 @@ export async function processAssetGeneration(
   };
 
   return metadata;
+}
+
+// ──────────────────────────────────────────────────────
+// 치비 캐릭터 프레임별 생성 파이프라인
+// ──────────────────────────────────────────────────────
+
+const CHIBI_DIRECTIONS = ["down", "left", "right", "up"] as const;
+const FRAMES_PER_DIR = 8;
+const SPRITE_FRAME_SIZE = 128; // 최종 스프라이트 프레임 크기
+const SPRITE_COLS = 8;
+const SPRITE_ROWS = 4;
+
+async function processChibiCharacterGeneration(
+  params: CreateAssetParams
+): Promise<GeneratedAssetMetadata> {
+  const startTime = Date.now();
+  const spec = ASSET_SPECS[params.type];
+  const client = new ComfyUIClient();
+
+  // 1. ControlNet 가용성 확인
+  const caps = await checkComfyUICapabilities();
+  const useControlNet =
+    (params.useControlNet !== false) && caps.controlNet;
+
+  // 2. 포즈 이미지 업로드 (ControlNet 사용 시)
+  if (useControlNet) {
+    await ensurePosesUploaded(client);
+  }
+
+  // 3. 워크플로우 로드
+  const workflowVariant = useControlNet ? "chibi-frame" : "chibi-fallback";
+  const { meta, workflow } = await loadWorkflowTemplate("character", workflowVariant);
+
+  // 4. 32프레임 순차 생성 (방향별 수집 → 일괄 정규화)
+  // 방향별 seed 고정: 같은 방향 8프레임은 동일 seed → 걷기 사이클 내 외형 일관성 최대화
+  const baseSeed = params.seed ?? Math.floor(Math.random() * 2147483647);
+  const frames: Buffer[] = [];
+  let globalFrameIndex = 0;
+
+  for (let dirIdx = 0; dirIdx < CHIBI_DIRECTIONS.length; dirIdx++) {
+    const direction = CHIBI_DIRECTIONS[dirIdx];
+    const directionSeed = baseSeed + dirIdx;
+    const dirRawFrames: Buffer[] = []; // 방향별 원본 프레임 (배경 제거 후, 리사이즈 전)
+
+    for (let fi = 0; fi < FRAMES_PER_DIR; fi++) {
+      const prompt = buildChibiPrompt(direction, params.prompt);
+      const negativePrompt = params.negativePrompt || CHIBI_NEGATIVE_PROMPT;
+      const seed = directionSeed;
+
+      const workflowParams: Record<string, unknown> = {
+        prompt,
+        negative_prompt: negativePrompt,
+        seed,
+        steps: params.steps ?? CHIBI_GENERATION_DEFAULTS.steps,
+        cfg: params.cfgScale ?? CHIBI_GENERATION_DEFAULTS.cfgScale,
+        sampler_name: params.samplerName ?? CHIBI_GENERATION_DEFAULTS.samplerName,
+        scheduler: params.scheduler ?? CHIBI_GENERATION_DEFAULTS.scheduler,
+        lora_strength: params.loraStrength ?? CHIBI_GENERATION_DEFAULTS.loraStrength,
+      };
+
+      if (useControlNet) {
+        workflowParams.pose_image = getPoseImageRef(direction, fi);
+        workflowParams.controlnet_strength =
+          params.controlNetStrength ?? CHIBI_GENERATION_DEFAULTS.controlNetStrength;
+        workflowParams.controlnet_start =
+          params.controlNetStart ?? CHIBI_GENERATION_DEFAULTS.controlNetStart;
+        workflowParams.controlnet_end =
+          params.controlNetEnd ?? CHIBI_GENERATION_DEFAULTS.controlNetEnd;
+      }
+
+      const injected = injectWorkflowParams(workflow, meta, workflowParams);
+
+      // SaveImage filename_prefix를 프레임별로 고유하게 설정 (ComfyUI 캐시 방지)
+      if (injected["9"]?.inputs) {
+        injected["9"].inputs.filename_prefix = `chibi_${direction}_${fi}_${Date.now()}`;
+      }
+
+      // ComfyUI 실행
+      let result;
+      try {
+        result = await client.generateAsset(
+          { type: "character", prompt: params.prompt, name: params.name, seed },
+          injected
+        );
+      } catch (error) {
+        const comfyError = ComfyUIError.fromError(error);
+        console.error(
+          `[ChibiProcessor] 프레임 ${globalFrameIndex} 에러 [${comfyError.type}]:`,
+          comfyError.message
+        );
+        throw new Error(`치비 프레임 ${globalFrameIndex} 생성 실패: ${comfyError.message}`);
+      }
+
+      if (result.status === "failed" || !result.images?.length) {
+        throw new Error(
+          `치비 프레임 ${globalFrameIndex} 생성 실패: ${result.error || "no images"}`
+        );
+      }
+
+      let frameData = result.images[0].data || Buffer.alloc(0);
+
+      // 배경 제거
+      if (params.removeBackground !== false && frameData.length > 0) {
+        try {
+          frameData = await removeBackground(Buffer.from(frameData), {
+            tolerance: params.bgRemovalTolerance,
+          });
+        } catch (err) {
+          console.warn(`[ChibiProcessor] 프레임 ${globalFrameIndex} 배경 제거 실패:`, err);
+        }
+      }
+
+      dirRawFrames.push(Buffer.from(frameData));
+      globalFrameIndex++;
+
+      console.log(
+        `[ChibiProcessor] 프레임 ${globalFrameIndex}/${CHIBI_DIRECTIONS.length * FRAMES_PER_DIR} 완료 (${direction}_${fi})`
+      );
+    }
+
+    // 방향별 일괄 정규화: 같은 방향 8프레임의 최대 bbox 폭 기준으로 통일 스케일링
+    console.log(`[ChibiProcessor] ${direction} 방향 8프레임 정규화...`);
+    const normalizedFrames = await normalizeDirectionFrames(dirRawFrames, {
+      targetW: SPRITE_FRAME_SIZE,
+      targetH: SPRITE_FRAME_SIZE,
+    });
+    frames.push(...normalizedFrames);
+  }
+
+  // 5. 스프라이트시트 합성
+  let imageData = await composeSpriteSheet(frames, {
+    frameW: SPRITE_FRAME_SIZE,
+    frameH: SPRITE_FRAME_SIZE,
+    cols: SPRITE_COLS,
+    rows: SPRITE_ROWS,
+  });
+
+  // 6. alignCharacterFrames 생략
+  // normalizeDirectionFrames가 이미 중앙 배치 + 바닥선 앵커를 처리하므로
+  // 추가 시프트는 오히려 프레임 경계 클리핑을 유발 (Down 방향 폭 축소 원인)
+
+  // 7. 파일 저장
+  const filename = generateAssetFilename(params.type, params.name, "chibi");
+  const storagePath = ASSET_STORAGE_PATHS[params.type];
+  const filePath = join(storagePath, filename);
+
+  await mkdir(dirname(join(process.cwd(), "public", filePath)), { recursive: true });
+  await writeFile(join(process.cwd(), "public", filePath), imageData);
+
+  // 썸네일
+  const thumbFilename = `thumb_${Date.now().toString(36)}.png`;
+  const thumbPath = join(THUMBNAIL_PATH, thumbFilename);
+  await mkdir(dirname(join(process.cwd(), "public", thumbPath)), { recursive: true });
+  await writeFile(join(process.cwd(), "public", thumbPath), imageData);
+
+  // 유효성 검증
+  const actualWidth = SPRITE_COLS * SPRITE_FRAME_SIZE; // 1024
+  const actualHeight = SPRITE_ROWS * SPRITE_FRAME_SIZE; // 512
+  const validation = validateAssetMetadata(params.type, actualWidth, actualHeight);
+  if (!validation.valid) {
+    console.warn("[ChibiProcessor] 유효성 경고:", validation.errors);
+  }
+
+  // 메타데이터 생성
+  const processingTime = Date.now() - startTime;
+
+  return {
+    id: `chibi-${Date.now()}`,
+    type: params.type,
+    name: params.name,
+    prompt: params.prompt,
+    workflow: `character-${workflowVariant}`,
+    width: actualWidth,
+    height: actualHeight,
+    frameWidth: SPRITE_FRAME_SIZE,
+    frameHeight: SPRITE_FRAME_SIZE,
+    columns: SPRITE_COLS,
+    rows: SPRITE_ROWS,
+    filePath: `/${filePath.replace(/\\/g, "/")}`,
+    thumbnailPath: `/${thumbPath.replace(/\\/g, "/")}`,
+    fileSize: imageData.length,
+    format: "png",
+    seed: baseSeed,
+    generatedAt: new Date().toISOString(),
+    processingTime,
+    status: "completed",
+  };
+}
+
+/** 치비 방향별 프롬프트 빌드 */
+function buildChibiPrompt(direction: string, userPrompt: string): string {
+  const directionPrompt = CHIBI_DIRECTION_PROMPTS[direction] || "";
+  return CHIBI_PROMPT_PREFIX + directionPrompt + userPrompt;
 }
 
 /** 에셋 유형별 프롬프트 빌드 */

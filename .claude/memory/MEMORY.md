@@ -9,7 +9,7 @@
 ## Active Epic
 | Epic | 상태 | Phase 진행 | 마지막 업데이트 |
 |------|------|------------|-----------------|
-| (없음) | | | |
+| 치비 캐릭터 파이프라인 | Phase 1~7 완료, Phase 8 대기 | 7/8 | 2026-02-22 |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -22,6 +22,7 @@
 | 파츠 조합 캐릭터 시스템 | 2026-02-21 | Phase 1~3 (Core+UI+인게임) |
 | ComfyUI 파이프라인 개선 | 2026-02-22 | Phase 1~4 (프롬프트+배경제거+Seamless+ControlNet) |
 | 에셋-게임 연동 | 2026-02-22 | Phase 1 (연동 수정+한글화+ControlNet 설치) |
+| 에셋 갤러리 리팩토링 | 2026-02-22 | Ad-hoc (스튜디오→갤러리 통합) |
 
 ## Architecture Decisions
 - 6 도메인 rules (`.claude/rules/` path-based auto-load)

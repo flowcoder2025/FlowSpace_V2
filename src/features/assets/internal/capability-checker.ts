@@ -3,6 +3,11 @@ import { ComfyUIClient } from "@/lib/comfyui";
 export interface ComfyUICapabilities {
   controlNet: boolean;
   controlNetModels: string[];
+  hasAnimagineXL: boolean;
+  hasChibiLoRA: boolean;
+  hasOpenPoseXL: boolean;
+  checkpointModels: string[];
+  loraModels: string[];
   checkedAt: number;
 }
 
@@ -29,6 +34,11 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
     const result: ComfyUICapabilities = {
       controlNet: false,
       controlNetModels: [],
+      hasAnimagineXL: false,
+      hasChibiLoRA: false,
+      hasOpenPoseXL: false,
+      checkpointModels: [],
+      loraModels: [],
       checkedAt: Date.now(),
     };
     capabilityCache = result;
@@ -52,9 +62,42 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
         loaderInfo.input?.required?.control_net_name?.[0] || [];
     }
 
+    // 체크포인트 모델 목록
+    let checkpointModels: string[] = [];
+    if (objectInfo["CheckpointLoaderSimple"]) {
+      const ckptInfo = objectInfo["CheckpointLoaderSimple"] as {
+        input?: { required?: { ckpt_name?: [string[]] } };
+      };
+      checkpointModels = ckptInfo.input?.required?.ckpt_name?.[0] || [];
+    }
+
+    // LoRA 모델 목록
+    let loraModels: string[] = [];
+    if (objectInfo["LoraLoader"]) {
+      const loraInfo = objectInfo["LoraLoader"] as {
+        input?: { required?: { lora_name?: [string[]] } };
+      };
+      loraModels = loraInfo.input?.required?.lora_name?.[0] || [];
+    }
+
+    const hasAnimagineXL = checkpointModels.some((m) =>
+      m.toLowerCase().includes("animaginexl")
+    );
+    const hasChibiLoRA = loraModels.some((m) =>
+      m.toLowerCase().includes("chibistyle") || m.toLowerCase().includes("yuugiri")
+    );
+    const hasOpenPoseXL = controlNetModels.some((m) =>
+      m.toLowerCase().includes("openposexl")
+    );
+
     const result: ComfyUICapabilities = {
       controlNet: hasControlNet && controlNetModels.length > 0,
       controlNetModels,
+      hasAnimagineXL,
+      hasChibiLoRA,
+      hasOpenPoseXL,
+      checkpointModels,
+      loraModels,
       checkedAt: Date.now(),
     };
     capabilityCache = result;
@@ -63,6 +106,11 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
     const result: ComfyUICapabilities = {
       controlNet: false,
       controlNetModels: [],
+      hasAnimagineXL: false,
+      hasChibiLoRA: false,
+      hasOpenPoseXL: false,
+      checkpointModels: [],
+      loraModels: [],
       checkedAt: Date.now(),
     };
     capabilityCache = result;

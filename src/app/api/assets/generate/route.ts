@@ -72,6 +72,10 @@ export async function POST(request: Request) {
       controlNetModel: body.controlNetModel,
       controlNetStrength: body.controlNetStrength,
       poseImage: body.poseImage,
+      useChibiStyle: body.useChibiStyle,
+      loraStrength: body.loraStrength,
+      controlNetStart: body.controlNetStart,
+      controlNetEnd: body.controlNetEnd,
     })
       .then(async (metadata) => {
         await prisma.generatedAsset.update({

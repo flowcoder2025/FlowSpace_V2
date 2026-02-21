@@ -277,6 +277,48 @@ export class ComfyUIClient {
     }
   }
 
+  /** 이미지를 ComfyUI input 디렉토리에 업로드 */
+  async uploadImage(
+    imageBuffer: Buffer,
+    filename: string,
+    subfolder?: string
+  ): Promise<{ name: string; subfolder: string; type: string }> {
+    const effectiveMode = await this.resolveEffectiveMode();
+    if (effectiveMode === "mock") {
+      return { name: filename, subfolder: subfolder || "", type: "input" };
+    }
+
+    const formData = new FormData();
+    const blob = new Blob([imageBuffer as unknown as ArrayBuffer], { type: "image/png" });
+    formData.append("image", blob, filename);
+    if (subfolder) {
+      formData.append("subfolder", subfolder);
+    }
+    formData.append("overwrite", "true");
+
+    try {
+      const response = await fetch(`${this.baseUrl}/upload/image`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new ComfyUIError(
+          `Failed to upload image: ${response.status}`,
+          "UNKNOWN"
+        );
+      }
+
+      return (await response.json()) as {
+        name: string;
+        subfolder: string;
+        type: string;
+      };
+    } catch (error) {
+      throw ComfyUIError.fromError(error);
+    }
+  }
+
   // ============================================
   // Mock implementations
   // ============================================

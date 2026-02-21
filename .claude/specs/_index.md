@@ -7,7 +7,7 @@
 ## Active Epics
 | Epic | 상태 | Phase 진행 | 마지막 업데이트 |
 |------|------|------------|-----------------|
-| (없음) | | | |
+| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 1~7 완료, Phase 8 대기 | 7/8 | 2026-02-22 |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -19,6 +19,11 @@
 | [livekit-voicevideo](./livekit-voicevideo/README.md) | 2026-02-20 | 1 (Phase 11) |
 | [parts-avatar-system](./parts-avatar-system/README.md) | 2026-02-21 | 3 (Phase 1~3) |
 | [asset-integration](./asset-integration/README.md) | 2026-02-22 | 1 (연동 수정) |
+
+## Ad-hoc Work (2026-02-22)
+- 에셋 갤러리 리팩토링: 스튜디오/생성폼 제거, 단일 갤러리 통합 (커밋: 7a8287a)
+- 오피스 테마 에셋 배치 생성 (캐릭터 3 + 타일셋 1 + 맵 1)
+- 프롬프트 프리픽스/네거티브 강화 (tileset/map/object 픽셀아트)
 
 ## Ad-hoc Work (2026-02-21)
 - 배포 준비: Dockerfile, docker-compose, CI, Vitest, Prisma migrate
@@ -59,7 +64,12 @@ specs/
 │   ├── 01-core-engine.md
 │   ├── 02-customization-ui.md
 │   └── 03-ingame-integration.md
-└── asset-integration/
+├── asset-integration/
+│   ├── README.md
+│   └── 01-integration-fix.md
+└── chibi-pipeline/
     ├── README.md
-    └── 01-integration-fix.md
+    ├── 01-frame-generation.md
+    └── decisions/
+        └── 2026-02-22-ipadapter-identity.md
 ```

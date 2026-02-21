@@ -58,7 +58,7 @@ export const SCHEDULER_OPTIONS = [
 /** 에셋 유형별 프롬프트 프리픽스 */
 export const PROMPT_PREFIXES: Record<AssetType, string> = {
   character:
-    "pixel art character sprite sheet, 8 frames walk cycle, 4 directions (down, left, right, up), 64x64 pixel per frame, 8x4 grid layout, transparent background, game asset, top-down RPG style, ",
+    "pixel art character sprite sheet, 8 frames walk cycle, 4 directions (down, left, right, up), 128x128 pixel per frame, 8x4 grid layout, transparent background, game asset, top-down RPG style, centered character in each frame, consistent size across all frames, uniform scale, aligned poses, ",
   tileset:
     "16-bit pixel art tileset sprite sheet, top-down view, 32x32 pixel tiles arranged in a grid, retro RPG game asset, flat 2D, no perspective, no shadows, clean pixel edges, consistent color palette, ",
   object:
@@ -73,10 +73,46 @@ export const SEAMLESS_PROMPT_PREFIX =
 /** 에셋 유형별 기본 네거티브 프롬프트 */
 export const DEFAULT_NEGATIVE_PROMPTS: Record<AssetType, string> = {
   character:
-    "blurry, low quality, watermark, text, realistic, photorealistic, 3d render, deformed, ugly",
+    "blurry, low quality, watermark, text, realistic, photorealistic, 3d render, deformed, ugly, different sizes, varying scale, inconsistent proportions, misaligned, off-center, cropped, cut off, partial character, overlapping frames",
   tileset:
     "blurry, low quality, watermark, text, realistic, photorealistic, 3d render, perspective, vanishing point, photograph, high resolution, shadows, lighting effects",
   object:
     "blurry, low quality, watermark, text, realistic, photorealistic, 3d render, perspective, photograph, complex background, shadows",
   map: "blurry, low quality, watermark, text, realistic, photorealistic, 3d render, perspective view, isometric, photograph, vanishing point, shadows, lighting effects",
 };
+
+/** 캐릭터 전용 결정론적 샘플러 기본값 */
+export const CHARACTER_GENERATION_DEFAULTS = {
+  samplerName: "dpmpp_2m",
+  scheduler: "karras",
+  steps: 30,
+  cfgScale: 7.5,
+} as const;
+
+// ─── 치비 캐릭터 생성 ───────────────────────────────
+
+export const CHIBI_PROMPT_PREFIX =
+  "1character, chibi, 2heads tall, full body, centered, simple white background, game sprite, high quality, detailed, same character design, consistent outfit, consistent colors, same distance, no camera zoom, ";
+
+export const CHIBI_DIRECTION_PROMPTS: Record<string, string> = {
+  down: "facing viewer, front view, walking pose, ",
+  left: "facing left, side view, profile, walking pose, ",
+  right: "facing right, side view, profile, walking pose, ",
+  up: "from behind, back view, walking pose, ",
+};
+
+export const CHIBI_NEGATIVE_PROMPT =
+  "realistic, photorealistic, 3d render, blurry, low quality, deformed, ugly, extra limbs, missing limbs, fused limbs, watermark, text, signature, multiple characters, multiple views, pixel art, retro, 8bit";
+
+export const CHIBI_GENERATION_DEFAULTS = {
+  samplerName: "euler_ancestral",
+  scheduler: "normal",
+  steps: 25,
+  cfgScale: 7,
+  loraStrength: 0.9,
+  controlNetStrength: 0.75,
+  controlNetStart: 0.0,
+  controlNetEnd: 0.8,
+  frameWidth: 1024,
+  frameHeight: 1024,
+} as const;

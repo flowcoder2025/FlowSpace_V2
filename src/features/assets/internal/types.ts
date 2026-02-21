@@ -46,6 +46,14 @@ export interface CreateAssetParams {
   controlNetStrength?: number;
   /** 포즈 참조 이미지 경로 */
   poseImage?: string;
+  /** 치비 스타일 캐릭터 생성 (프레임별 생성 + 합성) */
+  useChibiStyle?: boolean;
+  /** LoRA 적용 강도 (0-1, 기본 0.9) */
+  loraStrength?: number;
+  /** ControlNet 시작 (0-1, 기본 0.0) */
+  controlNetStart?: number;
+  /** ControlNet 끝 (0-1, 기본 0.8) */
+  controlNetEnd?: number;
 }
 
 /** 에셋 규격 정의 */

@@ -1,0 +1,120 @@
+{
+  "_meta": {
+    "name": "Chibi Character Frame Generator",
+    "description": "Animagine XL 3.1 + ChibiStyleXL LoRA + OpenPose ControlNet으로 단일 프레임을 생성합니다",
+    "version": "1.0.0",
+    "assetType": "character",
+    "outputFormat": {
+      "width": 1024,
+      "height": 1024,
+      "grid": "1x1",
+      "frameSize": "1024x1024"
+    },
+    "parameters": {
+      "prompt": { "nodeId": "6", "field": "text", "type": "string" },
+      "negative_prompt": { "nodeId": "7", "field": "text", "type": "string" },
+      "seed": { "nodeId": "3", "field": "seed", "type": "number" },
+      "steps": { "nodeId": "3", "field": "steps", "type": "number", "default": 25 },
+      "cfg": { "nodeId": "3", "field": "cfg", "type": "number", "default": 7 },
+      "sampler_name": { "nodeId": "3", "field": "sampler_name", "type": "string", "default": "euler_ancestral" },
+      "scheduler": { "nodeId": "3", "field": "scheduler", "type": "string", "default": "normal" },
+      "lora_strength": { "nodeId": "13", "field": "strength_model", "type": "number", "default": 0.9 },
+      "controlnet_strength": { "nodeId": "11", "field": "strength", "type": "number", "default": 0.75 },
+      "controlnet_start": { "nodeId": "11", "field": "start_percent", "type": "number", "default": 0.0 },
+      "controlnet_end": { "nodeId": "11", "field": "end_percent", "type": "number", "default": 0.8 },
+      "pose_image": { "nodeId": "12", "field": "image", "type": "string", "default": "chibi-poses/pose_down_0.png" }
+    }
+  },
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 25,
+      "cfg": 7,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "normal",
+      "denoise": 1.0,
+      "model": ["13", 0],
+      "positive": ["11", 0],
+      "negative": ["11", 1],
+      "latent_image": ["5", 0]
+    }
+  },
+  "4": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "animagineXL31_v31.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": ["13", 1]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": ["13", 1]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["4", 2]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "chibi_frame",
+      "images": ["8", 0]
+    }
+  },
+  "10": {
+    "class_type": "ControlNetLoader",
+    "inputs": {
+      "control_net_name": "OpenPoseXL2.safetensors"
+    }
+  },
+  "11": {
+    "class_type": "ControlNetApplyAdvanced",
+    "inputs": {
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "control_net": ["10", 0],
+      "image": ["12", 0],
+      "strength": 0.75,
+      "start_percent": 0.0,
+      "end_percent": 0.8
+    }
+  },
+  "12": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "chibi-poses/pose_down_0.png",
+      "upload": "image"
+    }
+  },
+  "13": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "lora_name": "yuugiri-lyco-nochekaiser.safetensors",
+      "strength_model": 0.9,
+      "strength_clip": 0.9,
+      "model": ["4", 0],
+      "clip": ["4", 1]
+    }
+  }
+}
