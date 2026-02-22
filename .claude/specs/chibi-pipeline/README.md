@@ -12,7 +12,8 @@
 | Animagine XL 3.1 | 베이스 체크포인트 |
 | yuugiri-lyco-nochekaiser (LoRA) | 치비 스타일 |
 | OpenPoseXL2 (ControlNet) | 포즈 가이드 |
-| IP-Adapter Plus SDXL (예정) | 캐릭터 identity 유지 |
+| IP-Adapter Plus SDXL | 캐릭터 identity 유지 |
+| CLIP-ViT-H | IP-Adapter 이미지 인코딩 |
 
 ## Phase 목록
 | Phase | 설명 | 상태 |
@@ -24,11 +25,12 @@
 | 5 | 프로세서 리팩토링 (32프레임 루프) | 완료 |
 | 6 | API/모듈 연결 | 완료 |
 | 7 | 검증 + 폭 정규화 | 완료 (GRADE: PASS) |
-| 8 | IP-Adapter 캐릭터 identity 유지 | 플랜 작성 완료, 구현 대기 |
+| 8 | IP-Adapter 캐릭터 identity 유지 | **완료** (GRADE: PASS) |
 
 ## 핵심 결과
-- 32프레임 생성 시간: ~8분
+- 32프레임 생성 시간: ~19분 (IP-Adapter 포함, Phase A+B)
 - 분석기 GRADE: **PASS**
-- 높이 stddev: 0px (완벽 통일)
+- 높이/폭 stddev: 0px (완벽 통일)
 - 방향 내 폭 range: 0px (4방향 모두 완전 통일)
-- **잔여 문제**: 프레임 간 캐릭터 외형 불일치 → Phase 8 (IP-Adapter)로 해결 예정
+- IP-Adapter로 프레임 간 캐릭터 외형 일관성 확보
+- 2-Phase 방식: Phase A(레퍼런스 1장) → Phase B(32프레임 IP-Adapter 주입)

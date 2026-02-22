@@ -7,7 +7,7 @@
 ## Active Epics
 | Epic | 상태 | Phase 진행 | 마지막 업데이트 |
 |------|------|------------|-----------------|
-| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 1~7 완료, Phase 8 대기 | 7/8 | 2026-02-22 |
+| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 1~8 완료 | 8/8 | 2026-02-22 |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -70,6 +70,10 @@ specs/
 └── chibi-pipeline/
     ├── README.md
     ├── 01-frame-generation.md
+    ├── 08-ipadapter-identity.md
     └── decisions/
-        └── 2026-02-22-ipadapter-identity.md
+        ├── 2026-02-22-pixelart-to-chibi.md
+        ├── 2026-02-22-normalize-strategy.md
+        ├── 2026-02-22-ipadapter-identity.md
+        └── 2026-02-22-lora-training.md
 ```

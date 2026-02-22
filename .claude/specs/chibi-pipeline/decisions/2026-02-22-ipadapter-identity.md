@@ -24,3 +24,10 @@ IP-Adapter Plus SDXL (`ip-adapter-plus_sdxl_vit-h`) 도입.
 - ComfyUI_IPAdapter_plus 커스텀 노드 설치 필요
 - VRAM 사용량 증가: ~12GB → ~14GB (12GB GPU에서 타이트)
 - 미설치 시 기존 방식으로 자동 폴백
+
+## 구현 결과 (2026-02-22)
+- **IPAdapterAdvanced** 사용 (Simple은 clip_vision 직접 입력 불가)
+- IPAdapterModelLoader(raw model) + CLIPVisionLoader(별도) → IPAdapterAdvanced에 연결
+- weight_type: "linear" (Advanced에서 지원, Simple은 "standard"만)
+- 2-Phase: Phase A(chibi-frame 워크플로우) → Phase B(chibi-ipadapter 워크플로우)
+- GRADE: PASS, stddev=0px, 생성 시간 ~19분 (Phase A 15초 포함)

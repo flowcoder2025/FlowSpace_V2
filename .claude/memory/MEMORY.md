@@ -7,9 +7,23 @@
 - **Repo**: https://github.com/flowcoder2025/FlowSpace_V2.git
 
 ## Active Epic
-| Epic | 상태 | Phase 진행 | 마지막 업데이트 |
-|------|------|------------|-----------------|
-| 치비 캐릭터 파이프라인 | Phase 1~7 완료, Phase 8 대기 | 7/8 | 2026-02-22 |
+| Epic | 상태 | 다음 작업 |
+|------|------|-----------|
+| 치비 LoRA 학습 | 플랜 완료, 승인 대기 | Phase 1: kohya_ss 설치 |
+
+### 치비 LoRA 학습 상세
+- **목표**: 게임 스프라이트 전용 치비 스타일 LoRA → 32프레임 시각적 일관성 확보
+- **도구**: kohya_ss (sd-scripts)
+- **학습 데이터**: 35~50장 (AI 선별 + 오픈소스)
+- **하이퍼파라미터**: dim=32, alpha=16, AdamW8bit, LR=5e-5, 12 epochs
+- **트리거 워드**: `flowspace_chibi`
+- **yuugiri 대체** (fallback 유지)
+- **플랜 파일**: `~/.claude/plans/fluffy-meandering-hollerith.md`
+
+## Recently Completed
+| Epic | 완료일 | 핵심 산출물 |
+|------|--------|------------|
+| 치비 캐릭터 파이프라인 | 2026-02-22 | Phase 1~8 완료, IP-Adapter 포함, GRADE: PASS |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -25,18 +39,48 @@
 | 에셋 갤러리 리팩토링 | 2026-02-22 | Ad-hoc (스튜디오→갤러리 통합) |
 
 ## Architecture Decisions
+
+### 플랫폼 기반
 - 6 도메인 rules (`.claude/rules/` path-based auto-load)
-- event-protocol → `.claude/reference/` (인간용 레퍼런스)
 - EventBridge (React ↔ Phaser 통신)
 - Socket.io (Client ↔ Server 실시간) + dotenv 명시 로드 (tsx 환경)
 - Next.js 15 App Router + Prisma 6 + PostgreSQL (Supabase)
 - NextAuth v5 + JWT + PrismaAdapter + **auth.config.ts 분리 (Edge Runtime)**
 - 소켓 인증: `/api/socket/token` → jose JWT 발급 → 서버 검증
-- Admin Dashboard: requireSpaceAdmin 헬퍼 (OWNER/STAFF/superAdmin)
-- 채팅 드래그/리사이즈: useChatDrag 훅 (localStorage 위치/크기 저장)
-- Phaser 키보드 캡처: chatFocused 시 clearCaptures/addCapture 토글
 - DB: Supabase Transaction Pooler + `pgbouncer=true` (prepared statement 호환)
 - 배포: Dockerfile (standalone) + docker-compose + GitHub Actions CI
+
+### 에셋 파이프라인 (2026-02-19 ~ 02-22)
+- **ComfyUI 통합**: auto/real/mock 3모드, capability-checker로 설치 상태 자동 감지
+- **워크플로우 JSON**: `_meta.parameters` 기반 파라미터 주입 (injectWorkflowParams)
+- **후처리 체인**: removeBackground → alignCharacterFrames → blendTileEdges (유형별)
+- **품질 프리셋**: draft/standard/high (steps, cfg, sampler, scheduler 묶음)
+- **Seamless 타일**: 전용 워크플로우 variant + 2px 엣지 블렌딩
+- **에셋 갤러리 통합**: 스튜디오/생성폼 제거 → 단일 /assets 페이지 (2026-02-22)
+
+### 치비 캐릭터 파이프라인 (2026-02-22)
+- **픽셀아트 → 치비/SD 전환**: 사용자가 픽셀아트 스타일 거부 → Animagine XL 3.1 기반 치비로 변경
+- **프레임별 개별 생성**: 단일 시트 생성 불가 → 32프레임 순차 생성 + ControlNet 포즈 제어 + 합성
+- **모델 스택**: Animagine XL 3.1 + yuugiri-lyco LoRA (치비) + OpenPoseXL2 (포즈) + IP-Adapter Plus (identity)
+- **폭 정규화**: normalizeDirectionFrames — median bbox + fit:fill + 2차 equalization → stddev=0px 달성
+- **alignCharacterFrames 제거**: normalizeDirectionFrames가 중앙+바닥선 처리, 추가 시프트는 클리핑 유발
+- **alpha 임계값**: extractBBox alpha>10 (분석기와 동일 기준)
+- **IP-Adapter 2-Phase**: Phase A(down_0 레퍼런스) → Phase B(32프레임 identity 주입) — 외형 일관성 확보
+- **IPAdapterAdvanced 선택**: IPAdapter Simple은 clip_vision 직접 입력 불가 → Advanced 사용
+- **Graceful Fallback**: IP-Adapter 미설치 시 기존 chibi-frame 워크플로우 자동 사용
+- **방향별 seed 고정**: 같은 방향 8프레임은 동일 seed → 걷기 사이클 내 외형 일관성
+- **시각적 일관성 한계**: IP-Adapter+ControlNet으로도 프레임 간 외형(갑옷 디테일, 체형, 색상) 불일치 → 에셋 사용 불가 판정
+- **LoRA 학습 결정 (2026-02-22)**: kohya_ss로 범용 치비 스프라이트 스타일 LoRA 학습, yuugiri 대체 (fallback 유지)
+
+### 아바타 시스템 (2026-02-21)
+- **3종 공존**: `classic:` / `custom:` / `parts:` 포맷 하위 호환
+- **Custom Avatar 비동기 로드**: sync fallback(기본 파츠) → async Canvas 스케일(128→32x48) → re-emit
+- **런타임 스왑**: texture 제거 → 재생성 → animation 재등록
+
+### UI/UX (2026-02-22)
+- **전체 한글화**: 13개 컴포넌트, 모든 필드에 title 속성 한글 설명
+- **ControlNet 상태 표시**: "(미설치)" → "(설정 필요)" 변경
+- **barrel import 우회**: `@/features/assets` barrel이 sharp(Node전용) re-export → 클라이언트에서 직접 internal import
 
 ## Next Steps (일반)
 1. ComfyUI 추가 개선 (LoRA 지원, Flux.1 모델, 실시간 프리뷰)
