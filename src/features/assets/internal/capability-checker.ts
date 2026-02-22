@@ -8,6 +8,10 @@ export interface ComfyUICapabilities {
   hasOpenPoseXL: boolean;
   checkpointModels: string[];
   loraModels: string[];
+  hasIPAdapter: boolean;
+  hasIPAdapterPlus: boolean;
+  hasCLIPVision: boolean;
+  ipAdapterModels: string[];
   checkedAt: number;
 }
 
@@ -39,6 +43,10 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
       hasOpenPoseXL: false,
       checkpointModels: [],
       loraModels: [],
+      hasIPAdapter: false,
+      hasIPAdapterPlus: false,
+      hasCLIPVision: false,
+      ipAdapterModels: [],
       checkedAt: Date.now(),
     };
     capabilityCache = result;
@@ -90,6 +98,39 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
       m.toLowerCase().includes("openposexl")
     );
 
+    // IP-Adapter 노드 존재 확인
+    const hasIPAdapter =
+      !!objectInfo["IPAdapterModelLoader"] || !!objectInfo["IPAdapterAdvanced"];
+
+    // IP-Adapter 모델 목록 추출
+    let ipAdapterModels: string[] = [];
+    if (hasIPAdapter && objectInfo["IPAdapterModelLoader"]) {
+      const ipaInfo = objectInfo["IPAdapterModelLoader"] as {
+        input?: { required?: { ipadapter_file?: [string[]] } };
+      };
+      ipAdapterModels =
+        ipaInfo.input?.required?.ipadapter_file?.[0] || [];
+    }
+
+    const hasIPAdapterPlus = ipAdapterModels.some((m) =>
+      m.toLowerCase().includes("ip-adapter-plus") &&
+      m.toLowerCase().includes("sdxl")
+    );
+
+    // CLIP Vision 모델 확인
+    let clipVisionModels: string[] = [];
+    if (objectInfo["CLIPVisionLoader"]) {
+      const clipInfo = objectInfo["CLIPVisionLoader"] as {
+        input?: { required?: { clip_name?: [string[]] } };
+      };
+      clipVisionModels =
+        clipInfo.input?.required?.clip_name?.[0] || [];
+    }
+
+    const hasCLIPVision = clipVisionModels.some((m) =>
+      m.toLowerCase().includes("clip-vit-h")
+    );
+
     const result: ComfyUICapabilities = {
       controlNet: hasControlNet && controlNetModels.length > 0,
       controlNetModels,
@@ -98,6 +139,10 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
       hasOpenPoseXL,
       checkpointModels,
       loraModels,
+      hasIPAdapter,
+      hasIPAdapterPlus,
+      hasCLIPVision,
+      ipAdapterModels,
       checkedAt: Date.now(),
     };
     capabilityCache = result;
@@ -111,6 +156,10 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
       hasOpenPoseXL: false,
       checkpointModels: [],
       loraModels: [],
+      hasIPAdapter: false,
+      hasIPAdapterPlus: false,
+      hasCLIPVision: false,
+      ipAdapterModels: [],
       checkedAt: Date.now(),
     };
     capabilityCache = result;

@@ -116,3 +116,11 @@ export const CHIBI_GENERATION_DEFAULTS = {
   frameWidth: 1024,
   frameHeight: 1024,
 } as const;
+
+/** IP-Adapter 기본값 */
+export const IPADAPTER_DEFAULTS = {
+  weight: 0.8,
+  weightType: "linear",
+  startAt: 0.0,
+  endAt: 1.0,
+} as const;

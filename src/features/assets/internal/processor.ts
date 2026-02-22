@@ -29,6 +29,7 @@ import {
   CHIBI_DIRECTION_PROMPTS,
   CHIBI_NEGATIVE_PROMPT,
   CHIBI_GENERATION_DEFAULTS,
+  IPADAPTER_DEFAULTS,
 } from "./constants";
 import type { QualityPreset } from "./constants";
 import type { CreateAssetParams, GeneratedAssetMetadata } from "./types";
@@ -272,21 +273,116 @@ async function processChibiCharacterGeneration(
   const spec = ASSET_SPECS[params.type];
   const client = new ComfyUIClient();
 
-  // 1. ControlNet 가용성 확인
+  // 1. ControlNet + IP-Adapter 가용성 확인
   const caps = await checkComfyUICapabilities();
   const useControlNet =
     (params.useControlNet !== false) && caps.controlNet;
+  const useIPAdapter =
+    caps.hasIPAdapter && caps.hasIPAdapterPlus && caps.hasCLIPVision;
+
+  if (useIPAdapter) {
+    console.log("[ChibiProcessor] IP-Adapter 사용 가능 → 2-Phase 생성 모드");
+  } else {
+    console.log("[ChibiProcessor] IP-Adapter 미설치 → 기존 방식 (ControlNet only)");
+  }
 
   // 2. 포즈 이미지 업로드 (ControlNet 사용 시)
   if (useControlNet) {
     await ensurePosesUploaded(client);
   }
 
-  // 3. 워크플로우 로드
-  const workflowVariant = useControlNet ? "chibi-frame" : "chibi-fallback";
+  // 3. Phase A: 레퍼런스 이미지 생성 (IP-Adapter 사용 시)
+  let uploadedRefPath: string | null = null;
+
+  if (useIPAdapter) {
+    console.log("[ChibiProcessor] Phase A: 레퍼런스 프레임 생성 (down_0)...");
+
+    const refWorkflowVariant = useControlNet ? "chibi-frame" : "chibi-fallback";
+    const { meta: refMeta, workflow: refWorkflow } =
+      await loadWorkflowTemplate("character", refWorkflowVariant);
+
+    const baseSeedForRef = params.seed ?? Math.floor(Math.random() * 2147483647);
+    const refPrompt = buildChibiPrompt("down", params.prompt);
+    const refParams: Record<string, unknown> = {
+      prompt: refPrompt,
+      negative_prompt: params.negativePrompt || CHIBI_NEGATIVE_PROMPT,
+      seed: baseSeedForRef,
+      steps: params.steps ?? CHIBI_GENERATION_DEFAULTS.steps,
+      cfg: params.cfgScale ?? CHIBI_GENERATION_DEFAULTS.cfgScale,
+      sampler_name: params.samplerName ?? CHIBI_GENERATION_DEFAULTS.samplerName,
+      scheduler: params.scheduler ?? CHIBI_GENERATION_DEFAULTS.scheduler,
+      lora_strength: params.loraStrength ?? CHIBI_GENERATION_DEFAULTS.loraStrength,
+    };
+
+    if (useControlNet) {
+      refParams.pose_image = getPoseImageRef("down", 0);
+      refParams.controlnet_strength =
+        params.controlNetStrength ?? CHIBI_GENERATION_DEFAULTS.controlNetStrength;
+      refParams.controlnet_start =
+        params.controlNetStart ?? CHIBI_GENERATION_DEFAULTS.controlNetStart;
+      refParams.controlnet_end =
+        params.controlNetEnd ?? CHIBI_GENERATION_DEFAULTS.controlNetEnd;
+    }
+
+    const refInjected = injectWorkflowParams(refWorkflow, refMeta, refParams);
+    if (refInjected["9"]?.inputs) {
+      refInjected["9"].inputs.filename_prefix = `chibi_ref_${Date.now()}`;
+    }
+
+    let refResult;
+    try {
+      refResult = await client.generateAsset(
+        { type: "character", prompt: params.prompt, name: params.name, seed: baseSeedForRef },
+        refInjected
+      );
+    } catch (error) {
+      const comfyError = ComfyUIError.fromError(error);
+      console.error(`[ChibiProcessor] 레퍼런스 프레임 에러 [${comfyError.type}]:`, comfyError.message);
+      throw new Error(`치비 레퍼런스 프레임 생성 실패: ${comfyError.message}`);
+    }
+
+    if (refResult.status === "failed" || !refResult.images?.length) {
+      throw new Error(`치비 레퍼런스 프레임 생성 실패: ${refResult.error || "no images"}`);
+    }
+
+    let refData = refResult.images[0].data || Buffer.alloc(0);
+
+    // 레퍼런스 이미지 배경 제거
+    if (params.removeBackground !== false && refData.length > 0) {
+      try {
+        refData = await removeBackground(Buffer.from(refData), {
+          tolerance: params.bgRemovalTolerance,
+        });
+      } catch (err) {
+        console.warn("[ChibiProcessor] 레퍼런스 배경 제거 실패:", err);
+      }
+    }
+
+    // ComfyUI input에 레퍼런스 이미지 업로드
+    const refFilename = `ref_${Date.now()}.png`;
+    try {
+      const uploaded = await client.uploadImage(
+        Buffer.from(refData),
+        refFilename,
+        "chibi-reference"
+      );
+      uploadedRefPath = `${uploaded.subfolder}/${uploaded.name}`;
+      console.log(`[ChibiProcessor] Phase A 완료: 레퍼런스 업로드 → ${uploadedRefPath}`);
+    } catch (err) {
+      console.warn("[ChibiProcessor] 레퍼런스 업로드 실패, IP-Adapter 비활성화:", err);
+      uploadedRefPath = null;
+    }
+  }
+
+  // 4. Phase B: 32프레임 생성
+  const actualUseIPAdapter = useIPAdapter && uploadedRefPath !== null;
+  const workflowVariant = actualUseIPAdapter
+    ? "chibi-ipadapter"
+    : useControlNet ? "chibi-frame" : "chibi-fallback";
   const { meta, workflow } = await loadWorkflowTemplate("character", workflowVariant);
 
-  // 4. 32프레임 순차 생성 (방향별 수집 → 일괄 정규화)
+  console.log(`[ChibiProcessor] Phase B: 32프레임 생성 (워크플로우: ${workflowVariant})`);
+
   // 방향별 seed 고정: 같은 방향 8프레임은 동일 seed → 걷기 사이클 내 외형 일관성 최대화
   const baseSeed = params.seed ?? Math.floor(Math.random() * 2147483647);
   const frames: Buffer[] = [];
@@ -321,6 +417,13 @@ async function processChibiCharacterGeneration(
           params.controlNetStart ?? CHIBI_GENERATION_DEFAULTS.controlNetStart;
         workflowParams.controlnet_end =
           params.controlNetEnd ?? CHIBI_GENERATION_DEFAULTS.controlNetEnd;
+      }
+
+      // IP-Adapter 파라미터 주입
+      if (actualUseIPAdapter) {
+        workflowParams.reference_image = uploadedRefPath;
+        workflowParams.ipadapter_weight =
+          params.ipAdapterWeight ?? IPADAPTER_DEFAULTS.weight;
       }
 
       const injected = injectWorkflowParams(workflow, meta, workflowParams);

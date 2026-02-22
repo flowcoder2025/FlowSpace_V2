@@ -25,6 +25,7 @@ export {
   CHIBI_DIRECTION_PROMPTS,
   CHIBI_NEGATIVE_PROMPT,
   CHIBI_GENERATION_DEFAULTS,
+  IPADAPTER_DEFAULTS,
 } from "./internal/constants";
 export type { QualityPreset } from "./internal/constants";
 export type {

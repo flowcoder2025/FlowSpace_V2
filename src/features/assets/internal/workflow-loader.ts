@@ -15,6 +15,7 @@ const WORKFLOW_FILES: Record<string, string> = {
   "character-controlnet": "character-controlnet.json",
   "character-chibi-frame": "character-chibi-frame.json",
   "character-chibi-fallback": "character-chibi-fallback.json",
+  "character-chibi-ipadapter": "character-chibi-ipadapter.json",
 };
 
 interface WorkflowFile {

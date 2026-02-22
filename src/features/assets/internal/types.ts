@@ -54,6 +54,8 @@ export interface CreateAssetParams {
   controlNetStart?: number;
   /** ControlNet 끝 (0-1, 기본 0.8) */
   controlNetEnd?: number;
+  /** IP-Adapter 강도 (0-1, 기본 0.8) */
+  ipAdapterWeight?: number;
 }
 
 /** 에셋 규격 정의 */

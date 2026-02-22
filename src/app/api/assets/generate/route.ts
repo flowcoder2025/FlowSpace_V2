@@ -76,6 +76,7 @@ export async function POST(request: Request) {
       loraStrength: body.loraStrength,
       controlNetStart: body.controlNetStart,
       controlNetEnd: body.controlNetEnd,
+      ipAdapterWeight: body.ipAdapterWeight,
     })
       .then(async (metadata) => {
         await prisma.generatedAsset.update({
