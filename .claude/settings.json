@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Check if this session created or modified any source files (.ts, .tsx, .prisma). If yes, respond {\"ok\": false, \"reason\": \"Source files were changed. Run qa-agent to verify quality (tsc, lint, security, boundaries).\"}. If no source files were changed (only docs, config, .md), respond {\"ok\": true}."
+            "prompt": "Check if this session created or modified any source files (.ts, .tsx, .prisma) AND qa-agent has NOT already been run in this session. If source files were changed and qa-agent was not yet run, respond {\"ok\": false, \"reason\": \"Source files were changed. Run qa-agent to verify quality (tsc, lint, security, boundaries).\"}. If no source files were changed, or if qa-agent already ran in this session, respond {\"ok\": true}."
           }
         ]
       },
@@ -13,7 +13,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Check if this session created or modified 3 or more source files (.ts, .tsx, .prisma) as part of feature implementation. If yes, respond {\"ok\": false, \"reason\": \"Significant code changes detected. Run doc-agent to generate or update spec documentation.\"}. If fewer than 3 source files changed or changes are trivial, respond {\"ok\": true}."
+            "prompt": "Check if this session created or modified 3 or more source files (.ts, .tsx, .prisma) as part of feature implementation AND doc-agent has NOT already been run in this session. If 3+ source files were changed and doc-agent was not yet run, respond {\"ok\": false, \"reason\": \"Significant code changes detected. Run doc-agent to generate or update spec documentation.\"}. If fewer than 3 source files changed, changes are trivial, or doc-agent already ran in this session, respond {\"ok\": true}."
           }
         ]
       }

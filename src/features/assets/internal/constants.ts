@@ -107,17 +107,17 @@ export const CHIBI_LORA_TRIGGER = "flowspace_chibi";
 // ─── 치비 캐릭터 생성 ───────────────────────────────
 
 export const CHIBI_PROMPT_PREFIX =
-  "1character, chibi, 2heads tall, full body, centered, simple white background, game sprite, high quality, detailed, same character design, consistent outfit, consistent colors, same distance, no camera zoom, ";
+  "masterpiece, best quality, very aesthetic, absurdres, 1boy, solo, chibi, 2-head-tall full body, centered in frame, whole body fully visible from head to toe, no cropping, equal margins top and bottom, no ground, no shadow, no floor, simple_background, green_background, green screen, game sprite, clean silhouette, consistent character design, same outfit, same colors, same distance from camera, no zoom, orthographic feeling, ";
 
 export const CHIBI_DIRECTION_PROMPTS: Record<string, string> = {
-  down: "facing viewer, front view, standing pose, ",
-  left: "facing left, left side view, perfect profile, looking left, body turned left, side facing, standing pose, ",
-  right: "facing right, right side view, perfect profile, looking right, body turned right, side facing, standing pose, ",
-  up: "from behind, back view, rear view, standing pose, ",
+  down: "looking_at_viewer, front view, standing, full_body, ",
+  left: "from_side, profile, facing left, standing, full_body, ",
+  right: "from_side, profile, facing right, standing, full_body, ",
+  up: "from_behind, facing_away, back of character, cape seen from behind, full back view, standing, full_body, ",
 };
 
 export const CHIBI_NEGATIVE_PROMPT =
-  "realistic, photorealistic, 3d render, blurry, low quality, deformed, ugly, extra limbs, missing limbs, fused limbs, watermark, text, signature, multiple characters, multiple views, pixel art, retro, 8bit";
+  "nsfw, lowres, (bad), text, error, fewer, extra, missing, worst quality, jpeg artifacts, low quality, watermark, unfinished, displeasing, oldest, early, chromatic aberration, signature, extra digits, artistic error, username, scan, abstract, realistic, photorealistic, 3d render, deformed, ugly, extra limbs, missing limbs, fused limbs, multiple characters, multiple views";
 
 export const CHIBI_GENERATION_DEFAULTS = {
   samplerName: "euler_ancestral",

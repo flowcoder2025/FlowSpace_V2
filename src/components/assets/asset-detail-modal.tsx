@@ -4,7 +4,7 @@ import { useEffect, useCallback, useState } from "react";
 import { AssetPreview } from "./asset-preview";
 import { GenerationProgress } from "./generation-progress";
 import { useAssetStore } from "@/stores/asset-store";
-import { loadAssetToPhaser } from "@/features/assets/internal/game-loader";
+import { loadAssetToPhaser } from "@/features/assets";
 
 const TYPE_LABELS: Record<string, string> = {
   CHARACTER: "캐릭터",

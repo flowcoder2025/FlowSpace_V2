@@ -4,7 +4,17 @@
       "Bash(npx next lint:*)",
       "Bash(curl:*)",
       "Bash(node -e:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(\"/c/Users/User/ComfyUI/.venv/Scripts/pip.exe\" list)",
+      "Bash(while read:*)",
+      "Bash(do identify \"$f\")",
+      "Bash(done)",
+      "Bash(/c/Users/User/sd-scripts/venv/Scripts/python.exe:*)",
+      "mcp__comfyui__get_job_status"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "comfyui"
+  ]
 }

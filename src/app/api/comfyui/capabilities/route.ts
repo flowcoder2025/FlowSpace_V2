@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { checkComfyUICapabilities } from "@/features/assets/internal/capability-checker";
+import { checkComfyUICapabilities } from "@/features/assets";
 
 /** GET /api/comfyui/capabilities - ComfyUI 기능 지원 현황 조회 */
 export async function GET() {
