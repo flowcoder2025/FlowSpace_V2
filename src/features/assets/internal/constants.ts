@@ -89,16 +89,31 @@ export const CHARACTER_GENERATION_DEFAULTS = {
   cfgScale: 7.5,
 } as const;
 
+// ─── 치비 LoRA 설정 ─────────────────────────────────
+
+/** 치비 LoRA 우선순위 (앞쪽이 높은 우선순위) */
+export const CHIBI_LORA_PRIORITY = [
+  "flowspace-chibi",
+  "chibistyle",
+  "yuugiri",
+] as const;
+
+/** 치비 LoRA 기본 폴백 */
+export const CHIBI_LORA_FALLBACK = "yuugiri-lyco-nochekaiser.safetensors";
+
+/** flowspace-chibi LoRA 트리거 워드 */
+export const CHIBI_LORA_TRIGGER = "flowspace_chibi";
+
 // ─── 치비 캐릭터 생성 ───────────────────────────────
 
 export const CHIBI_PROMPT_PREFIX =
   "1character, chibi, 2heads tall, full body, centered, simple white background, game sprite, high quality, detailed, same character design, consistent outfit, consistent colors, same distance, no camera zoom, ";
 
 export const CHIBI_DIRECTION_PROMPTS: Record<string, string> = {
-  down: "facing viewer, front view, walking pose, ",
-  left: "facing left, side view, profile, walking pose, ",
-  right: "facing right, side view, profile, walking pose, ",
-  up: "from behind, back view, walking pose, ",
+  down: "facing viewer, front view, standing pose, ",
+  left: "facing left, left side view, perfect profile, looking left, body turned left, side facing, standing pose, ",
+  right: "facing right, right side view, perfect profile, looking right, body turned right, side facing, standing pose, ",
+  up: "from behind, back view, rear view, standing pose, ",
 };
 
 export const CHIBI_NEGATIVE_PROMPT =
@@ -110,17 +125,17 @@ export const CHIBI_GENERATION_DEFAULTS = {
   steps: 25,
   cfgScale: 7,
   loraStrength: 0.9,
-  controlNetStrength: 0.75,
+  controlNetStrength: 0.85,
   controlNetStart: 0.0,
-  controlNetEnd: 0.8,
+  controlNetEnd: 0.85,
   frameWidth: 1024,
   frameHeight: 1024,
 } as const;
 
 /** IP-Adapter 기본값 */
 export const IPADAPTER_DEFAULTS = {
-  weight: 0.8,
+  weight: 0.6,
   weightType: "linear",
   startAt: 0.0,
-  endAt: 1.0,
+  endAt: 0.5,
 } as const;

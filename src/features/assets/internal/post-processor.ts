@@ -739,6 +739,94 @@ export async function composeSpriteSheet(
     .toBuffer();
 }
 
+// ---------------------------------------------------------------------------
+// 치비 걷기 프레임 코드 생성
+// ---------------------------------------------------------------------------
+
+/**
+ * 단일 기저 프레임에서 8프레임 걷기 사이클 생성
+ *
+ * 1. baseFrame에서 alpha bbox 추출
+ * 2. 캐릭터를 상체(~60%)/하체(~40%)로 분리
+ * 3. 8프레임에 바디밥(Y축) + 하체 X시프트 적용
+ * 4. 각 프레임을 원본과 동일 크기의 투명 캔버스에 합성
+ */
+export async function generateWalkFrames(
+  baseFrame: Buffer,
+  frameCount = 8
+): Promise<Buffer[]> {
+  const meta = await sharp(baseFrame).metadata();
+  const canvasW = meta.width!;
+  const canvasH = meta.height!;
+
+  // 1. bbox 추출
+  const bbox = await extractBBox(baseFrame);
+  if (!bbox) {
+    // 빈 프레임이면 동일한 빈 프레임 반환
+    return Array(frameCount).fill(baseFrame);
+  }
+
+  const { minX, minY, cropW, cropH } = bbox;
+
+  // 2. 상체/하체 분리 지점 (bbox 높이의 60%)
+  const splitRatio = 0.6;
+  const splitH = Math.round(cropH * splitRatio);
+  const lowerH = cropH - splitH;
+
+  // 상체 크롭
+  const upperBody = await sharp(baseFrame)
+    .extract({ left: minX, top: minY, width: cropW, height: splitH })
+    .toBuffer();
+
+  // 하체 크롭
+  const lowerBody = await sharp(baseFrame)
+    .extract({ left: minX, top: minY + splitH, width: cropW, height: lowerH })
+    .toBuffer();
+
+  // 3. 걷기 사이클 파라미터 (bbox 크기 비례 — 해상도 무관)
+  const bobAmount = Math.max(2, Math.round(cropH * 0.04));
+  const shiftAmount = Math.max(2, Math.round(cropW * 0.07));
+
+  const bobFactors = [0, -0.6, -1, -0.6, 0, -0.6, -1, -0.6];
+  const shiftFactors = [-1, -0.5, 0, 0.5, 1, 0.5, 0, -0.5];
+
+  const bodyBob = bobFactors.map((f) => Math.round(f * bobAmount));
+  const legShift = shiftFactors.map((f) => Math.round(f * shiftAmount));
+
+  // 4. 8프레임 합성
+  const frames: Buffer[] = [];
+
+  for (let i = 0; i < frameCount; i++) {
+    const bobY = bodyBob[i % bodyBob.length];
+    const legX = legShift[i % legShift.length];
+
+    const upperTop = Math.max(0, minY + bobY);
+    const upperLeft = minX;
+
+    const lowerTop = Math.max(0, minY + splitH + bobY);
+    const lowerLeft = Math.max(0, Math.min(canvasW - cropW, minX + legX));
+
+    const frame = await sharp({
+      create: {
+        width: canvasW,
+        height: canvasH,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .composite([
+        { input: upperBody, left: upperLeft, top: upperTop },
+        { input: lowerBody, left: lowerLeft, top: lowerTop },
+      ])
+      .png()
+      .toBuffer();
+
+    frames.push(frame);
+  }
+
+  return frames;
+}
+
 /**
  * Seamless 타일 엣지 블렌딩
  *

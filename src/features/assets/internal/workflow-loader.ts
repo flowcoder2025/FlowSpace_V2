@@ -13,6 +13,7 @@ const WORKFLOW_FILES: Record<string, string> = {
   map: "map-background.json",
   "tileset-seamless": "tileset-seamless.json",
   "character-controlnet": "character-controlnet.json",
+  "character-chibi-batch": "character-chibi-batch.json",
   "character-chibi-frame": "character-chibi-frame.json",
   "character-chibi-fallback": "character-chibi-fallback.json",
   "character-chibi-ipadapter": "character-chibi-ipadapter.json",

@@ -1,6 +1,6 @@
 /**
- * 치비 파이프라인 빠른 테스트
- * processAssetGeneration()을 직접 호출
+ * 치비 캐릭터 하이브리드 파이프라인 테스트
+ * 방향당 1장 SD 생성 + Sharp 코드 기반 걷기 프레임 변환
  */
 import { config } from "dotenv";
 config();
@@ -12,19 +12,19 @@ async function main() {
     "../src/features/assets/internal/processor"
   );
 
-  console.log("=== 치비 캐릭터 전체 파이프라인 테스트 ===");
-  console.log("32프레임 생성 시작 (예상 소요: 5~10분)...\n");
+  console.log("=== 치비 하이브리드 파이프라인 테스트 ===");
+  console.log("3방향 SD 생성 + 코드 걷기 프레임 + right=left mirror\n");
 
   const startTime = Date.now();
 
   try {
     const result = await processAssetGeneration({
       type: "character",
-      name: "chibi_knight_test",
+      name: "chibi_rembg_test",
       prompt: "cute knight with silver armor and blue cape",
       useChibiStyle: true,
-      useControlNet: true,
       seed: 42,
+      // IP-Adapter 0.3 (constants default), ControlNet 방향 가이드 복원
     });
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

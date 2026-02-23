@@ -5,9 +5,12 @@
 - Last Review Date: 2026-02-21
 
 ## Active Epics
-| Epic | 상태 | Phase 진행 | 마지막 업데이트 |
-|------|------|------------|-----------------|
-| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 1~8 완료 | 8/8 | 2026-02-22 |
+없음
+
+## Recently Completed
+| Epic | 완료일 | 핵심 결과 |
+|------|--------|-----------|
+| [chibi-pipeline](./chibi-pipeline/README.md) | 2026-02-23 | Phase 1~10 완료 (batch v2, 77% 속도 향상) |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -71,6 +74,7 @@ specs/
     ├── README.md
     ├── 01-frame-generation.md
     ├── 08-ipadapter-identity.md
+    ├── 10-batch-refactoring.md
     └── decisions/
         ├── 2026-02-22-pixelart-to-chibi.md
         ├── 2026-02-22-normalize-strategy.md

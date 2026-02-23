@@ -30,8 +30,15 @@ const LIMB_COLORS: Record<string, [number, number, number]> = {
   head: [0, 255, 170],
 };
 
-// ─── 치비 스켈레톤 비율 (2등신: 머리 1/3, 몸 2/3) ───
+// ─── 치비 스켈레톤 비율 (2등신: 머리 ≈ 몸) ───
 // 좌표는 0~1 정규화 후 SIZE에 매핑
+//
+// 2등신 치비 비율:
+//   머리(head→neck): ~45% of total height
+//   몸통(neck→hip):  ~25%
+//   다리(hip→foot):  ~30%
+//
+// 전체 캐릭터 높이: 캔버스의 ~50% (0.22 ~ 0.72)
 interface Keypoint {
   x: number;
   y: number;
@@ -42,43 +49,43 @@ interface Skeleton {
   limbs: [string, string, [number, number, number]][];
 }
 
-/** 방향별 기본 포즈 생성 (치비 비율) */
+/** 방향별 기본 포즈 생성 (치비 2등신 비율) */
 function makeSkeleton(
   direction: (typeof DIRECTIONS)[number],
   frameIndex: number
 ): Skeleton {
   // 걷기 사이클: 8프레임 → 사인 기반 팔/다리 스윙
   const t = (frameIndex / FRAMES_PER_DIR) * Math.PI * 2;
-  const swing = Math.sin(t) * 0.04; // 팔다리 스윙 폭
-  const legSwing = Math.sin(t) * 0.06;
-  const bounce = Math.abs(Math.sin(t)) * 0.015; // 상하 바운스
+  const swing = Math.sin(t) * 0.02; // 치비: 짧은 팔 → 작은 스윙
+  const legSwing = Math.sin(t) * 0.03; // 치비: 짧은 다리 → 작은 스윙
+  const bounce = Math.abs(Math.sin(t)) * 0.01; // 상하 바운스
 
-  // 치비 비율 기준점 (정면 down 기준)
-  const cx = 0.5; // 중앙
-  const headY = 0.22 - bounce;
-  const neckY = 0.32 - bounce;
-  const shoulderY = 0.36 - bounce;
-  const hipY = 0.52 - bounce;
-  const kneeY = 0.66 - bounce;
-  const footY = 0.78 - bounce;
+  // 치비 2등신 기준점 (정면 down 기준)
+  const cx = 0.5;
+  const headY = 0.22 - bounce;    // 머리 꼭대기
+  const neckY = 0.44 - bounce;    // 목 (머리가 전체의 ~45%)
+  const shoulderY = 0.47 - bounce; // 어깨
+  const hipY = 0.57 - bounce;     // 힙
+  const kneeY = 0.64 - bounce;    // 무릎
+  const footY = 0.72 - bounce;    // 발
 
   let joints: Record<string, Keypoint>;
 
   switch (direction) {
     case "down": {
-      // 정면
-      const shoulderW = 0.12;
-      const hipW = 0.08;
-      const legW = 0.06;
+      // 정면 — 치비: 좁은 어깨, 짧은 팔다리
+      const shoulderW = 0.08;
+      const hipW = 0.05;
+      const legW = 0.04;
       joints = {
         head: { x: cx, y: headY },
         neck: { x: cx, y: neckY },
         lShoulder: { x: cx - shoulderW, y: shoulderY },
         rShoulder: { x: cx + shoulderW, y: shoulderY },
-        lElbow: { x: cx - shoulderW - 0.02 + swing, y: shoulderY + 0.08 },
-        rElbow: { x: cx + shoulderW + 0.02 - swing, y: shoulderY + 0.08 },
-        lWrist: { x: cx - shoulderW - 0.03 + swing * 1.5, y: shoulderY + 0.15 },
-        rWrist: { x: cx + shoulderW + 0.03 - swing * 1.5, y: shoulderY + 0.15 },
+        lElbow: { x: cx - shoulderW - 0.01 + swing, y: shoulderY + 0.04 },
+        rElbow: { x: cx + shoulderW + 0.01 - swing, y: shoulderY + 0.04 },
+        lWrist: { x: cx - shoulderW - 0.02 + swing * 1.5, y: shoulderY + 0.08 },
+        rWrist: { x: cx + shoulderW + 0.02 - swing * 1.5, y: shoulderY + 0.08 },
         lHip: { x: cx - hipW, y: hipY },
         rHip: { x: cx + hipW, y: hipY },
         lKnee: { x: cx - legW + legSwing, y: kneeY },
@@ -89,19 +96,19 @@ function makeSkeleton(
       break;
     }
     case "up": {
-      // 뒷면 (down과 좌우 반전 무)
-      const shoulderW = 0.12;
-      const hipW = 0.08;
-      const legW = 0.06;
+      // 뒷면
+      const shoulderW = 0.08;
+      const hipW = 0.05;
+      const legW = 0.04;
       joints = {
         head: { x: cx, y: headY },
         neck: { x: cx, y: neckY },
         lShoulder: { x: cx - shoulderW, y: shoulderY },
         rShoulder: { x: cx + shoulderW, y: shoulderY },
-        lElbow: { x: cx - shoulderW - 0.02 - swing, y: shoulderY + 0.08 },
-        rElbow: { x: cx + shoulderW + 0.02 + swing, y: shoulderY + 0.08 },
-        lWrist: { x: cx - shoulderW - 0.03 - swing * 1.5, y: shoulderY + 0.15 },
-        rWrist: { x: cx + shoulderW + 0.03 + swing * 1.5, y: shoulderY + 0.15 },
+        lElbow: { x: cx - shoulderW - 0.01 - swing, y: shoulderY + 0.04 },
+        rElbow: { x: cx + shoulderW + 0.01 + swing, y: shoulderY + 0.04 },
+        lWrist: { x: cx - shoulderW - 0.02 - swing * 1.5, y: shoulderY + 0.08 },
+        rWrist: { x: cx + shoulderW + 0.02 + swing * 1.5, y: shoulderY + 0.08 },
         lHip: { x: cx - hipW, y: hipY },
         rHip: { x: cx + hipW, y: hipY },
         lKnee: { x: cx - legW - legSwing, y: kneeY },
@@ -112,17 +119,17 @@ function makeSkeleton(
       break;
     }
     case "left": {
-      // 왼쪽 프로파일: 모든 관절 좌우 겹침
-      const offset = 0.02; // 앞뒤 분리 폭
+      // 왼쪽 프로파일: 모든 관절 좌우 겹침 (약간의 앞뒤 분리)
+      const offset = 0.015;
       joints = {
         head: { x: cx, y: headY },
         neck: { x: cx, y: neckY },
         lShoulder: { x: cx - offset, y: shoulderY },
         rShoulder: { x: cx + offset, y: shoulderY },
-        lElbow: { x: cx - offset + swing * 2, y: shoulderY + 0.08 },
-        rElbow: { x: cx + offset - swing * 2, y: shoulderY + 0.08 },
-        lWrist: { x: cx - offset + swing * 3, y: shoulderY + 0.15 },
-        rWrist: { x: cx + offset - swing * 3, y: shoulderY + 0.15 },
+        lElbow: { x: cx - offset + swing * 2, y: shoulderY + 0.04 },
+        rElbow: { x: cx + offset - swing * 2, y: shoulderY + 0.04 },
+        lWrist: { x: cx - offset + swing * 3, y: shoulderY + 0.08 },
+        rWrist: { x: cx + offset - swing * 3, y: shoulderY + 0.08 },
         lHip: { x: cx - offset, y: hipY },
         rHip: { x: cx + offset, y: hipY },
         lKnee: { x: cx - offset + legSwing * 2, y: kneeY },
@@ -134,16 +141,16 @@ function makeSkeleton(
     }
     case "right": {
       // 오른쪽 = 왼쪽 미러
-      const offset = 0.02;
+      const offset = 0.015;
       joints = {
         head: { x: cx, y: headY },
         neck: { x: cx, y: neckY },
         lShoulder: { x: cx + offset, y: shoulderY },
         rShoulder: { x: cx - offset, y: shoulderY },
-        lElbow: { x: cx + offset - swing * 2, y: shoulderY + 0.08 },
-        rElbow: { x: cx - offset + swing * 2, y: shoulderY + 0.08 },
-        lWrist: { x: cx + offset - swing * 3, y: shoulderY + 0.15 },
-        rWrist: { x: cx - offset + swing * 3, y: shoulderY + 0.15 },
+        lElbow: { x: cx + offset - swing * 2, y: shoulderY + 0.04 },
+        rElbow: { x: cx - offset + swing * 2, y: shoulderY + 0.04 },
+        lWrist: { x: cx + offset - swing * 3, y: shoulderY + 0.08 },
+        rWrist: { x: cx - offset + swing * 3, y: shoulderY + 0.08 },
         lHip: { x: cx + offset, y: hipY },
         rHip: { x: cx - offset, y: hipY },
         lKnee: { x: cx + offset - legSwing * 2, y: kneeY },

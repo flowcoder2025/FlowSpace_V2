@@ -19,6 +19,7 @@
       "sampler_name": { "nodeId": "3", "field": "sampler_name", "type": "string", "default": "euler_ancestral" },
       "scheduler": { "nodeId": "3", "field": "scheduler", "type": "string", "default": "normal" },
       "lora_strength": { "nodeId": "13", "field": "strength_model", "type": "number", "default": 0.9 },
+      "lora_name": { "nodeId": "13", "field": "lora_name", "type": "string", "default": "yuugiri-lyco-nochekaiser.safetensors" },
       "controlnet_strength": { "nodeId": "11", "field": "strength", "type": "number", "default": 0.75 },
       "controlnet_start": { "nodeId": "11", "field": "start_percent", "type": "number", "default": 0.0 },
       "controlnet_end": { "nodeId": "11", "field": "end_percent", "type": "number", "default": 0.8 },
@@ -81,7 +82,14 @@
     "class_type": "SaveImage",
     "inputs": {
       "filename_prefix": "chibi_ipadapter_frame",
-      "images": ["8", 0]
+      "images": ["18", 0]
+    }
+  },
+  "18": {
+    "class_type": "InspyrenetRembg",
+    "inputs": {
+      "image": ["8", 0],
+      "torchscript_jit": "default"
     }
   },
   "10": {

@@ -12,6 +12,7 @@ export interface ComfyUICapabilities {
   hasIPAdapterPlus: boolean;
   hasCLIPVision: boolean;
   ipAdapterModels: string[];
+  hasRembg: boolean;
   checkedAt: number;
 }
 
@@ -47,6 +48,7 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
       hasIPAdapterPlus: false,
       hasCLIPVision: false,
       ipAdapterModels: [],
+      hasRembg: false,
       checkedAt: Date.now(),
     };
     capabilityCache = result;
@@ -92,7 +94,9 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
       m.toLowerCase().includes("animaginexl")
     );
     const hasChibiLoRA = loraModels.some((m) =>
-      m.toLowerCase().includes("chibistyle") || m.toLowerCase().includes("yuugiri")
+      m.toLowerCase().includes("flowspace-chibi") ||
+      m.toLowerCase().includes("chibistyle") ||
+      m.toLowerCase().includes("yuugiri")
     );
     const hasOpenPoseXL = controlNetModels.some((m) =>
       m.toLowerCase().includes("openposexl")
@@ -131,6 +135,9 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
       m.toLowerCase().includes("clip-vit-h")
     );
 
+    // Rembg (Inspyrenet) 노드 존재 확인
+    const hasRembg = !!objectInfo["InspyrenetRembg"];
+
     const result: ComfyUICapabilities = {
       controlNet: hasControlNet && controlNetModels.length > 0,
       controlNetModels,
@@ -143,6 +150,7 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
       hasIPAdapterPlus,
       hasCLIPVision,
       ipAdapterModels,
+      hasRembg,
       checkedAt: Date.now(),
     };
     capabilityCache = result;
@@ -160,6 +168,7 @@ export async function checkComfyUICapabilities(): Promise<ComfyUICapabilities> {
       hasIPAdapterPlus: false,
       hasCLIPVision: false,
       ipAdapterModels: [],
+      hasRembg: false,
       checkedAt: Date.now(),
     };
     capabilityCache = result;

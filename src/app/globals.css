@@ -1,7 +1,8 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "../**/*.{ts,tsx,js,jsx}";
 
 /* ============================================
-   CHAT SCROLLBAR - 투명 테마
+   CHAT SCROLLBAR
    ============================================ */
 .chat-scrollbar {
   scrollbar-width: thin;
