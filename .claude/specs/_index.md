@@ -1,13 +1,13 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `87ae0fe`
-- Last Review Date: 2026-02-21
+- Last Reviewed Commit: `f27fdee`
+- Last Review Date: 2026-02-23
 
 ## Active Epics
 | Epic | 현재 Phase | 상태 |
 |------|-----------|------|
-| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 11 (일관성 최적화) | 진행중 — Task 11.7 Trellis2+UltraShape |
+| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 11 (일관성 최적화) | 완료 (근본 해결 보류 — LoRA 재학습 or Trellis2) |
 
 ## Recently Completed
 | Epic | 완료일 | 핵심 결과 |

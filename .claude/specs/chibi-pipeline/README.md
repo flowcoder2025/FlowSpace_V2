@@ -6,14 +6,15 @@
 픽셀아트 → 치비/SD 스타일 캐릭터 스프라이트 생성 파이프라인 구현.
 batch 생성 + Rembg AI 배경 제거 + LoRA 기반 스타일 통일.
 
-## 모델 스택 (v2 - batch)
+## 모델 스택 (v3 - hybrid)
 | 모델 | 용도 | 비고 |
 |------|------|------|
 | Animagine XL 3.1 | 베이스 체크포인트 | |
-| flowspace-chibi LoRA | 치비 스타일 (커스텀) | epoch 8 채택 |
+| flowspace-chibi LoRA | 치비 스타일 (커스텀) | epoch 8, strength 0.9 |
+| OpenPoseXL2 (ControlNet) | 방향 가이드 | strength 0.85, Up은 0 |
+| IP-Adapter Plus SDXL | 캐릭터 identity | style and composition, 0.8/endAt 0.5 |
+| CLIP Vision (clip-ViT-H) | IP-Adapter 인코딩 | |
 | Inspyrenet Rembg | AI 배경 제거 | ComfyUI 노드 |
-| ~~OpenPoseXL2 (ControlNet)~~ | ~~포즈 가이드~~ | v2에서 제거 |
-| ~~IP-Adapter Plus SDXL~~ | ~~캐릭터 identity~~ | v2에서 제거 |
 
 ## Phase 목록
 | Phase | 설명 | 상태 |
@@ -25,14 +26,15 @@ batch 생성 + Rembg AI 배경 제거 + LoRA 기반 스타일 통일.
 | 5 | 프로세서 리팩토링 (32프레임 루프) | 완료 |
 | 6 | API/모듈 연결 | 완료 |
 | 7 | 검증 + 폭 정규화 | 완료 (GRADE: PASS) |
-| 8 | IP-Adapter 캐릭터 identity 유지 | 완료 (v2에서 제거) |
+| 8 | IP-Adapter 캐릭터 identity 유지 | 완료 (v3에서 재도입) |
 | 9 | LoRA 학습 (flowspace-chibi) | 완료 (epoch 8 채택) |
 | 10 | **batch 리팩토링 (v2)** | **완료** (GRADE: PASS, 77% 속도 향상) |
+| 11 | **IP-Adapter 일관성 최적화 (v3)** | **완료** (근본 해결 보류) |
 
-## 핵심 결과 (v2 - batch)
-- 32프레임 생성 시간: **~4.4분** (기존 ~19분 대비 77% 단축)
-- ComfyUI 호출: **3회** (기존 24회 대비 87.5% 감소)
-- 분석기 GRADE: **PASS**
-- 높이 stddev: 0px, 방향 내 폭 range: 0px
-- Rembg AI 배경 제거 (기존 JS 임계값 방식 대체)
-- ControlNet/IP-Adapter 제거 → LoRA + 프롬프트 기반 단순화
+## 핵심 결과 (v3 - hybrid)
+- 32프레임 생성 시간: **~67초** (ComfyUI 4회: ref + down + left + up)
+- right = left mirror (sharp.flop)
+- 파이프라인: txt2img + IP-Adapter "style and composition" + ControlNet 방향 가이드
+- `resizeFrame()` → `generateWalkFrames()` 순서 (normalizeDirectionFrames 스킵)
+- Rembg AI 배경 제거 (워크플로우 내)
+- **남은 문제**: 방향 간 캐릭터 디자인 불일치 = LoRA 학습 데이터 근본 원인
