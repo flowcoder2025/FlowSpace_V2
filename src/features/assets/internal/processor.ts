@@ -262,8 +262,10 @@ export async function processAssetGeneration(
 // 치비 캐릭터 하이브리드 파이프라인 (SD 생성 + 코드 변환)
 // ──────────────────────────────────────────────────────
 
-/** 실제 ComfyUI로 생성하는 방향 (right는 left mirror) */
-const CHIBI_GENERATE_DIRECTIONS = ["down", "left", "up"] as const;
+/** Phase B에서 생성하는 방향 (모든 방향을 동일 파이프라인으로 → 스케일 일관성) */
+const CHIBI_IPADAPTER_DIRECTIONS = ["down", "left", "up"] as const;
+/** IP-Adapter 미사용 시 전체 방향 생성 */
+const CHIBI_ALL_DIRECTIONS = ["down", "left", "up"] as const;
 const FRAMES_PER_DIR = 8;
 const SPRITE_FRAME_SIZE = 128; // 최종 스프라이트 프레임 크기
 const SPRITE_COLS = 8;
@@ -294,7 +296,7 @@ async function processChibiCharacterGeneration(
     await ensurePosesUploaded(client);
   }
 
-  // 2. Phase A: 레퍼런스 이미지 생성 (IP-Adapter 사용 시)
+  // 2. Phase A: 레퍼런스 이미지 생성 (IP-Adapter용 — 모든 방향의 identity 가이드)
   let uploadedRefPath: string | null = null;
 
   if (useIPAdapter) {
@@ -401,7 +403,7 @@ async function processChibiCharacterGeneration(
     }
   }
 
-  // 3. Phase B: 3방향 × 1프레임 생성 (ControlNet 방향 가이드) → 걷기 프레임 코드 변환
+  // 3. Phase B: 방향별 기저 프레임 생성 (ControlNet 방향 가이드) → 걷기 프레임 코드 변환
   const actualUseIPAdapter = useIPAdapter && uploadedRefPath !== null;
   const workflowVariant = actualUseIPAdapter
     ? "chibi-ipadapter"
@@ -411,21 +413,26 @@ async function processChibiCharacterGeneration(
     workflowVariant
   );
 
-  console.log(
-    `[ChibiProcessor] Phase B: 3방향 기저 프레임 생성 (워크플로우: ${workflowVariant})`
-  );
+  // 모든 방향을 동일 파이프라인(Phase B)으로 생성 → 스케일 일관성 보장
+  const generateDirs = actualUseIPAdapter
+    ? CHIBI_IPADAPTER_DIRECTIONS
+    : CHIBI_ALL_DIRECTIONS;
 
   const baseSeed =
     params.seed ?? Math.floor(Math.random() * 2147483647);
   const dirBaseFrames = new Map<string, Buffer>();
 
+  console.log(
+    `[ChibiProcessor] Phase B: ${generateDirs.length}방향 기저 프레임 생성 (워크플로우: ${workflowVariant})`
+  );
+
   for (
     let dirIdx = 0;
-    dirIdx < CHIBI_GENERATE_DIRECTIONS.length;
+    dirIdx < generateDirs.length;
     dirIdx++
   ) {
-    const direction = CHIBI_GENERATE_DIRECTIONS[dirIdx];
-    const seed = baseSeed + dirIdx;
+    const direction = generateDirs[dirIdx];
+    const seed = baseSeed + dirIdx + 1;
 
     const prompt = buildChibiPrompt(direction, params.prompt);
     const workflowParams: Record<string, unknown> = {
@@ -459,11 +466,14 @@ async function processChibiCharacterGeneration(
       }
     }
 
-    // IP-Adapter 일관성
+    // IP-Adapter 일관성 (style transfer로 캐릭터 스타일 유지, 초반 50%만 적용)
     if (actualUseIPAdapter) {
       workflowParams.reference_image = uploadedRefPath;
       workflowParams.ipadapter_weight =
         params.ipAdapterWeight ?? IPADAPTER_DEFAULTS.weight;
+      workflowParams.ipadapter_start_at = IPADAPTER_DEFAULTS.startAt;
+      workflowParams.ipadapter_end_at = IPADAPTER_DEFAULTS.endAt;
+      workflowParams.ipadapter_weight_type = IPADAPTER_DEFAULTS.weightType;
     }
 
     const injected = injectWorkflowParams(workflow, meta, workflowParams);
@@ -521,7 +531,7 @@ async function processChibiCharacterGeneration(
 
     dirBaseFrames.set(direction, Buffer.from(frameData));
     console.log(
-      `[ChibiProcessor] ${direction} 기저 프레임 완료 (${dirIdx + 1}/${CHIBI_GENERATE_DIRECTIONS.length})`
+      `[ChibiProcessor] ${direction} 기저 프레임 완료 (${dirIdx + 1}/${generateDirs.length})`
     );
 
     // 디버그: 기저 프레임 저장

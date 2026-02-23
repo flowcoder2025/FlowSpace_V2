@@ -134,8 +134,8 @@ export const CHIBI_GENERATION_DEFAULTS = {
 
 /** IP-Adapter 기본값 */
 export const IPADAPTER_DEFAULTS = {
-  weight: 0.6,
-  weightType: "linear",
+  weight: 0.8,
+  weightType: "style and composition",
   startAt: 0.0,
   endAt: 0.5,
 } as const;

@@ -5,12 +5,14 @@
 - Last Review Date: 2026-02-21
 
 ## Active Epics
-없음
+| Epic | 현재 Phase | 상태 |
+|------|-----------|------|
+| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 11 (일관성 최적화) | 진행중 — Task 11.7 Trellis2+UltraShape |
 
 ## Recently Completed
 | Epic | 완료일 | 핵심 결과 |
 |------|--------|-----------|
-| [chibi-pipeline](./chibi-pipeline/README.md) | 2026-02-23 | Phase 1~10 완료 (batch v2, 77% 속도 향상) |
+| [chibi-pipeline](./chibi-pipeline/README.md) Phase 1~10 | 2026-02-23 | batch v2, 77% 속도 향상 |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
@@ -75,6 +77,7 @@ specs/
     ├── 01-frame-generation.md
     ├── 08-ipadapter-identity.md
     ├── 10-batch-refactoring.md
+    ├── 11-consistency-optimization.md
     └── decisions/
         ├── 2026-02-22-pixelart-to-chibi.md
         ├── 2026-02-22-normalize-strategy.md

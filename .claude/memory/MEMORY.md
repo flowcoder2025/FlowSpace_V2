@@ -7,7 +7,7 @@
 - **Repo**: https://github.com/flowcoder2025/FlowSpace_V2.git
 
 ## Active Epic
-없음 (치비 파이프라인 완료)
+chibi-pipeline Phase 11 — 일관성 최적화 (Task 11.7: Trellis2+UltraShape 3D 파이프라인)
 
 ### 치비 파이프라인 batch 리팩토링 (완료 2026-02-23)
 - **결과**: 24회 → 3회 호출, 19분 → 4.4분 (77% 단축), GRADE: PASS
@@ -68,10 +68,10 @@
 
 ### 치비 캐릭터 파이프라인 (2026-02-22 ~ 02-23)
 - **모델 스택**: Animagine XL 3.1 + flowspace-chibi LoRA + ControlNet(OpenPose) + IP-Adapter
-- **per-frame 방식 유지**: 프레임별 개별 생성 (ControlNet 방향 가이드 + IP-Adapter identity 유지)
-- **batch 접근 실패**: batch_size=8 시도 → 캐릭터 identity 붕괴 + 방향 불일치 → 복원
-- **Rembg AI 배경 제거 추가**: 3개 워크플로우(frame/ipadapter/fallback)에 InspyrenetRembg 노드 삽입
-- **LoRA 우선순위**: flowspace-chibi > chibistyle > yuugiri (CHIBI_LORA_PRIORITY)
+- **하이브리드 방식**: ref(down) 1장 + left/up 2장 SD 생성 → 코드 걷기 변환 (3호출, ~55초)
+- **Down = Phase A 레퍼런스 직접 사용** (재생성 안 함 → 얼굴/디테일 100% 일치)
+- **IP-Adapter 최적 설정**: `style and composition`, weight=0.8, endAt=0.5 (A/B 테스트 13종으로 확정)
+- **Rembg AI 배경 제거**: 3개 워크플로우에 InspyrenetRembg 노드
 - **right mirror**: left 생성 → sharp.flop() 반전
 
 ### 아바타 시스템 (2026-02-21)

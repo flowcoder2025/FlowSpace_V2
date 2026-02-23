@@ -25,7 +25,10 @@
       "controlnet_end": { "nodeId": "11", "field": "end_percent", "type": "number", "default": 0.8 },
       "pose_image": { "nodeId": "12", "field": "image", "type": "string", "default": "chibi-poses/pose_down_0.png" },
       "reference_image": { "nodeId": "16", "field": "image", "type": "string", "default": "chibi-reference/ref.png" },
-      "ipadapter_weight": { "nodeId": "17", "field": "weight", "type": "number", "default": 0.8 }
+      "ipadapter_weight": { "nodeId": "17", "field": "weight", "type": "number", "default": 0.8 },
+      "ipadapter_start_at": { "nodeId": "17", "field": "start_at", "type": "number", "default": 0.0 },
+      "ipadapter_end_at": { "nodeId": "17", "field": "end_at", "type": "number", "default": 1.0 },
+      "ipadapter_weight_type": { "nodeId": "17", "field": "weight_type", "type": "string", "default": "linear" }
     }
   },
   "3": {
