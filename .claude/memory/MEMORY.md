@@ -7,7 +7,7 @@
 - **Repo**: https://github.com/flowcoder2025/FlowSpace_V2.git
 
 ## Active Epic
-chibi-pipeline Phase 11 — 일관성 최적화 (Task 11.7: Trellis2+UltraShape 3D 파이프라인)
+chibi-pipeline Phase 12 — 3D→2D→치비 파이프라인 (일반 인간형→3D→4방향→치비화)
 
 ### 치비 파이프라인 batch 리팩토링 (완료 2026-02-23)
 - **결과**: 24회 → 3회 호출, 19분 → 4.4분 (77% 단축), GRADE: PASS

@@ -7,7 +7,7 @@
 ## Active Epics
 | Epic | 현재 Phase | 상태 |
 |------|-----------|------|
-| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 11 (일관성 최적화) | 완료 (근본 해결 보류 — LoRA 재학습 or Trellis2) |
+| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 12 (3D→2D→치비 파이프라인) | 일반 인간형→3D 변환→4방향 렌더링→치비화 파이프라인 검증 예정 |
 
 ## Recently Completed
 | Epic | 완료일 | 핵심 결과 |
