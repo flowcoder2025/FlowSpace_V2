@@ -40,7 +40,7 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
     if (tab !== "ai") return;
     let cancelled = false;
 
-    fetch("/api/assets?status=COMPLETED&type=CHARACTER&limit=50")
+    fetch("/api/assets?status=COMPLETED&type=CHARACTER&shared=true&limit=50")
       .then((res) => (res.ok ? res.json() : { assets: [] }))
       .then((data: { assets: CharacterAsset[] }) => {
         if (!cancelled) setAiCharacters(data.assets);

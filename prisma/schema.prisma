@@ -397,6 +397,7 @@ model GeneratedAsset {
   fileSize      Int?
 
   comfyuiJobId String?
+  isShared     Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -404,6 +405,7 @@ model GeneratedAsset {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([isShared, status, type])
   @@index([type])
   @@index([status])
   @@index([createdAt(sort: Desc)])

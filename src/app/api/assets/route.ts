@@ -13,13 +13,19 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get("type");
     const status = searchParams.get("status");
+    const shared = searchParams.get("shared");
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
 
-    // 항상 인증된 사용자의 에셋만 조회 (IDOR 방지)
-    const where: Record<string, unknown> = {
-      userId: session.user.id,
-    };
+    const where: Record<string, unknown> = {};
+
+    if (shared === "true") {
+      // 공용 에셋 조회 (아바타 선택 등)
+      where.isShared = true;
+    } else {
+      // 본인 에셋만 조회 (IDOR 방지)
+      where.userId = session.user.id;
+    }
 
     if (type) {
       where.type = type.toUpperCase();
