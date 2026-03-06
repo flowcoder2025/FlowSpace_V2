@@ -17,13 +17,15 @@ import type {
 } from "../src/features/space/socket/internal/types";
 
 const PORT = parseInt(process.env.SOCKET_PORT || "3001", 10);
-const CORS_ORIGIN = process.env.AUTH_URL || "http://localhost:3000";
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || process.env.AUTH_URL || "http://localhost:3000")
+  .split(",")
+  .map((s) => s.trim());
 
 const httpServer = createServer();
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: {
-    origin: CORS_ORIGIN,
+    origin: CORS_ORIGINS,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -69,5 +71,5 @@ io.on("connection", (socket) => {
 
 httpServer.listen(PORT, () => {
   console.log(`[Socket.io] Server running on port ${PORT}`);
-  console.log(`[Socket.io] CORS origin: ${CORS_ORIGIN}`);
+  console.log(`[Socket.io] CORS origins: ${CORS_ORIGINS.join(", ")}`);
 });
