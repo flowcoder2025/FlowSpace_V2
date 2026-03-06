@@ -32,16 +32,16 @@
 ## 핵심 결과
 - 5캐릭터 채택 (c02/c03/c04/c05/c07), c08 back 불량으로 후속 제외, 5캐릭터 IP-Adapter 한계로 제외
 - 걷기 프레임: 코드 기반 (standing에서 상체/다리 분리 → 프로그래밍 이동)
-- 게임 해상도: 96x128 텍스처 + scale 0.5 = 48x64 표시
+- 게임 해상도: 96x128 텍스처 + scale 0.35 = 34x45 표시 (ZEP/게더타운 수준)
 - 점프: Tween 시각 연출 + squash&stretch + 바닥 그림자
 - **흰 테두리 근본 해결**: clean ref(IP-Adapter 없이 생성) + `thick outline` 제거 → 전원 0%
 - **v5 파이프라인**: 3개 워크플로우 ComfyUI 저장, 배치 스크립트 v5
 
 ## 남은 작업
-- **그리드 이동 시스템** — ZEP/게더타운 스타일 타일 단위 이동 (계획 완료, 구현 대기)
-- **충돌 영역 구현** — TileCollisionChecker로 벽+가구 타일 체크
+- ~~**그리드 이동 시스템**~~ → **완료** (Task 12.31, Tween 기반 타일 단위 이동, Shift+방향 전환)
+- **충돌 영역 정밀화** — 가구별 blocked 타일 등록 (TileCollisionChecker.addBlocked)
 - **Y-sorting 구현** — 순수 Y-sort (`depth = bottom Y`), 리서치 완료
-- 가구 배치 최적화 (위치/스케일 조정)
+- 대각선 점프 도약 거리 통일
 
 ## Flux 2 Klein 오브젝트 워크플로우
 - **저장**: `flux2-klein-object-generator.json` (ComfyUI user library)

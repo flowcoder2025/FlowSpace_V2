@@ -105,10 +105,11 @@
 - `remove_white_fringe()`: Rembg 잔여 디프린지 (임시)
 - overlap 30px: LANCZOS 보간 경계 반투명 방지
 
-### 스프라이트 해상도 업그레이드 (Task 12.19)
-- 96x128 텍스처 + Phaser scale 0.5 = 48x64 표시
+### 스프라이트 해상도 업그레이드 (Task 12.19, 12.27)
+- 96x128 텍스처 + Phaser scale 0.35 = 34x45 표시 (Task 12.27에서 0.5→0.35, ZEP/게더타운 수준)
 - Parts/Classic 아바타: 32x48 tempCanvas 그린 뒤 96x128 스케일업
 - Custom 아바타: PLAYER_WIDTH/HEIGHT 참조 → 자동 적용
+- `PLAYER_SCALE = 0.35` (`src/constants/game-constants.ts`)
 
 ### 점프 기능 (Task 12.21, 그리드 이동 통합 후 업데이트)
 - jumpState.offsetY Tween (0→-20→0, JUMP_DURATION=400ms/2 yoyo, Sine.Out)
@@ -122,7 +123,7 @@
 | 파일 | 변경 유형 | 설명 |
 |------|-----------|------|
 | `src/constants/game-constants.ts` | 수정 | SCALE=0.35, NAME_OFFSET_Y, TILE_STEP_DURATION=130, TILE_HALF=16 추가 |
-| `src/features/space/game/internal/player/input-controller.ts` | 수정 | velocityX/Y → dx/dy 정수 델타 |
+| `src/features/space/game/internal/player/input-controller.ts` | 수정 | velocityX/Y → dx/dy 정수 델타, Shift+방향 = 방향전환만(이동 없음) |
 | `src/features/space/game/internal/player/local-player.ts` | 전면 수정 | Physics.Arcade.Sprite → GameObjects.Sprite, tileCol/tileRow, Tween 이동 |
 | `src/features/space/game/internal/player/tile-collision-checker.ts` | 신규 | 순수 로직 충돌 판정 클래스 |
 | `src/features/space/game/internal/remote/remote-player-sprite.ts` | 수정 | LERP 150→130ms (로컬 스텝과 동기화) |
@@ -213,6 +214,26 @@ interface MovementInput {
 ```
 
 대각선 입력 시 dx != 0 && dy != 0인 경우, `direction`은 항상 측면(left/right) 우선 반환.
+
+**Shift + 방향 = 방향 전환만 (이동 없음)**:
+
+```typescript
+// Shift 키 감지 — cursors.shift (Phaser 내장)
+const shiftHeld = this.cursors.shift.isDown;
+const isMoving = hasDirection && !shiftHeld;
+
+return {
+  dx: isMoving ? dx : 0,   // Shift 시 0 반환
+  dy: isMoving ? dy : 0,   // Shift 시 0 반환
+  direction: this.lastDirection, // 방향은 항상 갱신
+  isMoving,
+};
+```
+
+제약:
+- `this.cursors.shift`는 Phaser `createCursorKeys()`에 포함된 내장 키 — 별도 `addKey()` 불필요
+- Shift 중에는 `direction`만 갱신되고 `dx/dy = 0` → LocalPlayer는 `isStepping` 진입 안 함
+- 캐릭터는 제자리에서 방향만 전환 (ZEP/게더타운 캐릭터 방향 조작과 동일)
 
 #### LocalPlayer 이동 루프 (`local-player.ts`)
 
