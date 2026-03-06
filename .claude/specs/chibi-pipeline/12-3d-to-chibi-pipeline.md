@@ -115,9 +115,15 @@
 - jumpState.offsetY Tween (0→-20→0, JUMP_DURATION=400ms/2 yoyo, Sine.Out)
 - **logicalX/logicalY 분리**: jumpState.offsetY는 logicalY와 독립, syncVisuals()에서 합산
 - **jumpState 별도 객체**: 이동 Tween(`targets: this`)과 점프 Tween(`targets: this.jumpState`) 타겟 분리 → Phaser tween 간섭 방지
+- **점프 중 수직 이동 보정**: 하향 이동 시 오프셋 ×1.5 (상쇄 보상), 상향은 보정 없음
 - squash(scaleY 0.85, 80ms) + stretch(scaleY 1.15, 60ms)
 - 바닥 그림자: fillEllipse, 점프 높이 비례 축소/투명화
 - preupdate/apply/restore 패턴 → **제거됨** (logicalY 분리로 불필요)
+
+### Shift+방향 전환 버그 수정
+- `setIdle()`: 이미 idle 시 early return으로 `setFrame()` 미실행 → 방향 전환이 시각적으로 반영 안 됨
+- **수정**: `setFrame()`을 early return 밖으로 이동 → 방향 변경 시 항상 프레임 갱신
+- `update()`: `!isMoving` 분기에서 `direction !== currentDirection`이면 즉시 `setIdle(direction)` + `emitMovement(false)`
 
 ## 변경된 파일
 | 파일 | 변경 유형 | 설명 |
@@ -318,7 +324,8 @@ initWorld() → initTilemap() → initFurniture() → initTileCollision() → in
 Arcade Physics 충돌 설정(`addCollider`) 전면 제거.
 
 ## 다음 작업
-1. **대각선 점프 도약 거리 통일** — 대각선 점프+이동 시 4방향과 동일 거리
-2. 충돌 영역 정밀화 (가구별 blocked 타일 등록)
-3. Y-sorting (깊이 정렬)
-4. 가구/오브젝트 AI 생성 방안 결정
+1. ~~대각선 점프 도약 거리 통일~~ — 제거 (√2 대각선은 포켓몬/ZEP 표준 동작)
+2. **OCI 배포** — v1과 공존하는 v2 배포 (계획 완료 `~/.claude/plans/foamy-strolling-donut.md`)
+3. 충돌 영역 정밀화 (가구별 blocked 타일 등록)
+4. Y-sorting (깊이 정렬)
+5. 가구/오브젝트 AI 생성 방안 결정

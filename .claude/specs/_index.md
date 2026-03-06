@@ -1,22 +1,24 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `e5952e1` (71cc245 feat + e5952e1 docs 검토 완료)
+- Last Reviewed Commit: `3bea525` (OCI 배포 4개 커밋 검토 완료)
 - Last Review Date: 2026-03-06
 
 ## Active Epics
 | Epic | 현재 Phase | 상태 |
 |------|-----------|------|
-| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 12 (멀티뷰 스프라이트시트) | 그리드 이동 완료 (Task 12.31). 다음: 대각선 점프 도약 통일 → 충돌 영역 정밀화 → Y-sorting |
+| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 12 (멀티뷰 스프라이트시트) | 그리드 이동 + Shift 방향전환 + 점프 보정 완료. 다음: 충돌 영역 정밀화 → Y-sorting |
 
 ## Recently Completed
 | Epic | 완료일 | 핵심 결과 |
 |------|--------|-----------|
+| [oci-deployment](./oci-deployment/README.md) | 2026-03-06 | Socket.io OCI 배포, CD 자동화, CORS 다중 origin |
 | [chibi-pipeline](./chibi-pipeline/README.md) Phase 1~11 | 2026-02-23 | batch v2, 77% 속도 향상 |
 
 ## Completed Epics
 | Epic | 완료일 | Phase 수 |
 |------|--------|----------|
+| [oci-deployment](./oci-deployment/README.md) | 2026-03-06 | 1 |
 | [comfyui-asset-pipeline](./comfyui-asset-pipeline/README.md) | 2026-02-19 | 7 |
 | [map-editor](./map-editor/README.md) | 2026-02-19 | 1 (Phase 8) |
 | [admin-dashboard](./admin-dashboard/README.md) | 2026-02-19 | 1 (Phase 9) |
@@ -37,6 +39,9 @@
 ```
 specs/
 ├── _index.md
+├── oci-deployment/
+│   ├── README.md
+│   └── 01-socket-infra.md
 ├── comfyui-asset-pipeline/
 │   ├── README.md
 │   ├── 01~07 phase specs
