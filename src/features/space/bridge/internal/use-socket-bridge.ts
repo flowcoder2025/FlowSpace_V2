@@ -145,7 +145,7 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
           userId: player.userId,
           x: player.position.x,
           y: player.position.y,
-          direction: "down",
+          direction: player.direction ?? "down",
           nickname: player.nickname,
           avatar: player.avatar,
         });
@@ -158,13 +158,13 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
             avatar: player.avatar,
           });
         }
-        // 위치 변경 (moved)
-        if (prev.position.x !== player.position.x || prev.position.y !== player.position.y) {
+        // 위치/방향 변경 (moved)
+        if (prev !== player) {
           eventBridge.emit(GameEvents.REMOTE_PLAYER_MOVED, {
             userId: player.userId,
             x: player.position.x,
             y: player.position.y,
-            direction: "down",
+            direction: player.direction ?? "down",
             nickname: player.nickname,
             avatar: player.avatar,
           });

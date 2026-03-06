@@ -323,16 +323,22 @@ export function useSocket({
           syncPlayers();
         });
 
-        sock.on("player:moved", ({ userId: movedId, x, y }) => {
+        sock.on("player:moved", ({ userId: movedId, x, y, direction }) => {
           const player = playersMapRef.current.get(movedId);
           if (player) {
-            player.position = { x, y };
+            // 새 객체로 교체 (mutation → 참조 비교 실패 방지)
+            playersMapRef.current.set(movedId, {
+              ...player,
+              position: { x, y },
+              direction,
+            });
           } else if (movedId !== userId) {
             playersMapRef.current.set(movedId, {
               userId: movedId,
               nickname: DEFAULT_NICKNAME,
               avatar: "default",
               position: { x, y },
+              direction,
             });
           }
           syncPlayers();

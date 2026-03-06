@@ -6,6 +6,7 @@ export interface PlayerData {
   nickname: string;
   avatar: string;
   position: { x: number; y: number };
+  direction?: string;
 }
 
 /** 위치 업데이트 (경량 payload) */
