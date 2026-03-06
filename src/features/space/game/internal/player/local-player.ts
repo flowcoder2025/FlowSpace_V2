@@ -132,9 +132,15 @@ export class LocalPlayer {
         }
       }
     } else if (!this.isStepping && !isMoving) {
-      const elapsed = this.scene.time.now - this.lastStepEndTime;
-      if (!this.isIdle && elapsed > 80) {
-        this.setIdle(this.currentDirection);
+      // Shift+방향: direction이 변경되었으면 즉시 반영
+      if (direction !== this.currentDirection) {
+        this.setIdle(direction);
+        this.emitMovement(false);
+      } else {
+        const elapsed = this.scene.time.now - this.lastStepEndTime;
+        if (!this.isIdle && elapsed > 80) {
+          this.setIdle(this.currentDirection);
+        }
       }
     }
 
@@ -268,18 +274,23 @@ export class LocalPlayer {
     });
   }
 
-  /** idle 상태 설정 (이미 idle이면 스킵) */
+  /** idle 상태 설정 */
   private setIdle(dir: Direction): void {
     this.currentDirection = dir;
-    if (this.isIdle) return;
-    this.isIdle = true;
-    this.sprite.anims.stop();
+    if (!this.isIdle) {
+      this.isIdle = true;
+      this.sprite.anims.stop();
+    }
     this.sprite.setFrame(IDLE_FRAMES[this.currentDirection]);
   }
 
   /** 논리 좌표 + 점프 오프셋 → 시각 위치 동기화 (매 프레임) */
   private syncVisuals(): void {
-    const jy = this.jumpState.offsetY;
+    // 점프 중 수직 이동 시 오프셋 보정 (하향=상쇄 방지, 상향=과장 억제)
+    let jy = this.jumpState.offsetY;
+    if (jy !== 0 && this.isStepping && this.currentDirection === "down") {
+      jy *= 1.5; // 하향 이동 시 점프 상쇄 보상
+    }
     const visualY = this.logicalY + jy;
 
     this.sprite.setPosition(this.logicalX, visualY);

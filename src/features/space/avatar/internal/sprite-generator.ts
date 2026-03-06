@@ -185,6 +185,15 @@ export function generateAvatarSpriteFromConfig(
   if (config.type === "classic") {
     return generateAvatarSprite(scene, config);
   }
+  if (config.type === "chibi") {
+    // preload에서 이미 로드됨 → 즉시 반환
+    const key = getTextureKey(config);
+    if (scene.textures.exists(key)) {
+      return key;
+    }
+    // preload 누락 시 fallback
+    return generatePartsSprite(scene, DEFAULT_PARTS_AVATAR);
+  }
   // custom — 텍스처가 이미 등록되어 있으면 바로 반환
   if (scene.textures.exists(config.textureKey)) {
     return config.textureKey;

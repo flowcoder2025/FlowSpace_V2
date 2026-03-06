@@ -15,14 +15,19 @@
 - `src/features/space/editor/internal/tile-palette-data.ts:3` — `@/features/space/game/internal/tileset-generator`
 - `src/features/space/game/internal/scenes/main-scene.ts:16` — `@/features/space/editor/internal/editor-system`
 
-### [Medium] LocalPlayer.destroy() 리소스 누수 (2026-03-05, 첫 발생)
-- `src/features/space/game/internal/player/local-player.ts:220`
-- `destroy()`가 `this.shadow`만 정리. `this.sprite`와 `this.nameText`는 destroy() 누락
+### [Medium] LocalPlayer.destroy() 리소스 누수 (2026-03-05, 해결됨 2026-03-06)
+- `src/features/space/game/internal/player/local-player.ts`
+- 해결: destroy()에 sprite.destroy(), nameText.destroy(), shadow.destroy() 모두 포함됨
 
 ### [Low] tryCreateAnim 로직 결함 (2026-03-05, 첫 발생)
 - `src/features/space/game/internal/remote/remote-player-sprite.ts:201`
 - `tryCreateAnim()`이 `scene.anims.exists()` 체크만 하고 실제로 애니메이션을 생성하지 않음
 - 조건 `exists(key) || tryCreateAnim(key)`는 항상 `exists(key)` 와 동일 — fallback 의도 미달성
+
+### [Medium] 하드코딩 픽셀 수치 — avatar-editor-modal.tsx (2026-03-06, 첫 발생)
+- `src/components/space/avatar-editor-modal.tsx:165-166` — `const fw = 96; const fh = 128;`
+- PLAYER_WIDTH/PLAYER_HEIGHT가 game-constants.ts에 정의됨에도 직접 숫자 삽입
+- 해결: @/features/space/avatar barrel에 PLAYER_WIDTH/PLAYER_HEIGHT re-export 추가 또는 공용 상수 분리
 
 ### Notes
 - TypeScript strict mode on. No Bash available — cannot run tsc/lint directly.
@@ -31,3 +36,4 @@
 - constants.ts에 하드코딩된 파일명 (`yuugiri-lyco-nochekaiser.safetensors`) — internal only, not exposed
 - PLAYER_SPEED (game-constants.ts:13): 그리드 이동 전환 후 미사용 — 정리 대상
 - COLLISION_LAYER_NAMES: tilemap-system.ts가 re-export하므로 main-scene.ts는 map-data 직접 import 대신 tilemap-system import 권장 (intra-module이므로 High 아님)
+- chibi-characters.ts: index.ts에서 정상 re-export, 모든 외부 파일이 barrel 경유 확인됨 (2026-03-06)

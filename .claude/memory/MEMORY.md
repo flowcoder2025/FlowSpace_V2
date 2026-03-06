@@ -7,7 +7,17 @@
 - **Repo**: https://github.com/flowcoder2025/FlowSpace_V2.git
 
 ## Active Epic
-chibi-pipeline Phase 12 — **그리드 이동 시스템 구현 완료** (Tween 타일 스테핑, logicalX/Y 분리, 유령스텝 수정, 가구 그리드 정렬). **다음: 대각선 점프 도약 통일 → 충돌 영역 정밀화 → Y-sorting**
+chibi-pipeline Phase 12 — 그리드 이동 + 점프 + Shift 방향전환 + OCI 배포 + 배포 버그픽스 완료. **다음: AI 캐릭터 정적 에셋 전환** (플랜: `~/.claude/plans/sequential-drifting-newt.md`) → 충돌 영역 → Y-sorting
+
+### OCI 배포 (완료 2026-03-06)
+- **Vercel**: `flowspace-v2.vercel.app` (yh-devs-projects 팀, 개인 프로젝트)
+- **OCI Socket.io**: 포트 3002, `Dockerfile.socket` (esbuild 번들), `docker-compose.prod.yml`
+- **Caddy**: v2-socket vhost 추가 + nip.io 임시 (`socket-v2.144.24.72.143.nip.io`)
+- **LiveKit**: v1과 공유 (webhook URL 추가만)
+- **CD**: `.github/workflows/deploy-socket.yml` (server/ 변경 시 자동 배포)
+- **도메인**: 나중에 v2 확정 시 flowcoder 팀으로 이관 + flow-coder.com 연결 예정
+- **CORS**: `CORS_ORIGINS` 콤마 구분 다중 origin 지원
+- **SSH**: `~/.ssh/flowspace-oci` 키로 `ubuntu@144.24.72.143` 접속
 
 ### 치비 파이프라인 batch 리팩토링 (완료 2026-02-23)
 - **결과**: 24회 → 3회 호출, 19분 → 4.4분 (77% 단축), GRADE: PASS
@@ -55,7 +65,7 @@ chibi-pipeline Phase 12 — **그리드 이동 시스템 구현 완료** (Tween 
 - NextAuth v5 + JWT + PrismaAdapter + **auth.config.ts 분리 (Edge Runtime)**
 - 소켓 인증: `/api/socket/token` → jose JWT 발급 → 서버 검증
 - DB: Supabase Transaction Pooler + `pgbouncer=true` (prepared statement 호환)
-- 배포: Dockerfile (standalone) + docker-compose + GitHub Actions CI
+- 배포: Vercel(Next.js) + OCI(Socket.io Docker) + Caddy(리버스 프록시) + GitHub Actions CD
 
 ### 에셋 파이프라인 (2026-02-19 ~ 02-23)
 - **ComfyUI 통합**: auto/real/mock 3모드, capability-checker로 설치 상태 자동 감지
@@ -149,3 +159,7 @@ chibi-pipeline Phase 12 — **그리드 이동 시스템 구현 완료** (Tween 
 - 2D 모델(Klein/SV3D)은 front→back 깊이 모순 발생 (앞뒤 둘 다 파여있음). 진짜 3D 복원(Hunyuan3D)만 물리적 깊이 일관성 보장
 - Kijai ComfyUI-Hunyuan3DWrapper: `custom_nodes/`에 설치됨. pymeshlab + custom_rasterizer wheel 필요. nvdiffrast는 빌드 실패
 - Open3D Visualizer(visible=False)로 Windows에서 GLB → PNG 렌더 가능 (`scripts/render-back-view.py`)
+- docker-compose v1 (`docker-compose`)은 OCI에서 사용 중 — `docker compose` (v2) 안 됨
+- docker-compose v1의 ContainerConfig KeyError: `down` 후 `up --build` 로 우회
+- Vercel 도메인 추가 시 해당 도메인의 팀 scope에서 실행해야 함 (다른 팀 = 403)
+- OCI Caddy는 v1 docker network 안이라 v2 컨테이너에 직접 접근 불가 → `172.18.0.1:포트`(호스트 게이트웨이) 사용

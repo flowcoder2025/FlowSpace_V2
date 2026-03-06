@@ -17,9 +17,15 @@ export interface CustomAvatarConfig {
   textureKey: string;
 }
 
+/** Chibi 아바타 (정적 프리로드 스프라이트) */
+export interface ChibiAvatarConfig {
+  type: "chibi";
+  characterId: string; // "c02", "c03", ...
+}
+
 export type { PartsAvatarConfig };
 
-export type AvatarConfig = ClassicAvatarConfig | CustomAvatarConfig | PartsAvatarConfig;
+export type AvatarConfig = ClassicAvatarConfig | CustomAvatarConfig | PartsAvatarConfig | ChibiAvatarConfig;
 
 /** 방향별 애니메이션 프레임 매핑 (4x4 스프라이트시트) */
 export const DIRECTION_FRAMES = {

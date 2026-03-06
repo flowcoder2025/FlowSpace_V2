@@ -5,7 +5,7 @@
  * EventBridge로 React에 SCENE_READY 알림
  */
 
-import { SCENE_KEYS, MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, DEPTH, MAP_COLS, MAP_ROWS } from "@/constants/game-constants";
+import { SCENE_KEYS, MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, DEPTH, MAP_COLS, MAP_ROWS, PLAYER_WIDTH, PLAYER_HEIGHT } from "@/constants/game-constants";
 import { eventBridge, GameEvents } from "../../events";
 import { createTilemapSystem, type TilemapResult } from "../tilemap/tilemap-system";
 import { LocalPlayer } from "../player/local-player";
@@ -18,6 +18,7 @@ import { EditorSystem } from "@/features/space/editor/internal/editor-system";
 import { createLoadableAssets, loadAssetsInScene } from "../asset-loader";
 import { COLLISION_LAYER_NAMES } from "../tilemap/map-data";
 import type { AssetGeneratedPayload } from "../../events";
+import { CHIBI_CHARACTERS, getChibiTextureKey } from "@/features/space/avatar";
 
 export class MainScene extends Phaser.Scene {
   tilemapResult!: TilemapResult;
@@ -48,6 +49,13 @@ export class MainScene extends Phaser.Scene {
     this.load.image("obj-whiteboard", "/assets/objects/whiteboard.png");
     this.load.image("obj-table", "/assets/objects/table.png");
     this.load.image("obj-chair-back", "/assets/objects/chair_back.png");
+    // 치비 AI 캐릭터 스프라이트시트
+    for (const ch of CHIBI_CHARACTERS) {
+      this.load.spritesheet(getChibiTextureKey(ch.id), ch.spritePath, {
+        frameWidth: PLAYER_WIDTH,
+        frameHeight: PLAYER_HEIGHT,
+      });
+    }
   }
 
   create(): void {

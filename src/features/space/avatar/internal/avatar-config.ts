@@ -7,6 +7,7 @@
 import type { AvatarConfig, ClassicAvatarConfig } from "./avatar-types";
 import type { PartsAvatarConfig } from "./parts/parts-types";
 import { parsePartsString, getPartsTextureKey } from "./parts/parts-string";
+import { CHIBI_CHARACTERS, getChibiTextureKey } from "./chibi-characters";
 
 /** 기본 8색 팔레트 */
 export const SKIN_COLORS = [
@@ -75,7 +76,16 @@ export function parseAvatarString(avatarStr: string): AvatarConfig {
     return parsePartsString(data);
   }
 
+  if (type === "chibi" && data) {
+    return { type: "chibi", characterId: data };
+  }
+
   if (type === "custom" && data) {
+    // custom:character_xxx → chibi 자동 매핑 시도
+    const chibiId = matchCustomToChibi(data);
+    if (chibiId) {
+      return { type: "chibi", characterId: chibiId };
+    }
     return { type: "custom", textureKey: data };
   }
 
@@ -113,6 +123,9 @@ function generateFromHash(str: string): ClassicAvatarConfig {
 
 /** 텍스처 키 생성 (캐싱 식별자) */
 export function getTextureKey(config: AvatarConfig): string {
+  if (config.type === "chibi") {
+    return getChibiTextureKey(config.characterId);
+  }
   if (config.type === "custom") {
     return config.textureKey;
   }
@@ -120,4 +133,18 @@ export function getTextureKey(config: AvatarConfig): string {
     return getPartsTextureKey(config);
   }
   return `avatar_${config.skinColor}_${config.hairColor}_${config.shirtColor}_${config.pantsColor}`;
+}
+
+/**
+ * custom:character_xxx → chibi ID 매핑
+ * DB에 "custom:character_{uuid}" 형태로 저장된 기존 유저 호환
+ */
+function matchCustomToChibi(textureKey: string): string | null {
+  // "character_c02-sprite..." / "character_chibi_c03" 등 다양한 패턴
+  for (const ch of CHIBI_CHARACTERS) {
+    if (textureKey.includes(ch.id)) {
+      return ch.id;
+    }
+  }
+  return null;
 }

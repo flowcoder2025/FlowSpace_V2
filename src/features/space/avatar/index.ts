@@ -3,10 +3,14 @@ export type {
   AvatarConfig,
   ClassicAvatarConfig,
   CustomAvatarConfig,
+  ChibiAvatarConfig,
   PartsAvatarConfig,
   Direction,
 } from "./internal/avatar-types";
 export { DIRECTION_FRAMES, IDLE_FRAMES } from "./internal/avatar-types";
+
+export type { ChibiCharacterDef } from "./internal/chibi-characters";
+export { CHIBI_CHARACTERS, getChibiTextureKey } from "./internal/chibi-characters";
 
 export {
   parseAvatarString,

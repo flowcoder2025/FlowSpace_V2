@@ -1,13 +1,13 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `3bea525` (OCI 배포 4개 커밋 검토 완료)
-- Last Review Date: 2026-03-06
+- Last Reviewed Commit: `06ee1eb`
+- Last Review Date: 2026-03-07
 
 ## Active Epics
 | Epic | 현재 Phase | 상태 |
 |------|-----------|------|
-| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 12 (멀티뷰 스프라이트시트) | 그리드 이동 + Shift 방향전환 + 점프 보정 완료. 다음: 충돌 영역 정밀화 → Y-sorting |
+| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 12 (멀티뷰 스프라이트시트) | Task 12.32 완료 (AI 캐릭터 정적 에셋 전환). **다음: 충돌 영역 정밀화 → Y-sorting** |
 
 ## Recently Completed
 | Epic | 완료일 | 핵심 결과 |
@@ -58,7 +58,7 @@ specs/
     ├── 08-ipadapter-identity.md
     ├── 10-batch-refactoring.md
     ├── 11-consistency-optimization.md
-    ├── 12-3d-to-chibi-pipeline.md
+    ├── 12-3d-to-chibi-pipeline.md  ← Task 12.32 (정적 에셋 전환) 포함
     ├── quality-checklist.md
     └── decisions/
         ├── 2026-02-22-pixelart-to-chibi.md

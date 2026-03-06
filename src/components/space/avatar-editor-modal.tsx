@@ -1,20 +1,15 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { PartsAvatarConfig } from "@/features/space/avatar";
-import { DEFAULT_PARTS_AVATAR, buildPartsAvatarString, parseAvatarString } from "@/features/space/avatar";
+import { DEFAULT_PARTS_AVATAR, buildPartsAvatarString, parseAvatarString, CHIBI_CHARACTERS } from "@/features/space/avatar";
+import { PLAYER_WIDTH, PLAYER_HEIGHT } from "@/constants/game-constants";
 import { CharacterEditor } from "@/components/avatar";
 
 interface AvatarEditorModalProps {
   currentAvatar: string;
   onSave: (avatarString: string) => void;
   onClose: () => void;
-}
-
-interface CharacterAsset {
-  id: string;
-  name: string;
-  thumbnailPath: string | null;
 }
 
 type AvatarTab = "parts" | "ai";
@@ -26,36 +21,20 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
     parsed.type === "parts" ? parsed : DEFAULT_PARTS_AVATAR;
 
   const [tab, setTab] = useState<AvatarTab>(
-    parsed.type === "custom" ? "ai" : "parts"
+    parsed.type === "chibi" ? "ai" : "parts"
   );
   const [config, setConfig] = useState<PartsAvatarConfig>(initialConfig);
-  const [selectedCustomId, setSelectedCustomId] = useState<string | null>(
-    parsed.type === "custom" ? parsed.textureKey.replace("character_", "") : null
+  const [selectedChibiId, setSelectedChibiId] = useState<string | null>(
+    parsed.type === "chibi" ? parsed.characterId : null
   );
-  const [aiCharacters, setAiCharacters] = useState<CharacterAsset[]>([]);
   const [saving, setSaving] = useState(false);
-
-  // AI 캐릭터 목록 로드
-  useEffect(() => {
-    if (tab !== "ai") return;
-    let cancelled = false;
-
-    fetch("/api/assets?status=COMPLETED&type=CHARACTER&shared=true&limit=50")
-      .then((res) => (res.ok ? res.json() : { assets: [] }))
-      .then((data: { assets: CharacterAsset[] }) => {
-        if (!cancelled) setAiCharacters(data.assets);
-      })
-      .catch(() => {});
-
-    return () => { cancelled = true; };
-  }, [tab]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
 
     let avatarString: string;
-    if (tab === "ai" && selectedCustomId) {
-      avatarString = `custom:character_${selectedCustomId}`;
+    if (tab === "ai" && selectedChibiId) {
+      avatarString = `chibi:${selectedChibiId}`;
     } else {
       avatarString = buildPartsAvatarString(config);
     }
@@ -75,7 +54,7 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
     } finally {
       setSaving(false);
     }
-  }, [tab, selectedCustomId, config, onSave, onClose]);
+  }, [tab, selectedChibiId, config, onSave, onClose]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
@@ -124,44 +103,27 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
           <CharacterEditor initialConfig={initialConfig} onChange={setConfig} />
         ) : (
           <div className="min-h-[200px]">
-            {aiCharacters.length === 0 ? (
-              <div className="flex h-[200px] items-center justify-center text-sm text-gray-400">
-                아직 생성된 AI 캐릭터가 없습니다
-              </div>
-            ) : (
-              <div className="grid grid-cols-4 gap-2">
-                {aiCharacters.map((ch) => (
-                  <button
-                    key={ch.id}
-                    type="button"
-                    onClick={() =>
-                      setSelectedCustomId(selectedCustomId === ch.id ? null : ch.id)
-                    }
-                    className={`flex flex-col items-center rounded-lg border-2 p-2 transition-colors ${
-                      selectedCustomId === ch.id
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    {ch.thumbnailPath ? (
-                      <img
-                        src={ch.thumbnailPath}
-                        alt={ch.name}
-                        className="h-14 w-14 object-cover"
-                        style={{ imageRendering: "pixelated" }}
-                      />
-                    ) : (
-                      <div className="flex h-14 w-14 items-center justify-center rounded bg-gray-100 text-xs text-gray-400">
-                        ?
-                      </div>
-                    )}
-                    <span className="mt-1 w-full truncate text-center text-[10px] text-gray-600">
-                      {ch.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-4 gap-2">
+              {CHIBI_CHARACTERS.map((ch) => (
+                <button
+                  key={ch.id}
+                  type="button"
+                  onClick={() =>
+                    setSelectedChibiId(selectedChibiId === ch.id ? null : ch.id)
+                  }
+                  className={`flex flex-col items-center rounded-lg border-2 p-2 transition-colors ${
+                    selectedChibiId === ch.id
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <ChibiThumbnail spritePath={ch.spritePath} alt={ch.name} />
+                  <span className="mt-1 w-full truncate text-center text-[10px] text-gray-600">
+                    {ch.name}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -176,7 +138,7 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || (tab === "ai" && !selectedCustomId)}
+            disabled={saving || (tab === "ai" && !selectedChibiId)}
             className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {saving ? "저장 중..." : "적용"}
@@ -184,5 +146,37 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
         </div>
       </div>
     </div>
+  );
+}
+
+/** 스프라이트시트 첫 프레임(정면 idle)을 canvas로 추출하여 썸네일 표시 */
+function ChibiThumbnail({ spritePath, alt }: { spritePath: string; alt: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const img = new Image();
+    img.src = spritePath;
+    img.onload = () => {
+      canvas.width = PLAYER_WIDTH;
+      canvas.height = PLAYER_HEIGHT;
+      ctx.clearRect(0, 0, PLAYER_WIDTH, PLAYER_HEIGHT);
+      ctx.drawImage(img, 0, 0, PLAYER_WIDTH, PLAYER_HEIGHT, 0, 0, PLAYER_WIDTH, PLAYER_HEIGHT);
+    };
+  }, [spritePath]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={PLAYER_WIDTH}
+      height={PLAYER_HEIGHT}
+      className="h-16 w-12 object-contain"
+      style={{ imageRendering: "pixelated" }}
+      aria-label={alt}
+    />
   );
 }

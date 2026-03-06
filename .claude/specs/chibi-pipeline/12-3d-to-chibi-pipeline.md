@@ -1,7 +1,7 @@
 # Phase 12: 멀티뷰 스프라이트시트
 
 > Epic: [chibi-pipeline](./README.md)
-> 상태: 진행중 | 업데이트: 2026-03-06
+> 상태: 진행중 | 업데이트: 2026-03-07
 
 ## 목표
 11개 고정 프리셋 캐릭터의 8방향 걷기 스프라이트시트 생성 + 게임 적용.
@@ -151,6 +151,16 @@
 | `scripts/generate-office-tileset.py` | 추가 | 오피스 타일셋 ComfyUI 생성 스크립트 |
 | `scripts/register-characters.mjs` | 추가 | DB 캐릭터 일괄 등록 스크립트 |
 | `src/features/space/game/internal/tilemap/tileset-generator.ts` | 수정 | 타일맵 색상 ZEP 스타일 교체 (바닥=웜베이지, 벽=클린그레이) |
+| `src/features/space/avatar/internal/chibi-characters.ts` | 신규 | 5종 치비 캐릭터 상수 + getChibiTextureKey |
+| `src/features/space/avatar/internal/avatar-types.ts` | 수정 | ChibiAvatarConfig 추가, AvatarConfig 유니언 확장 |
+| `src/features/space/avatar/internal/avatar-config.ts` | 수정 | chibi 파싱 + custom→chibi 하위 호환 매핑 |
+| `src/features/space/avatar/internal/sprite-generator.ts` | 수정 | chibi 타입 즉시 반환 (preload 확인 + fallback) |
+| `src/features/space/avatar/index.ts` | 수정 | ChibiAvatarConfig, ChibiCharacterDef, CHIBI_CHARACTERS, getChibiTextureKey 재공개 |
+| `src/features/space/game/internal/scenes/main-scene.ts` | 수정 | preload()에 5종 치비 스프라이트시트 로드 |
+| `src/components/space/avatar-editor-modal.tsx` | 수정 | API 호출 제거, CHIBI_CHARACTERS 직접 렌더, ChibiThumbnail 컴포넌트 추가 |
+| `prisma/schema.prisma` | 수정 | GeneratedAsset.isShared 필드 + 복합 인덱스 추가 |
+| `src/app/api/assets/route.ts` | 수정 | shared=true 쿼리 지원 (공용 에셋 조회) |
+| `src/features/space/game/internal/player/local-player.ts` | 수정 | Shift+방향 전환 버그 수정, 점프 하향 이동 보정 |
 
 ### v5 파이프라인 (Task 12.23, 흰 테두리 근본 해결)
 - **원인**: ref 이미지에 흰 아웃라인 포함 → IP-Adapter가 스타일로 전파
@@ -323,9 +333,133 @@ initWorld() → initTilemap() → initFurniture() → initTileCollision() → in
 `initTileCollision()`이 `initPlayer()` 앞에 위치해야 함 — LocalPlayer 생성 후 `setCollisionChecker()` 주입.
 Arcade Physics 충돌 설정(`addCollider`) 전면 제거.
 
+### 게임 적용 (계속)
+
+- [x] Task 12.32: AI 캐릭터 정적 에셋 전환 (런타임 API 의존 → Phaser preload 정적 로드)
+
+## 구현 상세 (Task 12.32)
+
+### AI 캐릭터 정적 에셋 전환
+
+런타임에 `/api/assets` API를 호출하여 DB에서 AI 캐릭터 목록을 가져오던 방식을 제거하고, 5종 치비 캐릭터를 코드 상수로 정의하여 Phaser `preload()`에서 정적으로 로드하는 방식으로 전환.
+
+**신규 파일: `src/features/space/avatar/internal/chibi-characters.ts`**
+
+```typescript
+export interface ChibiCharacterDef {
+  id: string;
+  name: string;
+  spritePath: string;
+}
+
+export const CHIBI_CHARACTERS: readonly ChibiCharacterDef[] = [
+  { id: "c02", name: "Maid",            spritePath: "/assets/generated/c02_spritesheet_96x128.png" },
+  { id: "c03", name: "Goggle Boy",      spritePath: "/assets/generated/c03_spritesheet_96x128.png" },
+  { id: "c04", name: "Glasses Girl",    spritePath: "/assets/generated/c04_spritesheet_96x128.png" },
+  { id: "c05", name: "White Hair Boy",  spritePath: "/assets/generated/c05_spritesheet_96x128.png" },
+  { id: "c07", name: "Ribbon Girl",     spritePath: "/assets/generated/c07_spritesheet_96x128.png" },
+] as const;
+
+export function getChibiTextureKey(characterId: string): string {
+  return `chibi_${characterId}`;
+}
+```
+
+**`avatar-types.ts`: ChibiAvatarConfig 추가**
+
+```typescript
+export interface ChibiAvatarConfig {
+  type: "chibi";
+  characterId: string; // "c02" | "c03" | "c04" | "c05" | "c07"
+}
+
+export type AvatarConfig =
+  | ClassicAvatarConfig
+  | CustomAvatarConfig
+  | PartsAvatarConfig
+  | ChibiAvatarConfig; // 추가
+```
+
+**`avatar-config.ts`: chibi 파싱 + custom→chibi 하위 호환 매핑**
+
+```typescript
+// "chibi:c02" 파싱
+if (type === "chibi" && data) {
+  return { type: "chibi", characterId: data };
+}
+
+// 기존 "custom:character_xxx" → chibi 자동 매핑 (DB 저장값 하위 호환)
+if (type === "custom" && data) {
+  const chibiId = matchCustomToChibi(data); // ch.id 포함 여부로 매핑
+  if (chibiId) return { type: "chibi", characterId: chibiId };
+  return { type: "custom", textureKey: data };
+}
+
+function matchCustomToChibi(textureKey: string): string | null {
+  for (const ch of CHIBI_CHARACTERS) {
+    if (textureKey.includes(ch.id)) return ch.id;
+  }
+  return null;
+}
+```
+
+**`sprite-generator.ts`: chibi 타입 즉시 반환**
+
+```typescript
+if (config.type === "chibi") {
+  const key = getTextureKey(config); // "chibi_c02" 등
+  if (scene.textures.exists(key)) return key; // preload 완료 → 즉시 반환
+  return generatePartsSprite(scene, DEFAULT_PARTS_AVATAR); // fallback
+}
+```
+
+**`main-scene.ts`: preload()에 치비 스프라이트시트 일괄 로드**
+
+```typescript
+for (const ch of CHIBI_CHARACTERS) {
+  this.load.spritesheet(getChibiTextureKey(ch.id), ch.spritePath, {
+    frameWidth: PLAYER_WIDTH,   // 96
+    frameHeight: PLAYER_HEIGHT, // 128
+  });
+}
+```
+
+**`avatar-editor-modal.tsx`: API 호출 제거 → CHIBI_CHARACTERS 직접 렌더**
+
+- `aiCharacters` state + `useEffect` fetch 제거
+- `selectedCustomId` → `selectedChibiId` (값: `"c02"` 등 ID 직접 사용)
+- 저장 시 `avatarString = chibi:${selectedChibiId}` (이전: `custom:character_${uuid}`)
+- `ChibiThumbnail` 컴포넌트 신규 추가: 스프라이트시트 첫 프레임(0,0) canvas로 추출하여 썸네일 표시
+
+```typescript
+function ChibiThumbnail({ spritePath, alt }: { spritePath: string; alt: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.src = spritePath;
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, 96, 128, 0, 0, 96, 128); // 첫 프레임만 추출
+    };
+  }, [spritePath]);
+  return <canvas ref={canvasRef} width={96} height={128} ... />;
+}
+```
+
+**부수 변경: `prisma/schema.prisma` + `src/app/api/assets/route.ts`**
+
+- `GeneratedAsset` 모델에 `isShared Boolean @default(false)` 필드 추가
+- `@@index([isShared, status, type])` 인덱스 추가
+- `/api/assets?shared=true` 쿼리 지원 (공용 에셋 조회, IDOR 예외 처리)
+  - `shared=true` 시 `where.isShared = true` (userId 필터 미적용)
+  - 미지정 시 기존 동작 유지 (`where.userId = session.user.id`)
+
+**`local-player.ts`: Shift+방향 전환 버그 수정 (부수 수정)**
+
+- `setIdle()`: early return을 `anims.stop()`에만 적용 → `setFrame()`은 항상 실행
+- `update()`: `!isMoving && direction !== currentDirection` 시 `setIdle(direction)` + `emitMovement(false)` 즉시 호출
+- 점프 중 하향 이동 시 `jy *= 1.5` 보정 (`syncVisuals()` 내 조건 추가)
+
 ## 다음 작업
-1. ~~대각선 점프 도약 거리 통일~~ — 제거 (√2 대각선은 포켓몬/ZEP 표준 동작)
-2. **OCI 배포** — v1과 공존하는 v2 배포 (계획 완료 `~/.claude/plans/foamy-strolling-donut.md`)
-3. 충돌 영역 정밀화 (가구별 blocked 타일 등록)
-4. Y-sorting (깊이 정렬)
-5. 가구/오브젝트 AI 생성 방안 결정
+1. 충돌 영역 정밀화 (가구별 blocked 타일 등록)
+2. Y-sorting (깊이 정렬)
+3. 가구/오브젝트 AI 생성 방안 결정
