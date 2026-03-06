@@ -42,10 +42,14 @@ next-env.d.ts
 # prisma
 prisma/migrations/
 
-# generated assets
-public/assets/generated/
+# generated assets - intermediate/debug only
+public/assets/generated/characters/debug/
+public/assets/generated/tilesets/
+public/assets/generated/maps/
 
 # IDE
 .vscode/
 .idea/
 bin/
+
+.vercel
