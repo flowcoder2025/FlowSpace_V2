@@ -1,24 +1,23 @@
 /**
  * Input Controller - WASD/Arrow 키 입력 처리
  *
- * 대각선 이동 시 0.707 정규화
+ * 그리드 이동용 정수 델타 (-1/0/+1) 반환
  * CHAT_FOCUS 이벤트 수신 시 입력 비활성
  */
 
-import { DIAGONAL_FACTOR } from "@/constants/game-constants";
 import { eventBridge, GameEvents } from "../../events";
 import type { Direction } from "@/features/space/avatar";
 
 export interface MovementInput {
-  velocityX: number;
-  velocityY: number;
+  dx: number; // -1 | 0 | 1
+  dy: number; // -1 | 0 | 1
   direction: Direction;
   isMoving: boolean;
 }
 
 const ZERO_INPUT: MovementInput = {
-  velocityX: 0,
-  velocityY: 0,
+  dx: 0,
+  dy: 0,
   direction: "down",
   isMoving: false,
 };
@@ -26,6 +25,7 @@ const ZERO_INPUT: MovementInput = {
 export class InputController {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
+  private spaceKey: Phaser.Input.Keyboard.Key;
   private chatFocused = false;
   private editorMode = false;
   private lastDirection: Direction = "down";
@@ -38,12 +38,10 @@ export class InputController {
     if (!kb) return;
 
     if (focused) {
-      // 채팅 활성화: Phaser 키보드 비활성 + 모든 키 캡처 해제 (preventDefault 방지)
       kb.enabled = false;
       kb.clearCaptures();
       kb.resetKeys();
     } else {
-      // 채팅 비활성화: Phaser 키보드 활성 + WASD/방향키 캡처 복원
       kb.enabled = true;
       kb.addCapture([
         Phaser.Input.Keyboard.KeyCodes.W,
@@ -54,6 +52,7 @@ export class InputController {
         Phaser.Input.Keyboard.KeyCodes.DOWN,
         Phaser.Input.Keyboard.KeyCodes.LEFT,
         Phaser.Input.Keyboard.KeyCodes.RIGHT,
+        Phaser.Input.Keyboard.KeyCodes.SPACE,
       ]);
     }
   };
@@ -70,52 +69,59 @@ export class InputController {
       S: kb.addKey(Phaser.Input.Keyboard.KeyCodes.S),
       D: kb.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
+    this.spaceKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     eventBridge.on(GameEvents.CHAT_FOCUS, this.onChatFocus);
     eventBridge.on(GameEvents.EDITOR_ENTER, this.onEditorEnter);
     eventBridge.on(GameEvents.EDITOR_EXIT, this.onEditorExit);
   }
 
-  /** 현재 프레임 이동 입력 */
+  /** 현재 프레임 이동 입력 (정수 델타) */
   getMovement(): MovementInput {
     if (this.chatFocused || this.editorMode) return { ...ZERO_INPUT, direction: this.lastDirection };
 
-    let vx = 0;
-    let vy = 0;
+    let dx = 0;
+    let dy = 0;
 
     const left = this.cursors.left.isDown || this.wasd.A.isDown;
     const right = this.cursors.right.isDown || this.wasd.D.isDown;
     const up = this.cursors.up.isDown || this.wasd.W.isDown;
     const down = this.cursors.down.isDown || this.wasd.S.isDown;
 
-    if (left) vx -= 1;
-    if (right) vx += 1;
-    if (up) vy -= 1;
-    if (down) vy += 1;
+    if (left) dx -= 1;
+    if (right) dx += 1;
+    if (up) dy -= 1;
+    if (down) dy += 1;
 
-    // 대각선 정규화
-    if (vx !== 0 && vy !== 0) {
-      vx *= DIAGONAL_FACTOR;
-      vy *= DIAGONAL_FACTOR;
-    }
+    const hasDirection = dx !== 0 || dy !== 0;
 
-    const isMoving = vx !== 0 || vy !== 0;
-
-    // 방향 결정 (마지막 입력 우선)
-    if (isMoving) {
-      if (Math.abs(vy) >= Math.abs(vx)) {
-        this.lastDirection = vy < 0 ? "up" : "down";
+    // 방향 결정 (대각선 = 측면 우선, ZEP/게더타운 방식)
+    if (hasDirection) {
+      if (dx !== 0 && dy !== 0) {
+        this.lastDirection = dx < 0 ? "left" : "right";
+      } else if (Math.abs(dy) > Math.abs(dx)) {
+        this.lastDirection = dy < 0 ? "up" : "down";
       } else {
-        this.lastDirection = vx < 0 ? "left" : "right";
+        this.lastDirection = dx < 0 ? "left" : "right";
       }
     }
 
+    // Shift + 방향 = 방향 전환만 (이동 없음)
+    const shiftHeld = this.cursors.shift.isDown;
+    const isMoving = hasDirection && !shiftHeld;
+
     return {
-      velocityX: vx,
-      velocityY: vy,
+      dx: isMoving ? dx : 0,
+      dy: isMoving ? dy : 0,
       direction: this.lastDirection,
       isMoving,
     };
+  }
+
+  /** 스페이스키 점프 입력 (JustDown = 1회만 감지) */
+  isJumpPressed(): boolean {
+    if (this.chatFocused || this.editorMode) return false;
+    return Phaser.Input.Keyboard.JustDown(this.spaceKey);
   }
 
   destroy(): void {

@@ -10,10 +10,14 @@ export const MAP_WIDTH = MAP_COLS * TILE_SIZE;
 export const MAP_HEIGHT = MAP_ROWS * TILE_SIZE;
 
 // Player
-export const PLAYER_SPEED = 160;
-export const PLAYER_WIDTH = 32;
-export const PLAYER_HEIGHT = 48;
-export const DIAGONAL_FACTOR = 0.707;
+export const PLAYER_WIDTH = 96;
+export const PLAYER_HEIGHT = 128;
+export const PLAYER_SCALE = 0.35; // 표시 크기: 34x45 (ZEP/게더타운 수준)
+export const NAME_OFFSET_Y = -(PLAYER_HEIGHT * PLAYER_SCALE) / 2 - 8; // 캐릭터 상단 위 여백
+
+// Grid movement
+export const TILE_STEP_DURATION = 130; // ms, 타일 1칸 이동 시간
+export const TILE_HALF = TILE_SIZE / 2; // 16px, 타일 중심 오프셋
 
 // Sprite
 export const SPRITE_COLS = 4;

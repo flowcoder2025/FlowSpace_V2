@@ -12,8 +12,12 @@ import { getTextureKey, DEFAULT_PARTS_AVATAR } from "./avatar-config";
 import { generatePartsSprite } from "./parts/parts-compositor";
 import { eventBridge, GameEvents } from "../../game/events";
 
-const SHEET_WIDTH = PLAYER_WIDTH * SPRITE_COLS; // 128
-const SHEET_HEIGHT = PLAYER_HEIGHT * SPRITE_ROWS; // 192
+const SHEET_WIDTH = PLAYER_WIDTH * SPRITE_COLS;
+const SHEET_HEIGHT = PLAYER_HEIGHT * SPRITE_ROWS;
+
+/** Classic/Parts 드로어의 내부 해상도 (32x48 좌표 유지) */
+const DRAW_WIDTH = 32;
+const DRAW_HEIGHT = 48;
 
 /** 현재 로딩 중인 custom 텍스처 키 (중복 로드 방지) */
 const loadingCustomKeys = new Set<string>();
@@ -127,18 +131,32 @@ export function generateAvatarSprite(
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return key;
+  ctx.imageSmoothingEnabled = false;
+
+  // 32x48 임시 캔버스에 그린 뒤 96x128로 스케일업
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = DRAW_WIDTH;
+  tempCanvas.height = DRAW_HEIGHT;
+  const tempCtx = tempCanvas.getContext("2d");
+  if (!tempCtx) return key;
 
   // 4행(방향) x 4열(프레임)
   for (let dir = 0; dir < SPRITE_ROWS; dir++) {
     for (let frame = 0; frame < SPRITE_COLS; frame++) {
+      tempCtx.clearRect(0, 0, DRAW_WIDTH, DRAW_HEIGHT);
       drawCharacterFrame({
-        ctx,
-        x: frame * PLAYER_WIDTH,
-        y: dir * PLAYER_HEIGHT,
+        ctx: tempCtx,
+        x: 0,
+        y: 0,
         config,
         direction: dir,
         frame,
       });
+      ctx.drawImage(
+        tempCanvas,
+        0, 0, DRAW_WIDTH, DRAW_HEIGHT,
+        frame * PLAYER_WIDTH, dir * PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT,
+      );
     }
   }
 

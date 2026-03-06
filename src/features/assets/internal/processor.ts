@@ -16,7 +16,6 @@ import {
   blendTileEdges,
   resizeFrame,
   composeSpriteSheet,
-  normalizeDirectionFrames,
   generateWalkFrames,
 } from "./post-processor";
 import { checkComfyUICapabilities } from "./capability-checker";
@@ -598,7 +597,7 @@ async function processChibiCharacterGeneration(
     ...upWalkFrames,
   ];
 
-  let imageData = await composeSpriteSheet(frames, {
+  const imageData = await composeSpriteSheet(frames, {
     frameW: SPRITE_FRAME_SIZE,
     frameH: SPRITE_FRAME_SIZE,
     cols: SPRITE_COLS,

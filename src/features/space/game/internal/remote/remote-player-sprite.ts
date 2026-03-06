@@ -4,11 +4,11 @@
  * Tween 기반 보간 이동 + 애니메이션 전환
  */
 
-import { DEPTH } from "@/constants/game-constants";
+import { DEPTH, PLAYER_SCALE, NAME_OFFSET_Y } from "@/constants/game-constants";
 import { parseAvatarString, generateAvatarSpriteFromConfig, DIRECTION_FRAMES, IDLE_FRAMES } from "@/features/space/avatar";
 import type { Direction } from "@/features/space/avatar";
 
-const LERP_DURATION = 150; // ms
+const LERP_DURATION = 130; // ms (로컬 TILE_STEP_DURATION과 동기화)
 
 export interface RemotePlayerInfo {
   userId: string;
@@ -19,6 +19,9 @@ export interface RemotePlayerInfo {
   direction?: string;
 }
 
+const JUMP_HEIGHT = 20;
+const JUMP_DURATION = 300;
+
 export class RemotePlayerSprite {
   private sprite: Phaser.GameObjects.Sprite;
   private nameText: Phaser.GameObjects.Text;
@@ -26,6 +29,9 @@ export class RemotePlayerSprite {
   private targetX: number;
   private targetY: number;
   private isMoving = false;
+  private jumpOffsetY = 0;
+  private isJumping = false;
+  private appliedVisualOffsetY = 0;
   readonly userId: string;
 
   constructor(private scene: Phaser.Scene, info: RemotePlayerInfo) {
@@ -40,14 +46,16 @@ export class RemotePlayerSprite {
     // 스프라이트 생성 (물리 없음 - 보간 이동)
     this.sprite = scene.add.sprite(info.x, info.y, textureKey, 0);
     this.sprite.setDepth(DEPTH.PLAYER);
+    this.sprite.setScale(PLAYER_SCALE);
 
     // 닉네임
-    this.nameText = scene.add.text(info.x, info.y - 28, info.nickname, {
-      fontSize: "11px",
+    this.nameText = scene.add.text(info.x, info.y + NAME_OFFSET_Y, info.nickname, {
+      fontSize: "12px",
+      fontStyle: "bold",
       color: "#ffffff",
-      fontFamily: "monospace",
-      backgroundColor: "#00000080",
-      padding: { x: 3, y: 1 },
+      fontFamily: "Arial, 'Malgun Gothic', sans-serif",
+      backgroundColor: "#00000088",
+      padding: { x: 4, y: 2 },
     });
     this.nameText.setOrigin(0.5);
     this.nameText.setDepth(DEPTH.PLAYER_NAME);
@@ -93,7 +101,7 @@ export class RemotePlayerSprite {
 
     this.scene.tweens.add({
       targets: this.nameText,
-      y: y - 28,
+      y: y + NAME_OFFSET_Y,
       duration: LERP_DURATION,
       ease: "Linear",
       onComplete: () => {
@@ -104,11 +112,43 @@ export class RemotePlayerSprite {
     });
   }
 
+  /** 점프 시각 효과 (이벤트 발행 없음) */
+  jump(): void {
+    if (this.isJumping) return;
+    this.isJumping = true;
+
+    this.scene.tweens.add({
+      targets: this,
+      jumpOffsetY: -JUMP_HEIGHT,
+      duration: JUMP_DURATION / 2,
+      ease: "Sine.Out",
+      yoyo: true,
+      onComplete: () => {
+        this.jumpOffsetY = 0;
+        this.isJumping = false;
+      },
+    });
+  }
+
   /** 업데이트 (매 프레임) */
   update(): void {
+    // 이전 프레임 시각 오프셋 복원
+    if (this.appliedVisualOffsetY !== 0) {
+      this.sprite.y -= this.appliedVisualOffsetY;
+      this.nameText.y -= this.appliedVisualOffsetY;
+      this.appliedVisualOffsetY = 0;
+    }
+
     // 닉네임 위치 동기화 (tween이 아닐 때)
     if (!this.isMoving) {
-      this.nameText.setPosition(this.sprite.x, this.sprite.y - 28);
+      this.nameText.setPosition(this.sprite.x, this.sprite.y + NAME_OFFSET_Y);
+    }
+
+    // 점프 시각 오프셋 (렌더 직전, 다음 update에서 복원)
+    if (this.jumpOffsetY !== 0) {
+      this.sprite.y += this.jumpOffsetY;
+      this.nameText.y += this.jumpOffsetY;
+      this.appliedVisualOffsetY = this.jumpOffsetY;
     }
   }
 

@@ -35,6 +35,10 @@ function ensureRegistered(): void {
 const SHEET_WIDTH = PLAYER_WIDTH * SPRITE_COLS;
 const SHEET_HEIGHT = PLAYER_HEIGHT * SPRITE_ROWS;
 
+/** 드로어의 내부 해상도 (32x48 좌표 유지) */
+const DRAW_WIDTH = 32;
+const DRAW_HEIGHT = 48;
+
 /** 카테고리 → config 키 매핑 */
 const CATEGORY_KEY: Record<PartCategory, keyof PartsAvatarConfig> = {
   body: "body",
@@ -63,12 +67,19 @@ export function generatePartsSprite(
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return key;
+  ctx.imageSmoothingEnabled = false;
+
+  // 32x48 임시 캔버스에 그린 뒤 96x128로 스케일업
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = DRAW_WIDTH;
+  tempCanvas.height = DRAW_HEIGHT;
+  const tempCtx = tempCanvas.getContext("2d");
+  if (!tempCtx) return key;
 
   // 4행(방향) x 4열(프레임)
   for (let dir = 0; dir < SPRITE_ROWS; dir++) {
     for (let frame = 0; frame < SPRITE_COLS; frame++) {
-      const fx = frame * PLAYER_WIDTH;
-      const fy = dir * PLAYER_HEIGHT;
+      tempCtx.clearRect(0, 0, DRAW_WIDTH, DRAW_HEIGHT);
       const yOff = WALK_OFFSETS[frame];
 
       // 레이어 순서대로 그리기
@@ -84,8 +95,14 @@ export function generatePartsSprite(
         const def = getPartDefinition(partId);
         const resolvedColor = color ?? def?.defaultColor ?? "#888888";
 
-        drawer({ ctx, x: fx, y: fy, direction: dir, frame, yOff, color: resolvedColor });
+        drawer({ ctx: tempCtx, x: 0, y: 0, direction: dir, frame, yOff, color: resolvedColor });
       }
+
+      ctx.drawImage(
+        tempCanvas,
+        0, 0, DRAW_WIDTH, DRAW_HEIGHT,
+        frame * PLAYER_WIDTH, dir * PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT,
+      );
     }
   }
 
@@ -121,10 +138,10 @@ export function renderPartsPreview(
   // 스케일 적용
   ctx.imageSmoothingEnabled = false;
 
-  // 임시 1x 캔버스에 그리기
+  // 32x48 임시 캔버스에 그린 뒤 스케일업
   const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = PLAYER_WIDTH;
-  tempCanvas.height = PLAYER_HEIGHT;
+  tempCanvas.width = DRAW_WIDTH;
+  tempCanvas.height = DRAW_HEIGHT;
   const tempCtx = tempCanvas.getContext("2d");
   if (!tempCtx) return canvas;
 
@@ -146,7 +163,7 @@ export function renderPartsPreview(
   }
 
   // 스케일업
-  ctx.drawImage(tempCanvas, 0, 0, PLAYER_WIDTH, PLAYER_HEIGHT, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(tempCanvas, 0, 0, DRAW_WIDTH, DRAW_HEIGHT, 0, 0, canvas.width, canvas.height);
 
   return canvas;
 }

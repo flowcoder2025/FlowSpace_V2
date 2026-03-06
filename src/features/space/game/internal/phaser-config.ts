@@ -21,7 +21,6 @@ export function createPhaserConfig(
     parent: options.parent,
     width: options.width ?? 960,
     height: options.height ?? 640,
-    pixelArt: true,
     backgroundColor: "#1a1a2e",
     physics: {
       default: "arcade",
@@ -36,8 +35,8 @@ export function createPhaserConfig(
     },
     scene: options.scenes,
     render: {
-      antialias: false,
-      roundPixels: true,
+      antialias: true,
+      roundPixels: false,
     },
     audio: {
       noAudio: true,

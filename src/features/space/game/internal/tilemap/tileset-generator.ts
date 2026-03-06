@@ -119,144 +119,88 @@ function drawTileset(ctx: CanvasRenderingContext2D): void {
   // Background transparent
   ctx.clearRect(0, 0, TILESET_WIDTH, TILESET_HEIGHT);
 
-  // === Row 0-1: Ground tiles ===
-  // Grass
-  drawTile(ctx, 0, 0, (d) => {
-    fillTile(d, "#4a8c50");
-    // Grass detail
-    for (let i = 0; i < 8; i++) {
-      const gx = (i * 7 + 3) % 28;
-      const gy = (i * 11 + 5) % 28;
-      fillRect(d, gx, gy, 2, 3, "#5a9c60");
-    }
-  });
+  // === Row 0: Ground tiles (전체 단색 오프화이트) ===
+  const FLOOR_COLOR = "#F0EEEB";
 
-  // Dark grass
-  drawTile(ctx, 1, 0, (d) => {
-    fillTile(d, "#3a7c40");
-    for (let i = 0; i < 6; i++) {
-      fillRect(d, (i * 9 + 2) % 28, (i * 7 + 4) % 28, 2, 3, "#4a8c50");
-    }
-  });
+  drawTile(ctx, 0, 0, (d) => fillTile(d, FLOOR_COLOR)); // GRASS
+  drawTile(ctx, 1, 0, (d) => fillTile(d, FLOOR_COLOR)); // GRASS_DARK
+  drawTile(ctx, 2, 0, (d) => fillTile(d, FLOOR_COLOR)); // STONE_FLOOR
+  drawTile(ctx, 3, 0, (d) => fillTile(d, FLOOR_COLOR)); // WOOD_FLOOR
+  drawTile(ctx, 4, 0, (d) => fillTile(d, FLOOR_COLOR)); // CARPET
+  drawTile(ctx, 5, 0, (d) => fillTile(d, FLOOR_COLOR)); // SAND
+  drawTile(ctx, 6, 0, (d) => fillTile(d, FLOOR_COLOR)); // WATER
+  drawTile(ctx, 7, 0, (d) => fillTile(d, FLOOR_COLOR)); // PATH
 
-  // Stone floor
-  drawTile(ctx, 2, 0, (d) => {
-    fillTile(d, "#8c8c8c");
-    fillRect(d, 0, 0, 16, 16, "#949494");
-    fillRect(d, 16, 16, 16, 16, "#949494");
-    // Grid lines
-    d.ctx.fillStyle = "#7c7c7c";
-    d.ctx.fillRect(d.x, d.y + 15, d.s, 2);
-    d.ctx.fillRect(d.x + 15, d.y, 2, d.s);
-  });
-
-  // Wood floor
-  drawTile(ctx, 3, 0, (d) => {
-    fillTile(d, "#b08050");
-    for (let i = 0; i < 4; i++) {
-      fillRect(d, 0, i * 8, d.s, 1, "#9a7040");
-    }
-    fillRect(d, 14, 0, 1, d.s, "#9a7040");
-  });
-
-  // Carpet
-  drawTile(ctx, 4, 0, (d) => {
-    fillTile(d, "#8c3030");
-    fillRect(d, 2, 2, 28, 28, "#9c4040");
-    fillRect(d, 4, 4, 24, 24, "#8c3030");
-  });
-
-  // Sand
-  drawTile(ctx, 5, 0, (d) => {
-    fillTile(d, "#d4b06a");
-    for (let i = 0; i < 5; i++) {
-      fillRect(d, (i * 11 + 3) % 28, (i * 7 + 2) % 28, 3, 2, "#c4a05a");
-    }
-  });
-
-  // Water
-  drawTile(ctx, 6, 0, (d) => {
-    fillTile(d, "#3060a0");
-    fillRect(d, 4, 8, 8, 2, "#4070b0");
-    fillRect(d, 18, 18, 10, 2, "#4070b0");
-  });
-
-  // Path
-  drawTile(ctx, 7, 0, (d) => {
-    fillTile(d, "#c0a070");
-    fillRect(d, 2, 0, 28, d.s, "#b09060");
-  });
-
-  // === Row 2-3: Walls ===
-  // Wall top
+  // === Row 2-3: Walls (ZEP-style clean grey) ===
+  // Wall top — 짙은 상단 + 밝은 하단으로 깊이감
   drawTile(ctx, 0, 2, (d) => {
-    fillTile(d, "#606080");
-    fillRect(d, 0, 24, d.s, 8, "#505070");
+    fillTile(d, "#5C5C6A");
+    fillRect(d, 0, 26, d.s, 6, "#6E6E7C");
   });
 
   // Wall mid
   drawTile(ctx, 1, 2, (d) => {
-    fillTile(d, "#505070");
-    fillRect(d, 0, 0, d.s, 2, "#606080");
+    fillTile(d, "#686878");
+    fillRect(d, 0, 0, d.s, 2, "#5C5C6A");
   });
 
-  // Wall bottom
+  // Wall bottom — 하단 베이스보드
   drawTile(ctx, 2, 2, (d) => {
-    fillTile(d, "#505070");
-    fillRect(d, 0, 0, d.s, 4, "#606080");
-    fillRect(d, 0, 28, d.s, 4, "#404060");
+    fillTile(d, "#686878");
+    fillRect(d, 0, 0, d.s, 2, "#5C5C6A");
+    fillRect(d, 0, 28, d.s, 4, "#4E4E5C");
   });
 
   // Wall left
   drawTile(ctx, 3, 2, (d) => {
-    fillTile(d, "#505070");
-    fillRect(d, 0, 0, 4, d.s, "#606080");
+    fillTile(d, "#686878");
+    fillRect(d, 0, 0, 4, d.s, "#5C5C6A");
   });
 
   // Wall right
   drawTile(ctx, 4, 2, (d) => {
-    fillTile(d, "#505070");
-    fillRect(d, 28, 0, 4, d.s, "#606080");
+    fillTile(d, "#686878");
+    fillRect(d, 28, 0, 4, d.s, "#5C5C6A");
   });
 
   // Corner TL
   drawTile(ctx, 5, 2, (d) => {
-    fillTile(d, "#606080");
-    fillRect(d, 0, 0, 4, d.s, "#707090");
-    fillRect(d, 0, 0, d.s, 4, "#707090");
+    fillTile(d, "#5C5C6A");
+    fillRect(d, 0, 0, 4, d.s, "#4E4E5C");
+    fillRect(d, 0, 0, d.s, 4, "#4E4E5C");
   });
 
   // Corner TR
   drawTile(ctx, 6, 2, (d) => {
-    fillTile(d, "#606080");
-    fillRect(d, 28, 0, 4, d.s, "#707090");
-    fillRect(d, 0, 0, d.s, 4, "#707090");
+    fillTile(d, "#5C5C6A");
+    fillRect(d, 28, 0, 4, d.s, "#4E4E5C");
+    fillRect(d, 0, 0, d.s, 4, "#4E4E5C");
   });
 
   // Corner BL
   drawTile(ctx, 7, 2, (d) => {
-    fillTile(d, "#606080");
-    fillRect(d, 0, 0, 4, d.s, "#707090");
-    fillRect(d, 0, 28, d.s, 4, "#707090");
+    fillTile(d, "#5C5C6A");
+    fillRect(d, 0, 0, 4, d.s, "#4E4E5C");
+    fillRect(d, 0, 28, d.s, 4, "#4E4E5C");
   });
 
   // Corner BR
   drawTile(ctx, 8, 2, (d) => {
-    fillTile(d, "#606080");
-    fillRect(d, 28, 0, 4, d.s, "#707090");
-    fillRect(d, 0, 28, d.s, 4, "#707090");
+    fillTile(d, "#5C5C6A");
+    fillRect(d, 28, 0, 4, d.s, "#4E4E5C");
+    fillRect(d, 0, 28, d.s, 4, "#4E4E5C");
   });
 
-  // Wall inner
+  // Wall inner — 파티션 벽
   drawTile(ctx, 9, 2, (d) => {
-    fillTile(d, "#484868");
+    fillTile(d, "#585868");
   });
 
-  // Door
+  // Door — 따뜻한 브라운
   drawTile(ctx, 10, 2, (d) => {
-    fillTile(d, "#8a6030");
-    fillRect(d, 2, 0, 28, 30, "#9a7040");
-    fillRect(d, 22, 14, 4, 4, "#d4a030"); // doorknob
+    fillTile(d, "#A07040");
+    fillRect(d, 2, 0, 28, 30, "#B08050");
+    fillRect(d, 22, 14, 4, 4, "#D4A850"); // doorknob
   });
 
   // === Row 4-5: Furniture ===
@@ -510,6 +454,28 @@ function drawTileset(ctx: CanvasRenderingContext2D): void {
   });
 }
 
+/** AI 생성 타일 이미지를 캔버스에 오버레이 */
+const AI_TILE_MAPPINGS = [
+  { key: "tile-wood-floor", col: 3, row: 0 },  // WOOD_FLOOR
+  { key: "tile-carpet-floor", col: 4, row: 0 }, // CARPET
+  { key: "tile-wall", col: 0, row: 2 },          // WALL_TOP
+  { key: "tile-wall", col: 1, row: 2 },          // WALL_MID
+  { key: "tile-wall", col: 2, row: 2 },          // WALL_BOTTOM
+] as const;
+
+function drawAITiles(
+  ctx: CanvasRenderingContext2D,
+  scene: Phaser.Scene
+): void {
+  for (const { key, col, row } of AI_TILE_MAPPINGS) {
+    if (!scene.textures.exists(key)) continue;
+    const source = scene.textures.get(key).getSourceImage() as HTMLImageElement;
+    const x = col * TILE_SIZE;
+    const y = row * TILE_SIZE;
+    ctx.drawImage(source, 0, 0, source.width, source.height, x, y, TILE_SIZE, TILE_SIZE);
+  }
+}
+
 /**
  * 프로시저럴 타일셋 텍스처를 Phaser에 등록
  *
@@ -526,6 +492,7 @@ export function generateTileset(scene: Phaser.Scene): void {
   if (!ctx) return;
 
   drawTileset(ctx);
+  drawAITiles(ctx, scene);
   scene.textures.addCanvas(TILESET_KEY, canvas);
 }
 

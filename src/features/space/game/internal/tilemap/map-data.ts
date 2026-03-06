@@ -33,243 +33,55 @@ function fillArea(
   }
 }
 
-/** Ground 레이어: 전체 바닥 */
+/** Ground 레이어: 영역별 바닥 */
 function createGroundLayer(): LayerData {
   const layer = createEmptyLayer();
-
-  // 외곽: 잔디
-  fillArea(layer, 0, 0, MAP_COLS, MAP_ROWS, TILE_INDEX.GRASS);
-
-  // 건물 내부: 나무 바닥 (8,5 ~ 32,25)
-  fillArea(layer, 8, 5, 24, 20, TILE_INDEX.WOOD_FLOOR);
-
-  // 입구 앞 경로
-  fillArea(layer, 18, 25, 4, 5, TILE_INDEX.PATH);
-
-  // 건물 내 카펫 구역
-  fillArea(layer, 14, 10, 12, 8, TILE_INDEX.CARPET);
-
-  // 외부 돌바닥 (좌측 정원)
-  fillArea(layer, 2, 10, 4, 8, TILE_INDEX.STONE_FLOOR);
-
+  // 전체 나무 바닥
+  fillArea(layer, 0, 0, MAP_COLS, MAP_ROWS, TILE_INDEX.WOOD_FLOOR);
+  // 우측 라운지 영역: 카펫 (col 23~38, row 3~15)
+  fillArea(layer, 23, 3, 16, 13, TILE_INDEX.CARPET);
   return layer;
 }
 
-/** Walls 레이어: 벽과 경계 */
+/** Walls 레이어: 상단/좌우 벽 + 영역 파티션 */
 function createWallsLayer(): LayerData {
   const layer = createEmptyLayer();
-
-  // 건물 상단 벽 (row 4)
-  fillArea(layer, 8, 4, 24, 1, TILE_INDEX.WALL_TOP);
-
-  // 건물 좌측 벽 (col 7)
-  fillArea(layer, 7, 5, 1, 20, TILE_INDEX.WALL_LEFT);
-
-  // 건물 우측 벽 (col 32)
-  fillArea(layer, 32, 5, 1, 20, TILE_INDEX.WALL_RIGHT);
-
-  // 건물 하단 벽 (row 25) - 문 제외
-  fillArea(layer, 8, 25, 10, 1, TILE_INDEX.WALL_BOTTOM);
-  fillArea(layer, 22, 25, 10, 1, TILE_INDEX.WALL_BOTTOM);
-
-  // 문
-  layer[25][18] = TILE_INDEX.DOOR;
-  layer[25][19] = TILE_INDEX.DOOR;
-  layer[25][20] = TILE_INDEX.DOOR;
-  layer[25][21] = TILE_INDEX.DOOR;
-
-  // 코너
-  layer[4][7] = TILE_INDEX.WALL_CORNER_TL;
-  layer[4][32] = TILE_INDEX.WALL_CORNER_TR;
-  layer[25][7] = TILE_INDEX.WALL_CORNER_BL;
-  layer[25][32] = TILE_INDEX.WALL_CORNER_BR;
-
-  // 내부 파티션 (가로 벽)
-  fillArea(layer, 14, 9, 12, 1, TILE_INDEX.WALL_INNER);
-
+  // 상단 벽
+  fillArea(layer, 1, 1, MAP_COLS - 2, 1, TILE_INDEX.WALL_TOP);
+  // 좌측 벽
+  fillArea(layer, 1, 2, 1, MAP_ROWS - 3, TILE_INDEX.WALL_LEFT);
+  // 우측 벽
+  fillArea(layer, MAP_COLS - 2, 2, 1, MAP_ROWS - 3, TILE_INDEX.WALL_RIGHT);
+  // 영역 구분 파티션 (업무-라운지 사이, col 22, row 3~15)
+  fillArea(layer, 22, 3, 1, 13, TILE_INDEX.WALL_INNER);
   return layer;
 }
 
-/** Furniture 레이어: 가구 배치 */
+/** Furniture 레이어: 가구 배치 (현재 비어 있음 — 오브젝트 시스템으로 이전 예정) */
 function createFurnitureLayer(): LayerData {
-  const layer = createEmptyLayer();
-
-  // 좌상단 책상 구역
-  layer[6][9] = TILE_INDEX.DESK;
-  layer[6][10] = TILE_INDEX.DESK_RIGHT;
-  layer[7][9] = TILE_INDEX.CHAIR;
-
-  layer[6][12] = TILE_INDEX.DESK;
-  layer[6][13] = TILE_INDEX.DESK_RIGHT;
-  layer[7][12] = TILE_INDEX.CHAIR;
-
-  // 우상단 책상 구역
-  layer[6][27] = TILE_INDEX.DESK;
-  layer[6][28] = TILE_INDEX.DESK_RIGHT;
-  layer[7][27] = TILE_INDEX.CHAIR;
-
-  layer[6][30] = TILE_INDEX.DESK;
-  layer[6][31] = TILE_INDEX.DESK_RIGHT;
-  layer[7][30] = TILE_INDEX.CHAIR;
-
-  // 중앙 테이블
-  layer[14][18] = TILE_INDEX.TABLE;
-  layer[14][19] = TILE_INDEX.TABLE;
-
-  // 소파 (좌측)
-  layer[14][15] = TILE_INDEX.SOFA;
-  layer[14][16] = TILE_INDEX.SOFA_RIGHT;
-
-  // 우측 책장
-  layer[5][31] = TILE_INDEX.BOOKSHELF;
-  layer[6][31] = TILE_INDEX.BOOKSHELF_BOTTOM;
-
-  // 하단 영역 가구
-  layer[20][10] = TILE_INDEX.CABINET;
-  layer[22][10] = TILE_INDEX.BED_TOP;
-  layer[23][10] = TILE_INDEX.BED_BOTTOM;
-
-  layer[20][28] = TILE_INDEX.CABINET;
-  layer[22][28] = TILE_INDEX.BED_TOP;
-  layer[23][28] = TILE_INDEX.BED_BOTTOM;
-
-  return layer;
+  return createEmptyLayer();
 }
 
-/** Furniture Top 레이어: 가구 위 소품 */
+/** Furniture Top 레이어: 가구 위 소품 (현재 비어 있음) */
 function createFurnitureTopLayer(): LayerData {
-  const layer = createEmptyLayer();
-
-  // 모니터 on 책상
-  layer[5][9] = TILE_INDEX.MONITOR;
-  layer[5][12] = TILE_INDEX.MONITOR;
-  layer[5][27] = TILE_INDEX.MONITOR;
-  layer[5][30] = TILE_INDEX.MONITOR;
-
-  // 테이블 위 책+컵
-  layer[13][18] = TILE_INDEX.BOOK;
-  layer[13][19] = TILE_INDEX.CUP;
-
-  // 화분
-  layer[5][14] = TILE_INDEX.PLANT;
-  layer[5][25] = TILE_INDEX.PLANT;
-
-  // 램프
-  layer[19][10] = TILE_INDEX.LAMP;
-
-  return layer;
+  return createEmptyLayer();
 }
 
-/** Decorations 레이어: 외부 장식 */
+/** Decorations 레이어: 외부 장식 (현재 비어 있음) */
 function createDecorationsLayer(): LayerData {
-  const layer = createEmptyLayer();
-
-  // 나무 (외부 좌측)
-  layer[2][2] = TILE_INDEX.TREE_TOP;
-  layer[3][2] = TILE_INDEX.TREE_BOTTOM;
-
-  layer[2][5] = TILE_INDEX.TREE_TOP;
-  layer[3][5] = TILE_INDEX.TREE_BOTTOM;
-
-  // 나무 (외부 우측)
-  layer[2][35] = TILE_INDEX.TREE_TOP;
-  layer[3][35] = TILE_INDEX.TREE_BOTTOM;
-
-  layer[2][38] = TILE_INDEX.TREE_TOP;
-  layer[3][38] = TILE_INDEX.TREE_BOTTOM;
-
-  // 꽃
-  layer[8][3] = TILE_INDEX.FLOWER;
-  layer[8][4] = TILE_INDEX.FLOWER;
-
-  // 덤불
-  layer[27][5] = TILE_INDEX.BUSH;
-  layer[27][34] = TILE_INDEX.BUSH;
-
-  // 바위
-  layer[15][2] = TILE_INDEX.ROCK;
-  layer[20][36] = TILE_INDEX.ROCK;
-
-  // 벤치
-  layer[28][14] = TILE_INDEX.BENCH;
-  layer[28][24] = TILE_INDEX.BENCH;
-
-  // 표지판
-  layer[26][16] = TILE_INDEX.SIGN;
-
-  // 분수대 (외부 중앙 하단)
-  layer[27][19] = TILE_INDEX.FOUNTAIN_TOP;
-  layer[28][19] = TILE_INDEX.FOUNTAIN_BOTTOM;
-
-  // 스폰 포인트
-  layer[28][20] = TILE_INDEX.SPAWN;
-
-  // 포털
-  layer[14][3] = TILE_INDEX.PORTAL;
-
-  return layer;
+  return createEmptyLayer();
 }
 
-/** Collision 레이어: 충돌 영역 표시 */
+/** Collision 레이어: 맵 경계만 */
 function createCollisionLayer(): LayerData {
   const layer = createEmptyLayer();
   const C = TILE_INDEX.COLLISION;
 
-  // 건물 벽 충돌
-  fillArea(layer, 7, 4, 26, 1, C); // 상단
-  fillArea(layer, 7, 5, 1, 21, C); // 좌측
-  fillArea(layer, 32, 5, 1, 21, C); // 우측
-  // 하단 (문 제외)
-  fillArea(layer, 8, 25, 10, 1, C);
-  fillArea(layer, 22, 25, 10, 1, C);
-
-  // 내부 파티션
-  fillArea(layer, 14, 9, 12, 1, C);
-
-  // 가구 충돌
-  // 책상
-  layer[6][9] = C;
-  layer[6][10] = C;
-  layer[6][12] = C;
-  layer[6][13] = C;
-  layer[6][27] = C;
-  layer[6][28] = C;
-  layer[6][30] = C;
-  layer[6][31] = C;
-
-  // 테이블
-  layer[14][18] = C;
-  layer[14][19] = C;
-
-  // 소파
-  layer[14][15] = C;
-  layer[14][16] = C;
-
-  // 책장
-  layer[5][31] = C;
-  layer[6][31] = C;
-
-  // 캐비넷, 침대
-  layer[20][10] = C;
-  layer[22][10] = C;
-  layer[23][10] = C;
-  layer[20][28] = C;
-  layer[22][28] = C;
-  layer[23][28] = C;
-
-  // 외부 나무
-  layer[3][2] = C;
-  layer[3][5] = C;
-  layer[3][35] = C;
-  layer[3][38] = C;
-
-  // 바위
-  layer[15][2] = C;
-  layer[20][36] = C;
-
-  // 분수대
-  layer[27][19] = C;
-  layer[28][19] = C;
+  // 맵 외곽 경계 (플레이어가 맵 밖으로 나가지 않도록)
+  fillArea(layer, 0, 0, MAP_COLS, 1, C); // 상단
+  fillArea(layer, 0, MAP_ROWS - 1, MAP_COLS, 1, C); // 하단
+  fillArea(layer, 0, 0, 1, MAP_ROWS, C); // 좌측
+  fillArea(layer, MAP_COLS - 1, 0, 1, MAP_ROWS, C); // 우측
 
   return layer;
 }
