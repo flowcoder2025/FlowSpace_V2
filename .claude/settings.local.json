@@ -10,7 +10,16 @@
       "Bash(do identify \"$f\")",
       "Bash(done)",
       "Bash(/c/Users/User/sd-scripts/venv/Scripts/python.exe:*)",
-      "mcp__comfyui__get_job_status"
+      "mcp__comfyui__get_job_status",
+      "mcp__comfyui__upload_image",
+      "mcp__comfyui__enqueue_workflow",
+      "WebSearch",
+      "mcp__comfyui__get_node_info",
+      "mcp__comfyui__get_queue",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.nextdiffusion.ai)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(\"C:/Users/User/ComfyUI/.venv/Scripts/python.exe\":*)"
     ]
   },
   "enableAllProjectMcpServers": true,
