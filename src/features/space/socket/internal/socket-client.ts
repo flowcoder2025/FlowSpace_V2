@@ -13,9 +13,13 @@ let socket: TypedSocket | null = null;
 
 function getSocketUrl(): string {
   if (typeof window === "undefined") return "";
+  // 프로덕션: 별도 서브도메인 (e.g. https://v2-socket.flow-coder.com)
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+    return process.env.NEXT_PUBLIC_SOCKET_URL;
+  }
+  // 개발: 같은 호스트의 다른 포트
   const port = process.env.NEXT_PUBLIC_SOCKET_PORT || "3001";
-  const url = `${window.location.protocol}//${window.location.hostname}:${port}`;
-  return url;
+  return `${window.location.protocol}//${window.location.hostname}:${port}`;
 }
 
 /** 소켓 클라이언트 인스턴스 (싱글턴) */

@@ -1,0 +1,40 @@
+# ============================================
+# Socket.io Server — Standalone Docker Image
+# ============================================
+# esbuild로 server/index.ts를 단일 JS 파일로 번들링
+# 런타임 의존성: socket.io, jose, dotenv (번들에 포함)
+
+# --- Build stage ---
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY server/ ./server/
+COPY src/features/space/socket/internal/types.ts ./src/features/space/socket/internal/types.ts
+COPY tsconfig.json ./
+
+RUN npx esbuild server/index.ts \
+  --bundle \
+  --platform=node \
+  --target=node20 \
+  --outfile=dist/server.js \
+  --external:bufferutil \
+  --external:utf-8-validate
+
+# --- Production stage ---
+FROM node:20-alpine
+WORKDIR /app
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 socketio
+
+COPY --from=builder --chown=socketio:nodejs /app/dist/server.js ./server.js
+
+USER socketio
+
+ENV NODE_ENV=production
+EXPOSE 3002
+
+CMD ["node", "server.js"]

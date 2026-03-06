@@ -1,0 +1,22 @@
+# FlowSpace v2 프로덕션 (OCI 배포용)
+# Next.js = Vercel, DB = Supabase, LiveKit = v1 공유
+# 이 파일은 Socket.io 서버만 담당
+
+services:
+  socket:
+    build:
+      context: .
+      dockerfile: Dockerfile.socket
+    ports:
+      - "${SOCKET_PORT:-3002}:${SOCKET_PORT:-3002}"
+    environment:
+      - NODE_ENV=production
+      - SOCKET_PORT=${SOCKET_PORT:-3002}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_URL=${AUTH_URL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:${SOCKET_PORT:-3002}/socket.io/?EIO=4&transport=polling"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
