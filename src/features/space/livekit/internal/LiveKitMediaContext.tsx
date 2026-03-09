@@ -574,6 +574,7 @@ export function LiveKitMediaInternalProvider({
 
     // Tier 2: subscribedTracksRef
     // trackUpdateTrigger in deps ensures re-run when ref changes
+    /* eslint-disable react-hooks/refs */
     subscribedTracksRef.current.forEach((storedInfo, key) => {
       const [identity] = key.split("::");
       const entry = map.get(identity);
@@ -605,6 +606,7 @@ export function LiveKitMediaInternalProvider({
           break;
       }
     });
+    /* eslint-enable react-hooks/refs */
 
     // Tier 3: room.remoteParticipants fallback
     if (room) {
