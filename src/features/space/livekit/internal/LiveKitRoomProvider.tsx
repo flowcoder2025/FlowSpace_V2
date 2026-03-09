@@ -70,7 +70,7 @@ export function LiveKitRoomProvider({
   onParticipantIdResolved,
 }: LiveKitRoomProviderProps) {
   const [token, setToken] = useState<string | null>(null);
-  const [, setState] = useState<LiveKitProviderState>({
+  const [state, setState] = useState<LiveKitProviderState>({
     isConnecting: true,
     isConnected: false,
     connectionError: null,
@@ -121,6 +121,7 @@ export function LiveKitRoomProvider({
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Connection failed";
+      console.error("[LiveKitProvider] Token fetch failed:", errorMessage);
       setState((prev) => ({
         ...prev,
         isConnecting: false,
@@ -209,7 +210,7 @@ export function LiveKitRoomProvider({
   );
 
   const handleConnected = useCallback(() => {
-    setState((prev) => ({ ...prev, isConnected: true }));
+    setState((prev) => ({ ...prev, isConnected: true, connectionError: null }));
     onConnected?.();
   }, [onConnected]);
 
@@ -240,7 +241,7 @@ export function LiveKitRoomProvider({
       onDisconnected={handleDisconnected}
       onError={handleError}
     >
-      <LiveKitMediaInternalProvider>
+      <LiveKitMediaInternalProvider connectionError={state.connectionError}>
         {children}
       </LiveKitMediaInternalProvider>
     </LiveKitRoom>

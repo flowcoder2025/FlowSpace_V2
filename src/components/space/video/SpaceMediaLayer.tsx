@@ -41,6 +41,7 @@ export function SpaceMediaLayer({
     participantTracks,
     mediaState,
     mediaError,
+    connectionError,
     isAvailable,
     localParticipantId,
     toggleCamera,
@@ -105,7 +106,9 @@ export function SpaceMediaLayer({
           )}
           {!isAvailable && !mediaError && (
             <div className="rounded-lg bg-gray-800/90 px-4 py-2 text-sm text-gray-300 shadow-lg">
-              음성/영상 서버 미연결
+              {connectionError
+                ? `음성/영상 연결 실패: ${connectionError}`
+                : "음성/영상 서버 연결 중..."}
             </div>
           )}
         </div>

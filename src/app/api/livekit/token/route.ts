@@ -50,7 +50,12 @@ async function removeDuplicateParticipants(
 ): Promise<void> {
   try {
     const roomService = new RoomServiceClient(LIVEKIT_URL, apiKey, apiSecret);
-    const participants = await roomService.listParticipants(roomName);
+    const participants = await Promise.race([
+      roomService.listParticipants(roomName),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 3000)
+      ),
+    ]);
 
     const duplicates = participants.filter(
       (p) => p.name === participantName && p.identity !== newIdentity
@@ -73,7 +78,7 @@ async function removeDuplicateParticipants(
       }
     }
   } catch {
-    // Room이 아직 없거나 조회 실패 - 무시
+    // Room이 아직 없거나 조회 실패/타임아웃 - 무시
   }
 }
 

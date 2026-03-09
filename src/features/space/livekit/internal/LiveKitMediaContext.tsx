@@ -74,6 +74,7 @@ export interface LiveKitMediaContextValue {
   participantTracks: Map<string, ParticipantTrack>;
   mediaState: MediaState;
   mediaError: MediaError | null;
+  connectionError: string | null;
   isAvailable: boolean;
   localParticipantId: string | null;
   localAudioTrack: MediaStreamTrack | null;
@@ -105,6 +106,7 @@ const defaultContextValue: LiveKitMediaContextValue = {
     isScreenShareEnabled: false,
   },
   mediaError: null,
+  connectionError: null,
   isAvailable: false,
   localParticipantId: null,
   localAudioTrack: null,
@@ -158,8 +160,10 @@ interface StoredTrackInfo {
 
 export function LiveKitMediaInternalProvider({
   children,
+  connectionError: providerConnectionError = null,
 }: {
   children: ReactNode;
+  connectionError?: string | null;
 }) {
   const [mediaError, setMediaError] = useState<MediaError | null>(null);
 
@@ -570,7 +574,6 @@ export function LiveKitMediaInternalProvider({
 
     // Tier 2: subscribedTracksRef
     // trackUpdateTrigger in deps ensures re-run when ref changes
-    /* eslint-disable react-hooks/refs */
     subscribedTracksRef.current.forEach((storedInfo, key) => {
       const [identity] = key.split("::");
       const entry = map.get(identity);
@@ -602,7 +605,6 @@ export function LiveKitMediaInternalProvider({
           break;
       }
     });
-    /* eslint-enable react-hooks/refs */
 
     // Tier 3: room.remoteParticipants fallback
     if (room) {
@@ -1159,6 +1161,7 @@ export function LiveKitMediaInternalProvider({
       participantTracks,
       mediaState,
       mediaError,
+      connectionError: providerConnectionError,
       isAvailable: isConnected,
       localParticipantId: localParticipant?.identity ?? null,
       localAudioTrack,
@@ -1177,6 +1180,7 @@ export function LiveKitMediaInternalProvider({
       participantTracks,
       mediaState,
       mediaError,
+      providerConnectionError,
       isConnected,
       localParticipant?.identity,
       localAudioTrack,
