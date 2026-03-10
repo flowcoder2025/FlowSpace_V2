@@ -29,6 +29,15 @@
 - PLAYER_WIDTH/PLAYER_HEIGHT가 game-constants.ts에 정의됨에도 직접 숫자 삽입
 - 해결: @/features/space/avatar barrel에 PLAYER_WIDTH/PLAYER_HEIGHT re-export 추가 또는 공용 상수 분리
 
+### [Medium] AbortController 비기능적 타임아웃 (2026-03-09, 첫 발생)
+- `src/app/api/livekit/token/route.ts:52-61`
+- `AbortController.abort()`를 `listParticipants`에 전달하지 않아 실제 취소 불가
+- 코드 주석에 인식됨. `Promise.race` 패턴으로 교체 필요
+
+### [Low] 존재하지 않는 ESLint 규칙 비활성화 (2026-03-09, 첫 발생)
+- `src/features/space/livekit/internal/LiveKitMediaContext.tsx:577,609`
+- `react-hooks/refs`는 존재하지 않는 규칙 — 주석 제거 또는 실제 규칙명으로 교체
+
 ### Notes
 - TypeScript strict mode on. No Bash available — cannot run tsc/lint directly.
 - Phaser SSR: game-manager.ts uses dynamic `await import("phaser")` — PASS
@@ -37,3 +46,4 @@
 - PLAYER_SPEED (game-constants.ts:13): 그리드 이동 전환 후 미사용 — 정리 대상
 - COLLISION_LAYER_NAMES: tilemap-system.ts가 re-export하므로 main-scene.ts는 map-data 직접 import 대신 tilemap-system import 권장 (intra-module이므로 High 아님)
 - chibi-characters.ts: index.ts에서 정상 re-export, 모든 외부 파일이 barrel 경유 확인됨 (2026-03-06)
+- connectionError 흐름 (LiveKitRoomProvider → LiveKitMediaContext → SpaceMediaLayer) 검증 완료 (2026-03-09)

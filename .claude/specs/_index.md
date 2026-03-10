@@ -1,13 +1,13 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `06ee1eb`
-- Last Review Date: 2026-03-07
+- Last Reviewed Commit: `2b07d64`
+- Last Review Date: 2026-03-10
 
 ## Active Epics
 | Epic | 현재 Phase | 상태 |
 |------|-----------|------|
-| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 12 (멀티뷰 스프라이트시트) | Task 12.32 완료 (AI 캐릭터 정적 에셋 전환). **다음: 충돌 영역 정밀화 → Y-sorting** |
+| [chibi-pipeline](./chibi-pipeline/README.md) | Phase 12 (멀티뷰 스프라이트시트) | LiveKit 에러 진단 강화 완료. **다음: LiveKit 연결 테스트 → 충돌 영역 → Y-sorting** |
 
 ## Recently Completed
 | Epic | 완료일 | 핵심 결과 |
@@ -26,6 +26,9 @@
 | [livekit-voicevideo](./livekit-voicevideo/README.md) | 2026-02-20 | 1 (Phase 11) |
 | [parts-avatar-system](./parts-avatar-system/README.md) | 2026-02-21 | 3 (Phase 1~3) |
 | [asset-integration](./asset-integration/README.md) | 2026-02-22 | 1 (연동 수정) |
+
+## Ad-hoc Work (2026-03-09)
+- LiveKit 연결 에러 진단 강화: connectionError UI 전파, 토큰 API 타임아웃, 에러 메시지 표시
 
 ## Ad-hoc Work (2026-02-22)
 - 에셋 갤러리 리팩토링: 스튜디오/생성폼 제거, 단일 갤러리 통합

@@ -7,7 +7,7 @@
 - **Repo**: https://github.com/flowcoder2025/FlowSpace_V2.git
 
 ## Active Epic
-chibi-pipeline Phase 12 — 그리드 이동 + 점프 + Shift 방향전환 + OCI 배포 + 배포 버그픽스 완료. **다음: AI 캐릭터 정적 에셋 전환** (플랜: `~/.claude/plans/sequential-drifting-newt.md`) → 충돌 영역 → Y-sorting
+chibi-pipeline Phase 12 — LiveKit 에러 진단 강화 완료 (connectionError UI 전파, 토큰 API 타임아웃). **다음: LiveKit 연결 테스트(에러 메시지 확인) → 충돌 영역 → Y-sorting**
 
 ### OCI 배포 (완료 2026-03-06)
 - **Vercel**: `flowspace-v2.vercel.app` (yh-devs-projects 팀, 개인 프로젝트)
