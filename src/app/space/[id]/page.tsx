@@ -43,6 +43,31 @@ export default async function SpacePage({ params }: PageProps) {
     redirect("/login");
   }
 
+  // 멤버십 자동 생성 (스페이스 입장 시 PARTICIPANT로 자동 가입)
+  const existingMember = await prisma.spaceMember.findUnique({
+    where: { spaceId_userId: { spaceId: id, userId: user.id } },
+    select: { id: true },
+  });
+
+  if (!existingMember) {
+    // 오너가 아닌 경우에만 생성 (오너는 LiveKit에서 별도 체크)
+    const isOwner = await prisma.space.findFirst({
+      where: { id, ownerId: user.id },
+      select: { id: true },
+    });
+
+    if (!isOwner) {
+      await prisma.spaceMember.create({
+        data: {
+          spaceId: id,
+          userId: user.id,
+          displayName: user.name,
+          role: "PARTICIPANT",
+        },
+      });
+    }
+  }
+
   // avatarConfig에서 avatarString 추출, 없으면 userId 해시 폴백
   const avatarConfig = user.avatarConfig as Record<string, unknown> | null;
   const avatarString = (avatarConfig?.avatarString as string) ?? user.image ?? "default";
