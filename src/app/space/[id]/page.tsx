@@ -24,6 +24,8 @@ export default async function SpacePage({ params }: PageProps) {
       name: true,
       description: true,
       maxUsers: true,
+      ownerId: true,
+      accessType: true,
       template: { select: { key: true, name: true } },
       _count: { select: { members: true } },
     },
@@ -43,28 +45,29 @@ export default async function SpacePage({ params }: PageProps) {
     redirect("/login");
   }
 
-  // 멤버십 자동 생성 (스페이스 입장 시 PARTICIPANT로 자동 가입)
-  const existingMember = await prisma.spaceMember.findUnique({
-    where: { spaceId_userId: { spaceId: id, userId: user.id } },
-    select: { id: true },
-  });
+  // 멤버십 자동 생성 (PUBLIC 스페이스 + 비오너 + 미가입자만)
+  const isOwner = space.ownerId === session.user.id;
 
-  if (!existingMember) {
-    // 오너가 아닌 경우에만 생성 (오너는 LiveKit에서 별도 체크)
-    const isOwner = await prisma.space.findFirst({
-      where: { id, ownerId: user.id },
+  if (!isOwner) {
+    const existingMember = await prisma.spaceMember.findUnique({
+      where: { spaceId_userId: { spaceId: id, userId: user.id } },
       select: { id: true },
     });
 
-    if (!isOwner) {
-      await prisma.spaceMember.create({
-        data: {
-          spaceId: id,
-          userId: user.id,
-          displayName: user.name,
-          role: "PARTICIPANT",
-        },
-      });
+    if (!existingMember) {
+      if (space.accessType === "PUBLIC") {
+        await prisma.spaceMember.create({
+          data: {
+            spaceId: id,
+            userId: user.id,
+            displayName: user.name,
+            role: "PARTICIPANT",
+          },
+        });
+      } else {
+        // PRIVATE/PASSWORD 스페이스는 초대 코드로만 가입 가능
+        redirect("/my-spaces");
+      }
     }
   }
 
