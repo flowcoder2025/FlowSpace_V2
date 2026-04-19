@@ -3,6 +3,7 @@
 # ============================================
 # esbuild로 server/index.ts를 단일 JS 파일로 번들링
 # 런타임 의존성: socket.io, jose, dotenv (번들에 포함)
+# Prisma: @prisma/client는 dynamic import로 external 처리 (runtime에서 로드)
 
 # --- Build stage ---
 FROM node:20-alpine AS builder
@@ -10,6 +11,10 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci
+
+# Prisma client 생성 (alpine musl binary 자동 감지)
+COPY prisma/ ./prisma/
+RUN npx prisma generate
 
 COPY server/ ./server/
 COPY src/features/space/socket/internal/types.ts ./src/features/space/socket/internal/types.ts
@@ -22,7 +27,9 @@ RUN npx esbuild server/index.ts \
   --target=node20 \
   --outfile=dist/server.js \
   --external:bufferutil \
-  --external:utf-8-validate
+  --external:utf-8-validate \
+  --external:@prisma/client \
+  --external:.prisma/client
 
 # --- Production stage ---
 FROM node:20-alpine
@@ -31,7 +38,11 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 socketio
 
+# Bundle + Prisma runtime (generated client + engine binary)
 COPY --from=builder --chown=socketio:nodejs /app/dist/server.js ./server.js
+COPY --from=builder --chown=socketio:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=socketio:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=socketio:nodejs /app/prisma ./prisma
 
 USER socketio
 
