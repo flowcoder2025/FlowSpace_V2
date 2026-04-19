@@ -10,14 +10,16 @@ Next.js(Vercel) + Socket.io(OCI) + DB(Supabase) 분리 아키텍처로 전환.
 | Phase | 제목 | 상태 |
 |-------|------|------|
 | [Phase 1](./01-socket-infra.md) | Socket.io 프로덕션 인프라 | 완료 |
+| [Phase 2](./02-prisma-runtime-singleton.md) | Prisma 런타임 Docker 통합 + 싱글턴 | 완료 |
+| [Phase 3](./03-vercel-seoul-region.md) | Vercel 서울 리전 전환 | 완료 |
 
 ## 최종 아키텍처
 ```
 클라이언트 (브라우저)
-  ├── Next.js App: https://flowspace-v2.vercel.app (Vercel)
-  └── Socket.io:   https://v2-socket.flow-coder.com → OCI :3002
+  ├── Next.js App: https://flowspace-v2.vercel.app (Vercel Pro, icn1 Seoul)
+  └── Socket.io:   https://socket-v2.144.24.72.143.nip.io → OCI :3002
                    (Caddy reverse proxy)
-DB: Supabase
+DB: Supabase (PgBouncer)
 LiveKit: v1 서버 공유 (v2 webhook URL 추가)
 ```
 

@@ -7,10 +7,10 @@
 - **Repo**: https://github.com/flowcoder2025/FlowSpace_V2.git
 
 ## Active Epic
-chibi-pipeline Phase 12 — LiveKit 에러 진단 강화 완료 (connectionError UI 전파, 토큰 API 타임아웃). **다음: LiveKit 연결 테스트(에러 메시지 확인) → 충돌 영역 → Y-sorting**
+chibi-pipeline Phase 12 — LiveKit 멤버십 자동 생성 + Vercel 서울 리전 이관 + Prisma Docker 런타임/싱글턴 완료. **다음: 충돌 영역 정밀화 → Y-sorting**
 
-### OCI 배포 (완료 2026-03-06)
-- **Vercel**: `flowspace-v2.vercel.app` (yh-devs-projects 팀, 개인 프로젝트)
+### OCI 배포 (완료 2026-03-06, 2026-04-19 Prisma 런타임 추가)
+- **Vercel**: `flowspace-v2.vercel.app` (**flowcoder 팀 Pro**, 서울 리전 `icn1`)
 - **OCI Socket.io**: 포트 3002, `Dockerfile.socket` (esbuild 번들), `docker-compose.prod.yml`
 - **Caddy**: v2-socket vhost 추가 + nip.io 임시 (`socket-v2.144.24.72.143.nip.io`)
 - **LiveKit**: v1과 공유 (webhook URL 추가만)

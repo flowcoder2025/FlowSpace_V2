@@ -1,8 +1,8 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `2b07d64`
-- Last Review Date: 2026-03-10
+- Last Reviewed Commit: `06cf9c5`
+- Last Review Date: 2026-04-19
 
 ## Active Epics
 | Epic | 현재 Phase | 상태 |
@@ -12,7 +12,8 @@
 ## Recently Completed
 | Epic | 완료일 | 핵심 결과 |
 |------|--------|-----------|
-| [oci-deployment](./oci-deployment/README.md) | 2026-03-06 | Socket.io OCI 배포, CD 자동화, CORS 다중 origin |
+| [oci-deployment](./oci-deployment/README.md) Phase 2~3 | 2026-04-19 | Prisma Docker 런타임 + 싱글턴, Vercel 서울 리전 |
+| [oci-deployment](./oci-deployment/README.md) Phase 1 | 2026-03-06 | Socket.io OCI 배포, CD 자동화, CORS 다중 origin |
 | [chibi-pipeline](./chibi-pipeline/README.md) Phase 1~11 | 2026-02-23 | batch v2, 77% 속도 향상 |
 
 ## Completed Epics
@@ -26,6 +27,12 @@
 | [livekit-voicevideo](./livekit-voicevideo/README.md) | 2026-02-20 | 1 (Phase 11) |
 | [parts-avatar-system](./parts-avatar-system/README.md) | 2026-02-21 | 3 (Phase 1~3) |
 | [asset-integration](./asset-integration/README.md) | 2026-02-22 | 1 (연동 수정) |
+
+## Ad-hoc Work (2026-04-19)
+- LiveKit 멤버십 자동 생성: PUBLIC 스페이스 직접 입장 시 spaceMember 자동 생성 → LiveKit "not a member" 에러 수정 (`livekit-voicevideo/12-membership-bugfix.md`)
+- Vercel 서울 리전 전환: icn1, Hobby→Pro 팀 이관, URL 유지 (`oci-deployment/03-vercel-seoul-region.md`)
+- Socket Docker Prisma 런타임: esbuild external + dynamic import + 싱글턴, Alpine binary target 추가 (`oci-deployment/02-prisma-runtime-singleton.md`)
+- CD 워크플로우 미동작: `OCI_SSH_PRIVATE_KEY` GitHub Secret 미설정 — 수동 배포 중 [KNOWN ISSUE]
 
 ## Ad-hoc Work (2026-03-09)
 - LiveKit 연결 에러 진단 강화: connectionError UI 전파, 토큰 API 타임아웃, 에러 메시지 표시
@@ -44,7 +51,13 @@ specs/
 ├── _index.md
 ├── oci-deployment/
 │   ├── README.md
-│   └── 01-socket-infra.md
+│   ├── 01-socket-infra.md
+│   ├── 02-prisma-runtime-singleton.md
+│   └── 03-vercel-seoul-region.md
+├── livekit-voicevideo/
+│   ├── README.md
+│   ├── 11-livekit-integration.md
+│   └── 12-membership-bugfix.md
 ├── comfyui-asset-pipeline/
 │   ├── README.md
 │   ├── 01~07 phase specs
@@ -52,7 +65,6 @@ specs/
 ├── map-editor/
 ├── admin-dashboard/
 ├── chat-port/
-├── livekit-voicevideo/
 ├── parts-avatar-system/
 ├── asset-integration/
 └── chibi-pipeline/

@@ -38,6 +38,11 @@
 - `src/features/space/livekit/internal/LiveKitMediaContext.tsx:577,609`
 - `react-hooks/refs`는 존재하지 않는 규칙 — 주석 제거 또는 실제 규칙명으로 교체
 
+### [Critical] accessType 미체크 자동 멤버십 생성 (2026-04-10, 해결됨 2026-04-10)
+- `src/app/space/[id]/page.tsx` — accessType === "PUBLIC" 조건 추가, PRIVATE/PASSWORD는 `/my-spaces` redirect
+- isOwner 체크를 `space.ownerId === session.user.id`로 변경 (별도 DB 쿼리 제거)
+- tsc PASS, lint PASS, 보안 PASS 확인됨
+
 ### Notes
 - TypeScript strict mode on. No Bash available — cannot run tsc/lint directly.
 - Phaser SSR: game-manager.ts uses dynamic `await import("phaser")` — PASS
@@ -47,3 +52,5 @@
 - COLLISION_LAYER_NAMES: tilemap-system.ts가 re-export하므로 main-scene.ts는 map-data 직접 import 대신 tilemap-system import 권장 (intra-module이므로 High 아님)
 - chibi-characters.ts: index.ts에서 정상 re-export, 모든 외부 파일이 barrel 경유 확인됨 (2026-03-06)
 - connectionError 흐름 (LiveKitRoomProvider → LiveKitMediaContext → SpaceMediaLayer) 검증 완료 (2026-03-09)
+- src/app/space/[id]/page.tsx: Server Component에서 Prisma 직접 사용은 기존 dashboard 패턴과 동일 (pre-existing)
+- 멤버십 자동 생성 로직: space.findUnique에 ownerId/accessType 포함하여 쿼리 1회로 통합됨 (해결 2026-04-10)
