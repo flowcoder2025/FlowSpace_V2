@@ -8,6 +8,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from "../../src/features/space/socket/internal/types";
+import { getPrisma } from "../lib/prisma";
 import {
   recordingStates,
   spotlightStates,
@@ -140,8 +141,7 @@ export function handleMedia(io: IO, socket: TypedSocket) {
 
     try {
       // DB에서 스포트라이트 권한 확인
-      const { PrismaClient } = await import("@prisma/client");
-      const prisma = new PrismaClient();
+      const prisma = await getPrisma();
 
       const grant = await prisma.spotlightGrant.findFirst({
         where: {
@@ -152,7 +152,6 @@ export function handleMedia(io: IO, socket: TypedSocket) {
       });
 
       if (!grant) {
-        await prisma.$disconnect();
         socket.emit("media:error", {
           code: "NO_GRANT",
           message: "스포트라이트 권한이 없습니다.",
@@ -164,8 +163,6 @@ export function handleMedia(io: IO, socket: TypedSocket) {
         where: { id: grant.id },
         data: { isActive: true },
       });
-
-      await prisma.$disconnect();
 
       // 메모리 상태 업데이트
       const spotlightState = getOrCreateSpotlightState(spaceId);
@@ -206,16 +203,13 @@ export function handleMedia(io: IO, socket: TypedSocket) {
     }
 
     try {
-      const { PrismaClient } = await import("@prisma/client");
-      const prisma = new PrismaClient();
+      const prisma = await getPrisma();
 
       // DB에서 활성 grant 비활성화
       await prisma.spotlightGrant.updateMany({
         where: { spaceId, userId, isActive: true },
         data: { isActive: false },
       });
-
-      await prisma.$disconnect();
 
       // 메모리 상태 업데이트
       const spotlightState = spotlightStates.get(spaceId);

@@ -4,6 +4,7 @@ import type {
   ServerToClientEvents,
   PlayerData,
 } from "../../src/features/space/socket/internal/types";
+import { getPrisma } from "../lib/prisma";
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -94,8 +95,7 @@ function leaveSpace(io: IO, socket: TypedSocket, spaceId: string) {
 /** DB에서 SpaceMember 정보 로드하여 socket.data에 할당 */
 async function loadMemberInfo(spaceId: string, userId: string, socket: TypedSocket): Promise<void> {
   try {
-    const { PrismaClient } = await import("@prisma/client");
-    const prisma = new PrismaClient();
+    const prisma = await getPrisma();
 
     const member = await prisma.spaceMember.findUnique({
       where: { spaceId_userId: { spaceId, userId } },
@@ -107,8 +107,6 @@ async function loadMemberInfo(spaceId: string, userId: string, socket: TypedSock
       socket.data.role = member.role as "OWNER" | "STAFF" | "PARTICIPANT";
       socket.data.restriction = member.restriction as "NONE" | "MUTED" | "BANNED";
     }
-
-    await prisma.$disconnect();
   } catch (err) {
     console.error("[Room] Prisma member load error:", err);
   }

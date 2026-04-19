@@ -39,10 +39,11 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 socketio
 
 # Bundle + Prisma runtime (generated client + engine binary)
+# prisma schema만 복사 (migrations/ 제외하여 이미지 크기 축소)
 COPY --from=builder --chown=socketio:nodejs /app/dist/server.js ./server.js
 COPY --from=builder --chown=socketio:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=socketio:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=socketio:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=socketio:nodejs /app/prisma/schema.prisma ./prisma/schema.prisma
 
 USER socketio
 

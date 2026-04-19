@@ -4,6 +4,7 @@ import type {
   ServerToClientEvents,
 } from "../../src/features/space/socket/internal/types";
 import { spacePlayersMap } from "./room";
+import { getPrisma } from "../lib/prisma";
 import {
   MAX_CONTENT_LENGTH,
   RATE_LIMIT_MS,
@@ -325,9 +326,7 @@ async function saveChatMessageAsync(
   _replyTo?: { id: string; senderNickname: string; content: string }
 ): Promise<void> {
   try {
-    // Dynamic import to avoid bundling issues in socket server
-    const { PrismaClient } = await import("@prisma/client");
-    const prisma = new PrismaClient();
+    const prisma = await getPrisma();
 
     const messageTypeMap: Record<string, string> = {
       message: "MESSAGE",
@@ -347,8 +346,6 @@ async function saveChatMessageAsync(
         type: (messageTypeMap[type] ?? "MESSAGE") as "MESSAGE" | "WHISPER" | "PARTY" | "SYSTEM" | "ANNOUNCEMENT",
       },
     });
-
-    await prisma.$disconnect();
   } catch (err) {
     console.error("[Chat] DB save error:", err);
   }
@@ -357,8 +354,7 @@ async function saveChatMessageAsync(
 /** DB soft delete (소켓 경로용) */
 async function softDeleteMessageAsync(messageId: string, deletedBy: string): Promise<void> {
   try {
-    const { PrismaClient } = await import("@prisma/client");
-    const prisma = new PrismaClient();
+    const prisma = await getPrisma();
 
     await prisma.chatMessage.update({
       where: { id: messageId },
@@ -368,8 +364,6 @@ async function softDeleteMessageAsync(messageId: string, deletedBy: string): Pro
         deletedAt: new Date(),
       },
     });
-
-    await prisma.$disconnect();
   } catch (err) {
     console.error("[Chat] DB soft delete error:", err);
   }
