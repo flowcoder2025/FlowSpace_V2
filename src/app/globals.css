@@ -2,6 +2,37 @@
 @source "../**/*.{ts,tsx,js,jsx}";
 
 /* ============================================
+   DESIGN TOKENS (Tailwind v4 @theme)
+   ============================================ */
+@theme {
+  --color-cream: #ffffff;
+  --color-cream-deep: #fafafa;
+  --color-ink: #0a0a0a;
+  --color-ink-soft: #262626;
+  --color-ink-muted: #737373;
+  --color-ink-light: #a3a3a3;
+  --color-line: #e5e5e5;
+  --color-line-soft: #f0f0f0;
+  --color-brand: #0a0a0a;
+  --color-brand-deep: #000000;
+  --color-accent: #0a0a0a;
+  --color-accent-soft: #f0f0f0;
+
+  --font-serif: var(--font-source-serif), "Source Serif 4", Georgia, serif;
+  --font-sans: "Pretendard", "Inter", system-ui, sans-serif;
+
+  --tracking-tightest: -0.04em;
+}
+
+/* Wireframe placeholder pattern (used in landing image slots) */
+.landing-placeholder {
+  background:
+    linear-gradient(135deg, transparent 49.5%, rgba(10, 10, 10, 0.05) 49.5%, rgba(10, 10, 10, 0.05) 50.5%, transparent 50.5%),
+    linear-gradient(45deg, transparent 49.5%, rgba(10, 10, 10, 0.05) 49.5%, rgba(10, 10, 10, 0.05) 50.5%, transparent 50.5%),
+    var(--color-cream-deep);
+}
+
+/* ============================================
    CHAT SCROLLBAR
    ============================================ */
 .chat-scrollbar {

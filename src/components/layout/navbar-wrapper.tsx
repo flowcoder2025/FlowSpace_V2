@@ -7,9 +7,10 @@ import { Navbar } from "./navbar";
 export function NavbarWrapper() {
   const pathname = usePathname();
 
-  const isHidden = NAVBAR_HIDDEN_ROUTES.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isHomeRoute = pathname === "/";
+  const isHidden =
+    isHomeRoute ||
+    NAVBAR_HIDDEN_ROUTES.some((route) => pathname.startsWith(route));
 
   if (isHidden) return null;
 

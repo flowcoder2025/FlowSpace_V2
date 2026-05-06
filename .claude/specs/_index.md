@@ -30,6 +30,7 @@
 | [asset-integration](./asset-integration/README.md) | 2026-02-22 | 1 (연동 수정) |
 
 ## Ad-hoc Work (2026-05-06)
+- 랜딩페이지 신규 구현: `/` 라우트 → 9개 섹션 랜딩. 모노크롬 디자인 시스템(cream/ink/line 토큰, Source Serif 4 + Pretendard) 최초 확정. ImageSlot 패턴으로 스크린샷 슬롯 6개 와이어프레임 유지 중. (`landing/2026-05-06-initial-implementation.md`)
 - 인증 단순화 (GitHub OAuth 제거): GitHub provider 코드/UI 제거 → Google OAuth + Credentials 2체제 정착. Google Cloud Console OAuth Client 신규 발급, Vercel 프로덕션 env 등록 완료. 동의 화면은 테스트 모드 유지 (vercel.app = PSL 도메인, 커스텀 도메인 연결 후 Production 전환 필요) (`auth/2026-05-06-github-removal.md`)
 - Supabase 서울 마이그레이션: 시드니→서울 신규 프로젝트 + 데이터 144 rows 이전 + Prisma 스키마 드리프트 동기화. 사용자 체감 latency 개선 확인 (`oci-deployment/04-supabase-seoul-migration.md`)
 - OCI v1 스택 제거: flowspace-socket 컨테이너/이미지/Caddy 라우트 제거, LiveKit/Caddy 공유 인프라는 유지, v1 소스 1주 보존 (`oci-deployment/05-v1-removal.md`)
@@ -57,6 +58,8 @@
 ```
 specs/
 ├── _index.md
+├── landing/
+│   └── 2026-05-06-initial-implementation.md
 ├── auth/
 │   └── 2026-05-06-github-removal.md
 ├── oci-deployment/
