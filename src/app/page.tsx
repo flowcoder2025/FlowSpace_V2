@@ -1,5 +1,4 @@
 import {
-  LandingNavbar,
   Hero,
   TrustStrip,
   Features,
@@ -13,7 +12,6 @@ import {
 export default function Home() {
   return (
     <main className="bg-cream text-ink antialiased">
-      <LandingNavbar />
       <Hero />
       <TrustStrip />
       <Features />

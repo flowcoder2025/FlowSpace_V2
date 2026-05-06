@@ -1,4 +1,3 @@
-export { LandingNavbar } from "./internal/landing-navbar";
 export { Hero } from "./internal/hero";
 export { TrustStrip } from "./internal/trust-strip";
 export { Features } from "./internal/features";
