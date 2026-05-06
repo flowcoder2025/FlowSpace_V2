@@ -13,7 +13,7 @@ export default async function JoinSpacePage({ params }: PageProps) {
   const { inviteCode } = await params;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-cream-deep p-4">
       <JoinSpaceView inviteCode={inviteCode} />
     </main>
   );

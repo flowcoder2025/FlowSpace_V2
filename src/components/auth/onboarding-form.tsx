@@ -59,7 +59,7 @@ export function OnboardingForm({
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+    <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Profile Image (OAuth) */}
         {currentImage && (
@@ -74,7 +74,7 @@ export function OnboardingForm({
 
         {/* Character Editor */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">
+          <label className="mb-2 block text-sm font-medium text-ink-soft">
             Customize Your Character
           </label>
           <CharacterEditor
@@ -87,7 +87,7 @@ export function OnboardingForm({
         <div>
           <label
             htmlFor="display-name"
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1 block text-sm font-medium text-ink-soft"
           >
             Display Name
           </label>
@@ -97,7 +97,7 @@ export function OnboardingForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="What should we call you?"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
           />
         </div>
 
@@ -110,7 +110,7 @@ export function OnboardingForm({
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg bg-brand py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Saving..." : "Get Started"}
         </button>

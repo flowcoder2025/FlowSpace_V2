@@ -72,7 +72,7 @@ export function CharacterEditor({ initialConfig, onChange }: CharacterEditorProp
     <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
       {/* Preview */}
       <div className="flex flex-col items-center gap-3">
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+        <div className="rounded-xl border border-line bg-cream-deep p-4">
           <PreviewCanvas config={config} />
         </div>
         <SkinTonePicker
@@ -85,7 +85,7 @@ export function CharacterEditor({ initialConfig, onChange }: CharacterEditorProp
       <div className="flex flex-1 flex-col gap-3">
         <CategoryTabs active={activeCategory} onChange={setActiveCategory} />
 
-        <div className="rounded-lg border border-gray-200 bg-white p-3">
+        <div className="rounded-lg border border-line bg-white p-3">
           <PartGrid
             category={activeCategory}
             config={config}

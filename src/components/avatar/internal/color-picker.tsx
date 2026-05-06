@@ -17,7 +17,7 @@ export function ColorPicker({ value, onChange, label }: ColorPickerProps) {
   return (
     <div className="space-y-2">
       {label && (
-        <span className="text-xs font-medium text-gray-600">{label}</span>
+        <span className="text-xs font-medium text-ink-muted">{label}</span>
       )}
       <div className="flex flex-wrap gap-1.5">
         {PRESET_COLORS.map((color) => (
@@ -27,15 +27,15 @@ export function ColorPicker({ value, onChange, label }: ColorPickerProps) {
             onClick={() => onChange(color)}
             className={`h-6 w-6 rounded-full border-2 transition-transform ${
               value.toLowerCase() === color.toLowerCase()
-                ? "scale-110 border-blue-500"
-                : "border-gray-200 hover:scale-105"
+                ? "scale-110 border-ink"
+                : "border-line hover:scale-105"
             }`}
             style={{ backgroundColor: color }}
           />
         ))}
         {/* 커스텀 색상 */}
         <label
-          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-[10px] text-gray-400 hover:border-gray-400"
+          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-line text-[10px] text-ink-light hover:border-ink-light"
           title="직접 색상 선택"
         >
           +

@@ -23,14 +23,14 @@ export function DashboardSidebar({ spaceId, spaceName }: DashboardSidebarProps) 
   const basePath = `/dashboard/spaces/${spaceId}`;
 
   return (
-    <aside className="w-60 min-h-screen bg-gray-900 text-gray-300 flex flex-col">
+    <aside className="w-60 min-h-screen bg-ink text-ink-light flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-gray-700">
-        <Link href="/my-spaces" className="text-xs text-gray-500 hover:text-gray-300">
+      <div className="p-4 border-b border-cream/10">
+        <Link href="/my-spaces" className="text-xs text-ink-muted hover:text-ink-light">
           &larr; Back to Spaces
         </Link>
         <h2 className="mt-2 text-sm font-semibold text-white truncate">{spaceName}</h2>
-        <p className="text-xs text-gray-500">Admin Dashboard</p>
+        <p className="text-xs text-ink-muted">Admin Dashboard</p>
       </div>
 
       {/* Navigation */}
@@ -48,8 +48,8 @@ export function DashboardSidebar({ spaceId, spaceName }: DashboardSidebarProps) 
               href={href}
               className={`block px-4 py-2 text-sm transition-colors ${
                 isActive
-                  ? "bg-gray-800 text-white border-r-2 border-blue-500"
-                  : "hover:bg-gray-800 hover:text-white"
+                  ? "bg-ink text-white border-r-2 border-ink"
+                  : "hover:bg-ink hover:text-white"
               }`}
             >
               {item.label}
@@ -59,10 +59,10 @@ export function DashboardSidebar({ spaceId, spaceName }: DashboardSidebarProps) 
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-700">
+      <div className="p-4 border-t border-cream/10">
         <Link
           href={`/space/${spaceId}`}
-          className="block text-xs text-gray-500 hover:text-gray-300"
+          className="block text-xs text-ink-muted hover:text-ink-light"
         >
           Open Space &rarr;
         </Link>

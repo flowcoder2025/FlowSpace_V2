@@ -54,8 +54,8 @@ export default function MessagesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
+      <h1 className="text-2xl font-bold text-ink">Messages</h1>
+      <div className="bg-white rounded-lg border border-line p-5">
         <MessageModeration
           spaceId={spaceId}
           messages={messages}

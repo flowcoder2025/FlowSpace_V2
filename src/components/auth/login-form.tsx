@@ -65,9 +65,9 @@ export function LoginForm() {
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+    <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
       {/* Tab */}
-      <div className="mb-6 flex rounded-lg bg-gray-100 p-1">
+      <div className="mb-6 flex rounded-lg bg-cream-deep p-1">
         <button
           type="button"
           onClick={() => {
@@ -76,8 +76,8 @@ export function LoginForm() {
           }}
           className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
             mode === "login"
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
+              ? "bg-white text-ink shadow-sm"
+              : "text-ink-muted hover:text-ink-soft"
           }`}
         >
           Login
@@ -90,8 +90,8 @@ export function LoginForm() {
           }}
           className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
             mode === "register"
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
+              ? "bg-white text-ink shadow-sm"
+              : "text-ink-muted hover:text-ink-soft"
           }`}
         >
           Register
@@ -104,7 +104,7 @@ export function LoginForm() {
           <div>
             <label
               htmlFor="name"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1 block text-sm font-medium text-ink-soft"
             >
               Name
             </label>
@@ -114,7 +114,7 @@ export function LoginForm() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Display name (optional)"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
             />
           </div>
         )}
@@ -122,7 +122,7 @@ export function LoginForm() {
         <div>
           <label
             htmlFor="email"
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1 block text-sm font-medium text-ink-soft"
           >
             Email
           </label>
@@ -133,14 +133,14 @@ export function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
           />
         </div>
 
         <div>
           <label
             htmlFor="password"
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1 block text-sm font-medium text-ink-soft"
           >
             Password
           </label>
@@ -154,7 +154,7 @@ export function LoginForm() {
             placeholder={
               mode === "register" ? "8 characters minimum" : "Your password"
             }
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
           />
         </div>
 
@@ -167,7 +167,7 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg bg-brand py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading
             ? "Processing..."
@@ -179,9 +179,9 @@ export function LoginForm() {
 
       {/* Divider */}
       <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-gray-200" />
-        <span className="text-xs text-gray-400">OR</span>
-        <div className="h-px flex-1 bg-gray-200" />
+        <div className="h-px flex-1 bg-line" />
+        <span className="text-xs text-ink-light">OR</span>
+        <div className="h-px flex-1 bg-line" />
       </div>
 
       {/* OAuth */}

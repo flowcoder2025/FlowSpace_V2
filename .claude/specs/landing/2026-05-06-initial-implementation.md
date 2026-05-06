@@ -186,3 +186,8 @@ export const metadata: Metadata = {
 - `src` prop이 없는 `ImageSlot`은 빌드/런타임 에러 없이 와이어프레임 패턴을 보여주므로 스크린샷 확보 전에도 페이지가 동작한다.
 - Tailwind v4 `@theme`으로 정의한 토큰은 `bg-cream`, `text-ink-muted` 등 유틸리티 클래스로 직접 사용된다.
 - `brand` / `accent` 토큰을 `ink`와 동일값(`#0a0a0a`)으로 설정한 것은 의도적 선택 — 향후 컬러 도입 시 토큰만 교체하면 전체 반영.
+
+## 이후 확장
+
+2026-05-06 동일 세션에서 이 파일에서 확정한 토큰이 전체 앱(Navbar/인증/운영자 대시보드/인게임 UI)으로 확산됨.
+상세: `landing/2026-05-06-design-system-rollout.md`

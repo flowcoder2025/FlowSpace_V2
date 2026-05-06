@@ -52,8 +52,15 @@ public/assets/generated/maps/
 .idea/
 bin/
 
-.vercel
-
-.vercel
 .env*.local
+.env.backup*
 .backups/
+
+# 임시 와이어프레임/디버그 산출물
+.tmp_*.html
+public/assets/debug/
+
+# Claude runtime
+.claude/scheduled_tasks.lock
+.claude/read_session.py
+.claude/agent-memory/

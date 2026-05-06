@@ -8,8 +8,8 @@ export default function DashboardMediaPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Media Management</h1>
-      <p className="text-sm text-gray-500">
+      <h1 className="text-2xl font-bold text-ink">Media Management</h1>
+      <p className="text-sm text-ink-muted">
         Manage spotlight permissions for space members. Recording and proximity
         settings are controlled in real-time from within the space.
       </p>

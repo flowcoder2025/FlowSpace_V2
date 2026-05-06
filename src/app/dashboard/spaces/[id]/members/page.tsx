@@ -29,10 +29,10 @@ export default function MembersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Members</h1>
-        <span className="text-sm text-gray-500">{members.length} members</span>
+        <h1 className="text-2xl font-bold text-ink">Members</h1>
+        <span className="text-sm text-ink-muted">{members.length} members</span>
       </div>
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
+      <div className="bg-white rounded-lg border border-line p-5">
         <MemberTable spaceId={spaceId} members={members} onRefresh={loadMembers} />
       </div>
     </div>

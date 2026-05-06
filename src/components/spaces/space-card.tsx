@@ -34,7 +34,7 @@ export function SpaceCard({ space }: SpaceCardProps) {
   return (
     <div
       onClick={() => router.push(`/space/${space.id}`)}
-      className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:border-blue-300 hover:shadow-md"
+      className="group cursor-pointer rounded-xl border border-line bg-white p-5 shadow-sm transition-all hover:border-blue-300 hover:shadow-md"
     >
       {/* Header */}
       <div className="mb-3 flex items-start justify-between">
@@ -43,15 +43,15 @@ export function SpaceCard({ space }: SpaceCardProps) {
             {TEMPLATE_ICONS[space.template.key] || "🌐"}
           </span>
           <div>
-            <h3 className="font-semibold text-gray-900 group-hover:text-blue-600">
+            <h3 className="font-semibold text-ink group-hover:text-ink">
               {space.name}
             </h3>
-            <span className="text-xs text-gray-400">{space.template.name}</span>
+            <span className="text-xs text-ink-light">{space.template.name}</span>
           </div>
         </div>
 
         {space.myRole && (
-          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600">
+          <span className="rounded-full bg-cream-deep px-2 py-0.5 text-xs font-medium text-ink">
             {ROLE_LABELS[space.myRole] || space.myRole}
           </span>
         )}
@@ -59,13 +59,13 @@ export function SpaceCard({ space }: SpaceCardProps) {
 
       {/* Description */}
       {space.description && (
-        <p className="mb-3 line-clamp-2 text-sm text-gray-500">
+        <p className="mb-3 line-clamp-2 text-sm text-ink-muted">
           {space.description}
         </p>
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-gray-400">
+      <div className="flex items-center justify-between text-xs text-ink-light">
         <span>
           {space.memberCount}/{space.maxUsers} members
         </span>
@@ -76,7 +76,7 @@ export function SpaceCard({ space }: SpaceCardProps) {
                 e.stopPropagation();
                 router.push(`/dashboard/spaces/${space.id}`);
               }}
-              className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600 hover:bg-gray-200 transition-colors"
+              className="rounded-full bg-cream-deep px-2 py-0.5 text-ink-muted hover:bg-line transition-colors"
             >
               Dashboard
             </button>

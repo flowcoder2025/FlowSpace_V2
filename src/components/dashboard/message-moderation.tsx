@@ -57,16 +57,16 @@ export function MessageModeration({
           <div
             key={msg.id}
             className={`flex items-start justify-between p-3 rounded-md border ${
-              msg.isDeleted ? "bg-red-50 border-red-200 opacity-60" : "bg-white border-gray-200"
+              msg.isDeleted ? "bg-red-50 border-red-200 opacity-60" : "bg-white border-line"
             }`}
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-900">{msg.senderName}</span>
-                <span className="text-xs text-gray-400">
+                <span className="text-sm font-medium text-ink">{msg.senderName}</span>
+                <span className="text-xs text-ink-light">
                   {new Date(msg.createdAt).toLocaleString("ko-KR")}
                 </span>
-                <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                <span className="text-xs px-1.5 py-0.5 rounded bg-cream-deep text-ink-muted">
                   {msg.type}
                 </span>
                 {msg.isDeleted && (
@@ -75,7 +75,7 @@ export function MessageModeration({
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-sm text-gray-700 truncate">{msg.content}</p>
+              <p className="mt-1 text-sm text-ink-soft truncate">{msg.content}</p>
             </div>
             {!msg.isDeleted && (
               <button
@@ -95,7 +95,7 @@ export function MessageModeration({
           <button
             onClick={onLoadMore}
             disabled={isLoading}
-            className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+            className="px-4 py-2 text-sm text-ink hover:text-brand-deep disabled:opacity-50"
           >
             {isLoading ? "Loading..." : "Load more"}
           </button>

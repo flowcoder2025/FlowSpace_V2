@@ -54,17 +54,17 @@ export default function EditorSidebar({
   onLinkPortal,
 }: EditorSidebarProps) {
   return (
-    <div className="absolute right-0 top-0 z-50 flex h-full w-56 flex-col gap-3 overflow-y-auto bg-gray-900/95 p-3 text-white">
+    <div className="absolute right-0 top-0 z-50 flex h-full w-64 flex-col gap-3 overflow-y-auto border-l border-cream/10 bg-ink/85 p-3 text-cream backdrop-blur-md">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-emerald-400">맵 에디터</h3>
+        <h3 className="font-serif text-base font-medium text-cream">맵 에디터</h3>
         <button
           onClick={onSave}
           disabled={!isDirty || isSaving}
-          className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+          className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
             isDirty && !isSaving
-              ? "bg-emerald-600 text-white hover:bg-emerald-700"
-              : "bg-gray-700 text-gray-500 cursor-not-allowed"
+              ? "bg-emerald-500 text-cream hover:bg-emerald-400"
+              : "bg-cream/10 text-cream/40 cursor-not-allowed"
           }`}
         >
           {isSaving ? "저장 중..." : isDirty ? "저장" : "저장됨"}
@@ -95,7 +95,7 @@ export default function EditorSidebar({
             className={`flex-1 rounded px-2 py-1 text-xs transition-colors ${
               paletteTab === key
                 ? "bg-emerald-600 text-white"
-                : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                : "bg-cream/10 text-ink-light hover:bg-cream/15"
             }`}
           >
             {label}

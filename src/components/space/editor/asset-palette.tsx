@@ -66,7 +66,7 @@ export default function AssetPalette({
             className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
               filter === key
                 ? "bg-emerald-600 text-white"
-                : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                : "bg-cream/10 text-ink-light hover:bg-cream/15"
             }`}
           >
             {label}
@@ -76,9 +76,9 @@ export default function AssetPalette({
 
       {/* Asset grid */}
       {loading ? (
-        <div className="py-4 text-center text-xs text-gray-500">불러오는 중...</div>
+        <div className="py-4 text-center text-xs text-ink-muted">불러오는 중...</div>
       ) : filtered.length === 0 ? (
-        <div className="py-4 text-center text-xs text-gray-500">에셋 없음</div>
+        <div className="py-4 text-center text-xs text-ink-muted">에셋 없음</div>
       ) : (
         <div className="grid max-h-[300px] grid-cols-2 gap-1 overflow-y-auto pr-1">
           {filtered.map((asset) => (
@@ -94,7 +94,7 @@ export default function AssetPalette({
               className={`flex flex-col items-center justify-center rounded border p-1 transition-colors ${
                 selectedAssetId === asset.id
                   ? "border-emerald-500 bg-emerald-600/30 text-emerald-300"
-                  : "border-gray-600 bg-gray-800 text-gray-400 hover:border-gray-500"
+                  : "border-cream/15 bg-ink text-ink-light hover:border-cream/20"
               }`}
             >
               {asset.thumbnailPath ? (
@@ -105,7 +105,7 @@ export default function AssetPalette({
                   style={{ imageRendering: "pixelated" }}
                 />
               ) : (
-                <div className="flex h-8 w-8 items-center justify-center text-[10px] text-gray-600">
+                <div className="flex h-8 w-8 items-center justify-center text-[10px] text-ink-muted">
                   ?
                 </div>
               )}

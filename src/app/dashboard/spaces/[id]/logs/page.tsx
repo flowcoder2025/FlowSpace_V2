@@ -58,11 +58,11 @@ export default function LogsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Event Logs</h1>
+        <h1 className="text-2xl font-bold text-ink">Event Logs</h1>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="text-sm border border-gray-300 rounded px-3 py-1.5"
+          className="text-sm border border-line rounded px-3 py-1.5"
         >
           <option value="">All Events</option>
           {EVENT_TYPES.filter(Boolean).map((t) => (
@@ -73,7 +73,7 @@ export default function LogsPage() {
         </select>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
+      <div className="bg-white rounded-lg border border-line p-5">
         <EventLogTable
           logs={logs}
           hasMore={hasMore}

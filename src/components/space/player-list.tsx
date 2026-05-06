@@ -22,24 +22,24 @@ export default function PlayerList({ players, currentNickname }: PlayerListProps
       {/* Toggle button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="mb-1 rounded bg-gray-800/80 px-3 py-1.5 text-sm text-white hover:bg-gray-700/80"
+        className="mb-1 rounded bg-ink/80 px-3 py-1.5 text-sm text-cream backdrop-blur-sm transition-colors hover:bg-ink/90"
       >
-        Players ({totalCount})
+        참가자 ({totalCount})
       </button>
 
       {/* Player list panel */}
       {isOpen && (
-        <div className="w-48 rounded bg-gray-800/90 p-2 text-sm text-white">
+        <div className="w-48 rounded-lg bg-ink/90 p-2 text-sm text-cream backdrop-blur-md">
           {/* Self */}
-          <div className="flex items-center gap-2 border-b border-gray-700 pb-1 mb-1">
+          <div className="flex items-center gap-2 border-b border-cream/15 pb-1 mb-1">
             <span className="h-2 w-2 rounded-full bg-green-400" />
             <span className="truncate">{currentNickname}</span>
-            <span className="ml-auto text-xs text-gray-400">(You)</span>
+            <span className="ml-auto text-xs text-ink-light">(나)</span>
           </div>
 
           {/* Others */}
           {players.length === 0 ? (
-            <p className="py-1 text-xs text-gray-500">No other players</p>
+            <p className="py-1 text-xs text-ink-muted">No other players</p>
           ) : (
             <ul className="max-h-48 space-y-0.5 overflow-y-auto">
               {players.map((p) => (

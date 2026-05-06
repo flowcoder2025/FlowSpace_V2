@@ -61,11 +61,11 @@ export function CreateSpaceForm() {
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+    <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Name */}
         <div>
-          <label htmlFor="space-name" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="space-name" className="mb-1 block text-sm font-medium text-ink-soft">
             Space Name
           </label>
           <input
@@ -75,13 +75,13 @@ export function CreateSpaceForm() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="My Awesome Space"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
           />
         </div>
 
         {/* Description */}
         <div>
-          <label htmlFor="space-desc" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="space-desc" className="mb-1 block text-sm font-medium text-ink-soft">
             Description
           </label>
           <textarea
@@ -90,13 +90,13 @@ export function CreateSpaceForm() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What's this space for? (optional)"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
           />
         </div>
 
         {/* Template */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">
+          <label className="mb-2 block text-sm font-medium text-ink-soft">
             Template
           </label>
           <div className="grid grid-cols-3 gap-3">
@@ -107,13 +107,13 @@ export function CreateSpaceForm() {
                 onClick={() => setTemplateKey(t.key)}
                 className={`flex flex-col items-center rounded-lg border-2 p-3 transition-colors ${
                   templateKey === t.key
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
+                    ? "border-ink bg-cream-deep"
+                    : "border-line hover:border-line"
                 }`}
               >
                 <span className="text-2xl">{t.icon}</span>
                 <span className="mt-1 text-sm font-medium">{t.name}</span>
-                <span className="text-xs text-gray-400">{t.desc}</span>
+                <span className="text-xs text-ink-light">{t.desc}</span>
               </button>
             ))}
           </div>
@@ -121,7 +121,7 @@ export function CreateSpaceForm() {
 
         {/* Access Type */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">
+          <label className="mb-2 block text-sm font-medium text-ink-soft">
             Access
           </label>
           <div className="space-y-2">
@@ -130,8 +130,8 @@ export function CreateSpaceForm() {
                 key={a.value}
                 className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
                   accessType === a.value
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
+                    ? "border-ink bg-cream-deep"
+                    : "border-line hover:border-line"
                 }`}
               >
                 <input
@@ -144,7 +144,7 @@ export function CreateSpaceForm() {
                 />
                 <div>
                   <span className="text-sm font-medium">{a.label}</span>
-                  <p className="text-xs text-gray-400">{a.desc}</p>
+                  <p className="text-xs text-ink-light">{a.desc}</p>
                 </div>
               </label>
             ))}
@@ -154,7 +154,7 @@ export function CreateSpaceForm() {
         {/* Password */}
         {accessType === "PASSWORD" && (
           <div>
-            <label htmlFor="space-pw" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="space-pw" className="mb-1 block text-sm font-medium text-ink-soft">
               Space Password
             </label>
             <input
@@ -164,7 +164,7 @@ export function CreateSpaceForm() {
               value={accessSecret}
               onChange={(e) => setAccessSecret(e.target.value)}
               placeholder="Set a password for this space"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
             />
           </div>
         )}
@@ -179,14 +179,14 @@ export function CreateSpaceForm() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex-1 rounded-lg border border-line py-2.5 text-sm font-medium text-ink-soft hover:bg-cream-deep"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading || !name.trim()}
-            className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-medium text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Creating..." : "Create Space"}
           </button>

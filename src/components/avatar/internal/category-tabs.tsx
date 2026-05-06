@@ -20,8 +20,8 @@ export function CategoryTabs({ active, onChange }: CategoryTabsProps) {
           onClick={() => onChange(cat)}
           className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
             active === cat
-              ? "bg-blue-600 text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-brand text-white"
+              : "bg-cream-deep text-ink-muted hover:bg-line"
           }`}
         >
           {CATEGORY_LABELS[cat]}

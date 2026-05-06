@@ -105,7 +105,7 @@ export function SpaceMediaLayer({
             </div>
           )}
           {!isAvailable && !mediaError && (
-            <div className="rounded-lg bg-gray-800/90 px-4 py-2 text-sm text-gray-300 shadow-lg">
+            <div className="rounded-lg bg-ink/90 px-4 py-2 text-sm text-ink-light shadow-lg">
               {connectionError
                 ? `음성/영상 연결 실패: ${connectionError}`
                 : "음성/영상 서버 연결 중..."}
@@ -150,7 +150,7 @@ export function SpaceMediaLayer({
       {/* Media controls (bottom center) */}
       <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
         <div className={cn(
-          "flex items-center gap-2 rounded-full bg-gray-900/90 px-4 py-2 shadow-lg backdrop-blur-sm",
+          "flex items-center gap-2 rounded-full bg-ink/90 px-4 py-2 shadow-lg backdrop-blur-sm",
           !isAvailable && "opacity-60"
         )}>
             {/* Microphone toggle */}
@@ -160,9 +160,9 @@ export function SpaceMediaLayer({
               className={cn(
                 "rounded-full p-2.5 transition-colors",
                 !isAvailable
-                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  ? "bg-cream/10 text-ink-light cursor-not-allowed"
                   : mediaState.isMicrophoneEnabled
-                    ? "bg-gray-700 text-white hover:bg-gray-600"
+                    ? "bg-cream/10 text-cream hover:bg-cream/15"
                     : "bg-red-600 text-white hover:bg-red-500"
               )}
               title={
@@ -193,9 +193,9 @@ export function SpaceMediaLayer({
               className={cn(
                 "rounded-full p-2.5 transition-colors",
                 !isAvailable
-                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  ? "bg-cream/10 text-ink-light cursor-not-allowed"
                   : mediaState.isCameraEnabled
-                    ? "bg-gray-700 text-white hover:bg-gray-600"
+                    ? "bg-cream/10 text-cream hover:bg-cream/15"
                     : "bg-red-600 text-white hover:bg-red-500"
               )}
               title={
@@ -226,10 +226,10 @@ export function SpaceMediaLayer({
               className={cn(
                 "rounded-full p-2.5 transition-colors",
                 !isAvailable
-                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  ? "bg-cream/10 text-ink-light cursor-not-allowed"
                   : mediaState.isScreenShareEnabled
-                    ? "bg-blue-600 text-white hover:bg-blue-500"
-                    : "bg-gray-700 text-white hover:bg-gray-600"
+                    ? "bg-brand text-cream hover:bg-brand-deep"
+                    : "bg-cream/10 text-cream hover:bg-cream/15"
               )}
               title={
                 !isAvailable
@@ -252,7 +252,7 @@ export function SpaceMediaLayer({
             {viewMode === "hidden" && participantTracks.size > 0 && (
               <button
                 onClick={() => setViewMode("sidebar")}
-                className="rounded-full bg-gray-700 p-2.5 text-white transition-colors hover:bg-gray-600"
+                className="rounded-full bg-cream/10 p-2.5 text-cream transition-colors hover:bg-cream/15"
                 title="참가자 패널 표시"
               >
                 <svg

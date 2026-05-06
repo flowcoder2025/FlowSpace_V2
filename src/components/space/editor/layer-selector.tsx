@@ -26,7 +26,7 @@ export default function LayerSelector({
 }: LayerSelectorProps) {
   return (
     <div className="space-y-1">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
         Layers
       </div>
       {EDITOR_LAYERS.map((layer) => (
@@ -35,7 +35,7 @@ export default function LayerSelector({
           className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
             activeLayer === layer
               ? "bg-emerald-600/30 text-emerald-300"
-              : "text-gray-300 hover:bg-gray-700"
+              : "text-ink-light hover:bg-cream/10"
           }`}
         >
           <button
@@ -46,7 +46,7 @@ export default function LayerSelector({
             className={`h-4 w-4 rounded border text-[8px] leading-none ${
               layerVisibility[layer]
                 ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
-                : "border-gray-600 text-gray-600"
+                : "border-cream/15 text-ink-muted"
             }`}
           >
             {layerVisibility[layer] ? "\u2713" : ""}

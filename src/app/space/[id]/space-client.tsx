@@ -392,12 +392,12 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-900 text-white">
+      <div className="flex h-screen items-center justify-center bg-ink text-cream">
         <div className="text-center">
-          <h2 className="text-xl font-bold mb-2">Error</h2>
-          <p className="text-gray-400">{error}</p>
-          <a href="/my-spaces" className="mt-4 inline-block text-blue-400 hover:underline">
-            Back to Spaces
+          <h2 className="font-serif text-2xl font-medium mb-2">오류가 발생했습니다</h2>
+          <p className="text-ink-light">{error}</p>
+          <a href="/my-spaces" className="mt-4 inline-block text-cream underline-offset-4 hover:underline">
+            스페이스 목록으로 돌아가기
           </a>
         </div>
       </div>
@@ -410,7 +410,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
       participantId={user.id}
       participantName={user.nickname}
     >
-      <div className="relative h-screen w-screen overflow-hidden bg-gray-900">
+      <div className="relative h-screen w-screen overflow-hidden bg-ink">
         {/* Phaser Canvas */}
         <GameCanvas
           spaceId={space.id}
@@ -462,7 +462,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
             <button
               type="button"
               onClick={() => setShowAvatarEditor(true)}
-              className="absolute left-4 top-14 z-50 rounded-lg bg-gray-800/80 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700/90"
+              className="absolute left-4 top-14 z-50 rounded-lg bg-ink/80 px-3 py-1.5 text-xs font-medium text-cream backdrop-blur-sm transition-colors hover:bg-ink/90"
             >
               Edit Avatar
             </button>

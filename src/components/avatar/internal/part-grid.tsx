@@ -55,8 +55,8 @@ function PartThumbnail({
       onClick={onClick}
       className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 transition-all ${
         selected
-          ? "border-blue-500 bg-blue-50"
-          : "border-gray-200 bg-white hover:border-gray-300"
+          ? "border-ink bg-cream-deep"
+          : "border-line bg-white hover:border-line"
       }`}
     >
       <canvas
@@ -64,7 +64,7 @@ function PartThumbnail({
         className="h-16 w-12"
         style={{ imageRendering: "pixelated" }}
       />
-      <span className="text-[10px] text-gray-500">{part.name}</span>
+      <span className="text-[10px] text-ink-muted">{part.name}</span>
     </button>
   );
 }

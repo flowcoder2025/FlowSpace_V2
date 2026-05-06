@@ -40,14 +40,14 @@ export function AnnounceForm({ spaceId }: AnnounceFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-5">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Send Announcement</h3>
+    <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-line p-5">
+      <h3 className="text-sm font-semibold text-ink-soft mb-3">Send Announcement</h3>
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="공지사항을 입력하세요..."
         rows={3}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+        className="w-full px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20 resize-none"
       />
       {message && (
         <p className={`mt-2 text-xs ${message.type === "success" ? "text-green-600" : "text-red-600"}`}>
@@ -57,7 +57,7 @@ export function AnnounceForm({ spaceId }: AnnounceFormProps) {
       <button
         type="submit"
         disabled={isSubmitting || !content.trim()}
-        className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="mt-3 px-4 py-2 bg-brand text-white text-sm rounded-md hover:bg-brand-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {isSubmitting ? "발송 중..." : "공지 발송"}
       </button>

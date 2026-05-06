@@ -25,7 +25,7 @@ export default function ToolBar({ activeTool, onToolChange }: ToolBarProps) {
           className={`flex h-8 w-8 items-center justify-center rounded text-xs font-bold transition-colors ${
             activeTool === tool
               ? "bg-emerald-600 text-white"
-              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              : "bg-cream/10 text-ink-light hover:bg-cream/15"
           }`}
         >
           {icon}

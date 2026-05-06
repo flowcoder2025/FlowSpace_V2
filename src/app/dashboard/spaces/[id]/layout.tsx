@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children, params }: LayoutProps)
   });
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-cream-deep">
       <DashboardSidebar spaceId={id} spaceName={space?.name ?? "Space"} />
       <main className="flex-1 p-6 overflow-auto">{children}</main>
     </div>

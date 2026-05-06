@@ -20,8 +20,8 @@ interface MemberTableProps {
 
 const ROLE_COLORS: Record<string, string> = {
   OWNER: "bg-purple-100 text-purple-700",
-  STAFF: "bg-blue-100 text-blue-700",
-  PARTICIPANT: "bg-gray-100 text-gray-600",
+  STAFF: "bg-blue-100 text-ink",
+  PARTICIPANT: "bg-cream-deep text-ink-muted",
 };
 
 const RESTRICTION_COLORS: Record<string, string> = {
@@ -57,7 +57,7 @@ export function MemberTable({ spaceId, members, onRefresh }: MemberTableProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-200 text-left text-gray-500">
+          <tr className="border-b border-line text-left text-ink-muted">
             <th className="pb-3 font-medium">Name</th>
             <th className="pb-3 font-medium">Role</th>
             <th className="pb-3 font-medium">Status</th>
@@ -72,14 +72,14 @@ export function MemberTable({ spaceId, members, onRefresh }: MemberTableProps) {
             const isLoading = actionLoading === m.id;
 
             return (
-              <tr key={m.id} className="border-b border-gray-100">
+              <tr key={m.id} className="border-b border-line">
                 <td className="py-3">
-                  <div className="font-medium text-gray-900">{name}</div>
+                  <div className="font-medium text-ink">{name}</div>
                   {m.user?.email && (
-                    <div className="text-xs text-gray-400">{m.user.email}</div>
+                    <div className="text-xs text-ink-light">{m.user.email}</div>
                   )}
                   {m.guestSession && (
-                    <div className="text-xs text-gray-400">Guest</div>
+                    <div className="text-xs text-ink-light">Guest</div>
                   )}
                 </td>
                 <td className="py-3">
@@ -94,7 +94,7 @@ export function MemberTable({ spaceId, members, onRefresh }: MemberTableProps) {
                     </span>
                   )}
                 </td>
-                <td className="py-3 text-gray-500">
+                <td className="py-3 text-ink-muted">
                   {new Date(m.createdAt).toLocaleDateString("ko-KR")}
                 </td>
                 <td className="py-3 text-right">
@@ -113,7 +113,7 @@ export function MemberTable({ spaceId, members, onRefresh }: MemberTableProps) {
                             handleAction(m.id, "changeRole", val.replace("role:", ""));
                           }
                         }}
-                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50"
+                        className="text-xs border border-line rounded px-2 py-1 bg-white disabled:opacity-50"
                       >
                         <option value="">Actions...</option>
                         {m.restriction === "MUTED" ? (

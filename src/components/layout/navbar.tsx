@@ -12,10 +12,10 @@ export function Navbar() {
   const { data: session } = useSession();
 
   return (
-    <nav className="border-b border-gray-200 bg-white">
+    <nav className="border-b border-line bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         {/* Left: Logo */}
-        <Link href={ROUTES.HOME} className="text-lg font-bold text-gray-900">
+        <Link href={ROUTES.HOME} className="text-lg font-bold text-ink">
           FlowSpace
         </Link>
 
@@ -27,8 +27,8 @@ export function Navbar() {
               href={item.href}
               className={`text-sm font-medium transition-colors ${
                 pathname === item.href
-                  ? "text-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "text-ink"
+                  : "text-ink-muted hover:text-ink"
               }`}
             >
               {item.label}
@@ -41,12 +41,12 @@ export function Navbar() {
           <ComfyUIStatusDot />
           {session?.user ? (
             <>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-ink-muted">
                 {session.user.name || session.user.email}
               </span>
               <button
                 onClick={() => signOut({ callbackUrl: ROUTES.HOME })}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="text-sm text-ink-muted hover:text-ink-soft"
               >
                 Logout
               </button>
@@ -54,7 +54,7 @@ export function Navbar() {
           ) : (
             <Link
               href={ROUTES.LOGIN}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+              className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand-deep"
             >
               Sign In
             </Link>

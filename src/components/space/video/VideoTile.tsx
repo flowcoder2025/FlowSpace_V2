@@ -324,8 +324,8 @@ export function VideoTile({
       />
 
       {!shouldShowVideo && (
-        <div className="flex size-full items-center justify-center bg-gray-900">
-          <div className="flex size-16 items-center justify-center rounded-full bg-gray-700 text-2xl text-white">
+        <div className="flex size-full items-center justify-center bg-ink">
+          <div className="flex size-16 items-center justify-center rounded-full bg-cream/15 text-2xl text-cream">
             {track.participantName.charAt(0).toUpperCase()}
           </div>
         </div>
@@ -526,7 +526,7 @@ export function VideoTile({
               </div>
             )}
             {!shouldShowVideo && (
-              <div className="rounded bg-gray-500/80 p-0.5 text-white">
+              <div className="rounded bg-ink/60 p-0.5 text-cream">
                 <svg
                   className="size-3"
                   fill="currentColor"

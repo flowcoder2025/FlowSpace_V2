@@ -117,14 +117,14 @@ export function ParticipantPanel({
   return (
     <div
       className={cn(
-        "flex flex-col bg-gray-900/95 backdrop-blur-sm",
-        viewMode === "sidebar" && "h-full w-64 border-l border-gray-800",
+        "flex flex-col bg-ink/85 backdrop-blur-md",
+        viewMode === "sidebar" && "h-full w-64 border-l border-cream/10",
         viewMode === "grid" && "w-full"
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-800 px-3 py-2">
-        <span className="text-sm font-medium text-white">
+      <div className="flex items-center justify-between border-b border-cream/10 px-3 py-2">
+        <span className="text-sm font-medium text-cream">
           참가자 ({totalCount})
         </span>
         <div className="flex items-center gap-1">
@@ -132,7 +132,7 @@ export function ParticipantPanel({
             onClick={() =>
               setViewMode(viewMode === "sidebar" ? "grid" : "sidebar")
             }
-            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+            className="rounded p-1 text-cream/60 transition-colors hover:bg-cream/15 hover:text-cream"
             title={viewMode === "sidebar" ? "그리드 뷰" : "사이드바 뷰"}
           >
             <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -149,7 +149,7 @@ export function ParticipantPanel({
           </button>
           <button
             onClick={() => setViewMode("hidden")}
-            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+            className="rounded p-1 text-cream/60 transition-colors hover:bg-cream/15 hover:text-cream"
             title="패널 숨기기"
           >
             <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -203,21 +203,21 @@ export function ParticipantPanel({
 
         {/* Non-media players (avatar list) */}
         {nonMediaPlayers.length > 0 && sortedTracks.length > 0 && (
-          <div className="border-t border-gray-700 pt-2 mt-1" />
+          <div className="border-t border-cream/10 pt-2 mt-1" />
         )}
         {nonMediaPlayers.map((p) => (
           <div
             key={p.id}
             className="flex items-center gap-2 rounded px-2 py-1.5 text-sm"
           >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-700 text-xs text-white">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cream/15 text-xs text-cream">
               {p.nickname.charAt(0).toUpperCase()}
             </div>
             <div className="flex flex-1 items-center gap-1.5 truncate">
               <span className="size-2 shrink-0 rounded-full bg-green-400" />
-              <span className="truncate text-gray-300">{p.nickname}</span>
+              <span className="truncate text-ink-light">{p.nickname}</span>
               {p.isSelf && (
-                <span className="shrink-0 text-xs text-gray-500">(나)</span>
+                <span className="shrink-0 text-xs text-ink-muted">(나)</span>
               )}
             </div>
           </div>

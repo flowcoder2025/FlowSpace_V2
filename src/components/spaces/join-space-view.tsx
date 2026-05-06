@@ -70,12 +70,12 @@ export function JoinSpaceView({ inviteCode }: JoinSpaceViewProps) {
 
   if (!space) {
     return (
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <p className="text-lg font-medium text-gray-900">Space Not Found</p>
-        <p className="mt-2 text-sm text-gray-500">{error}</p>
+      <div className="w-full max-w-md rounded-xl border border-line bg-white p-8 text-center shadow-sm">
+        <p className="text-lg font-medium text-ink">Space Not Found</p>
+        <p className="mt-2 text-sm text-ink-muted">{error}</p>
         <button
           onClick={() => router.push("/my-spaces")}
-          className="mt-6 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="mt-6 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-deep"
         >
           Go to My Spaces
         </button>
@@ -84,13 +84,13 @@ export function JoinSpaceView({ inviteCode }: JoinSpaceViewProps) {
   }
 
   return (
-    <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+    <div className="w-full max-w-md rounded-xl border border-line bg-white p-8 shadow-sm">
       <div className="mb-6 text-center">
-        <h2 className="text-xl font-bold text-gray-900">{space.name}</h2>
+        <h2 className="text-xl font-bold text-ink">{space.name}</h2>
         {space.description && (
-          <p className="mt-2 text-sm text-gray-500">{space.description}</p>
+          <p className="mt-2 text-sm text-ink-muted">{space.description}</p>
         )}
-        <div className="mt-3 flex items-center justify-center gap-3 text-xs text-gray-400">
+        <div className="mt-3 flex items-center justify-center gap-3 text-xs text-ink-light">
           <span>{space.template.name}</span>
           <span>
             {space.memberCount}/{space.maxUsers} members
@@ -102,7 +102,7 @@ export function JoinSpaceView({ inviteCode }: JoinSpaceViewProps) {
         <div className="mb-4">
           <label
             htmlFor="join-pw"
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1 block text-sm font-medium text-ink-soft"
           >
             Space Password
           </label>
@@ -112,7 +112,7 @@ export function JoinSpaceView({ inviteCode }: JoinSpaceViewProps) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter password to join"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
           />
         </div>
       )}
@@ -126,7 +126,7 @@ export function JoinSpaceView({ inviteCode }: JoinSpaceViewProps) {
       <button
         onClick={handleJoin}
         disabled={joining || (space.accessType === "PASSWORD" && !password)}
-        className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-lg bg-brand py-2.5 text-sm font-medium text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
       >
         {joining ? "Joining..." : "Join Space"}
       </button>

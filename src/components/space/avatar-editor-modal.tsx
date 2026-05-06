@@ -60,11 +60,11 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
       <div className="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">캐릭터 편집</h2>
+          <h2 className="text-lg font-semibold text-ink">캐릭터 편집</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-1.5 text-ink-light hover:bg-cream-deep hover:text-ink-muted"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
               <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
@@ -73,14 +73,14 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
         </div>
 
         {/* Tab selector */}
-        <div className="mb-4 flex gap-1 rounded-lg bg-gray-100 p-1">
+        <div className="mb-4 flex gap-1 rounded-lg bg-cream-deep p-1">
           <button
             type="button"
             onClick={() => setTab("parts")}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               tab === "parts"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-white text-ink shadow-sm"
+                : "text-ink-muted hover:text-ink-soft"
             }`}
           >
             파츠 조합
@@ -90,8 +90,8 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
             onClick={() => setTab("ai")}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               tab === "ai"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-white text-ink shadow-sm"
+                : "text-ink-muted hover:text-ink-soft"
             }`}
           >
             AI 캐릭터
@@ -113,12 +113,12 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
                   }
                   className={`flex flex-col items-center rounded-lg border-2 p-2 transition-colors ${
                     selectedChibiId === ch.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "border-ink bg-cream-deep"
+                      : "border-line hover:border-line"
                   }`}
                 >
                   <ChibiThumbnail spritePath={ch.spritePath} alt={ch.name} />
-                  <span className="mt-1 w-full truncate text-center text-[10px] text-gray-600">
+                  <span className="mt-1 w-full truncate text-center text-[10px] text-ink-muted">
                     {ch.name}
                   </span>
                 </button>
@@ -131,7 +131,7 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex-1 rounded-lg border border-line py-2 text-sm font-medium text-ink-soft hover:bg-cream-deep"
           >
             취소
           </button>
@@ -139,7 +139,7 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
             type="button"
             onClick={handleSave}
             disabled={saving || (tab === "ai" && !selectedChibiId)}
-            className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="flex-1 rounded-lg bg-brand py-2 text-sm font-medium text-white hover:bg-brand-deep disabled:opacity-50"
           >
             {saving ? "저장 중..." : "적용"}
           </button>

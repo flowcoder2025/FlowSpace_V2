@@ -32,16 +32,16 @@ export default function AnalyticsPage() {
   }, [spaceId, days]);
 
   if (error) return <div className="text-red-600 text-sm">{error}</div>;
-  if (!data) return <div className="text-gray-500 text-sm">Loading...</div>;
+  if (!data) return <div className="text-ink-muted text-sm">Loading...</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+        <h1 className="text-2xl font-bold text-ink">Analytics</h1>
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="text-sm border border-gray-300 rounded px-3 py-1.5"
+          className="text-sm border border-line rounded px-3 py-1.5"
         >
           <option value={7}>Last 7 days</option>
           <option value={14}>Last 14 days</option>

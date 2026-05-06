@@ -39,7 +39,7 @@ export default function ObjectPalette({
             className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
               activeCategory === key
                 ? "bg-emerald-600 text-white"
-                : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                : "bg-cream/10 text-ink-light hover:bg-cream/15"
             }`}
           >
             {label}
@@ -60,7 +60,7 @@ export default function ObjectPalette({
             className={`flex h-10 items-center justify-center rounded border text-[10px] transition-colors ${
               selectedObjectType === obj.objectType
                 ? "border-emerald-500 bg-emerald-600/30 text-emerald-300"
-                : "border-gray-600 bg-gray-800 text-gray-400 hover:border-gray-500"
+                : "border-cream/15 bg-ink text-ink-light hover:border-cream/20"
             }`}
           >
             <span className="truncate px-1">{obj.label}</span>

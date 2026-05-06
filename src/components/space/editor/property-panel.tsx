@@ -16,31 +16,31 @@ export default function PropertyPanel({
   if (!object) return null;
 
   return (
-    <div className="space-y-2 rounded bg-gray-800 p-2">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+    <div className="space-y-2 rounded bg-ink p-2">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
         Properties
       </div>
 
-      <div className="space-y-1 text-xs text-gray-300">
+      <div className="space-y-1 text-xs text-ink-light">
         <div className="flex justify-between">
-          <span className="text-gray-500">Type</span>
+          <span className="text-ink-muted">Type</span>
           <span>{object.objectType}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Position</span>
+          <span className="text-ink-muted">Position</span>
           <span>
             {Math.floor(object.positionX)}, {Math.floor(object.positionY)}
           </span>
         </div>
         {object.label && (
           <div className="flex justify-between">
-            <span className="text-gray-500">Label</span>
+            <span className="text-ink-muted">Label</span>
             <span>{object.label}</span>
           </div>
         )}
         {object.linkedObjectId && (
           <div className="flex justify-between">
-            <span className="text-gray-500">Linked</span>
+            <span className="text-ink-muted">Linked</span>
             <span className="truncate text-emerald-400">
               {object.linkedObjectId.slice(0, 8)}...
             </span>
@@ -52,7 +52,7 @@ export default function PropertyPanel({
         {object.objectType === "portal" && onLinkPortal && (
           <button
             onClick={() => onLinkPortal(object.id)}
-            className="flex-1 rounded bg-blue-700 px-2 py-1 text-xs text-white hover:bg-blue-600"
+            className="flex-1 rounded bg-brand-deep px-2 py-1 text-xs text-white hover:bg-brand"
           >
             Link Portal
           </button>

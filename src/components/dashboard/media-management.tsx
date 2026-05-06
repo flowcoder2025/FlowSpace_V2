@@ -106,7 +106,7 @@ export function MediaManagement({ spaceId }: MediaManagementProps) {
     }
   };
 
-  if (loading) return <div className="text-sm text-gray-500">Loading...</div>;
+  if (loading) return <div className="text-sm text-ink-muted">Loading...</div>;
 
   // grant가 없는 멤버만 선택 가능
   const grantedUserIds = new Set(grants.map((g) => g.userId));
@@ -123,17 +123,17 @@ export function MediaManagement({ spaceId }: MediaManagementProps) {
       )}
 
       {/* Grant Spotlight Form */}
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+      <div className="bg-white rounded-lg border border-line p-5">
+        <h3 className="text-sm font-semibold text-ink-soft mb-3">
           Grant Spotlight Permission
         </h3>
         <div className="flex items-end gap-3">
           <div className="flex-1">
-            <label className="block text-xs text-gray-500 mb-1">Member</label>
+            <label className="block text-xs text-ink-muted mb-1">Member</label>
             <select
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-line rounded px-3 py-2 text-sm"
             >
               <option value="">Select member...</option>
               {availableMembers.map((m) => (
@@ -144,7 +144,7 @@ export function MediaManagement({ spaceId }: MediaManagementProps) {
             </select>
           </div>
           <div className="w-32">
-            <label className="block text-xs text-gray-500 mb-1">
+            <label className="block text-xs text-ink-muted mb-1">
               Expires (min)
             </label>
             <input
@@ -153,13 +153,13 @@ export function MediaManagement({ spaceId }: MediaManagementProps) {
               placeholder="Unlimited"
               value={expiresMinutes}
               onChange={(e) => setExpiresMinutes(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-line rounded px-3 py-2 text-sm"
             />
           </div>
           <button
             onClick={handleGrantSpotlight}
             disabled={!selectedUserId || actionLoading}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-brand text-white text-sm rounded hover:bg-brand-deep disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Grant
           </button>
@@ -167,18 +167,18 @@ export function MediaManagement({ spaceId }: MediaManagementProps) {
       </div>
 
       {/* Spotlight Grants List */}
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+      <div className="bg-white rounded-lg border border-line p-5">
+        <h3 className="text-sm font-semibold text-ink-soft mb-3">
           Spotlight Grants ({grants.length})
         </h3>
 
         {grants.length === 0 ? (
-          <p className="text-sm text-gray-400">No spotlight grants</p>
+          <p className="text-sm text-ink-light">No spotlight grants</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
+                <tr className="border-b border-line text-left text-xs text-ink-muted">
                   <th className="pb-2 font-medium">User</th>
                   <th className="pb-2 font-medium">Status</th>
                   <th className="pb-2 font-medium">Expires</th>
@@ -190,13 +190,13 @@ export function MediaManagement({ spaceId }: MediaManagementProps) {
                 {grants.map((grant) => {
                   const isExpired = grant.expiresAt && new Date(grant.expiresAt) < new Date();
                   return (
-                    <tr key={grant.id} className="border-b border-gray-100">
+                    <tr key={grant.id} className="border-b border-line">
                       <td className="py-2">
                         {grant.user?.name || grant.user?.email || grant.userId || "Guest"}
                       </td>
                       <td className="py-2">
                         {isExpired ? (
-                          <span className="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-500">
+                          <span className="inline-block px-2 py-0.5 rounded text-xs bg-cream-deep text-ink-muted">
                             Expired
                           </span>
                         ) : grant.isActive ? (
@@ -209,12 +209,12 @@ export function MediaManagement({ spaceId }: MediaManagementProps) {
                           </span>
                         )}
                       </td>
-                      <td className="py-2 text-gray-500">
+                      <td className="py-2 text-ink-muted">
                         {grant.expiresAt
                           ? new Date(grant.expiresAt).toLocaleString("ko-KR")
                           : "Unlimited"}
                       </td>
-                      <td className="py-2 text-gray-500">
+                      <td className="py-2 text-ink-muted">
                         {new Date(grant.createdAt).toLocaleString("ko-KR")}
                       </td>
                       <td className="py-2">
