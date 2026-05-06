@@ -243,3 +243,96 @@ scale: {
 - 이 롤아웃 전에 `landing/2026-05-06-initial-implementation.md`에서 토큰 최초 확정. 전체 앱으로 확산되는 기준점이 됨.
 - `bg-gray-*`/`text-gray-*` 계열이 앱 전체에서 제거됨. 이후 신규 컴포넌트는 반드시 FlowSpace 토큰 사용.
 - Tailwind v4 `@theme` 토큰이므로 `globals.css`에서 값을 바꾸면 전체에 즉시 반영.
+
+---
+
+## 후속: 페이지 단위 재작업 (commit 8bdbb29, 2026-05-06)
+
+**업데이트**: 2026-05-06
+
+### 한계 및 재작업 배경
+
+위 bulk regex 치환(commit 2f54c9d)은 컬러 토큰만 갈아끼운 것으로, 검증 결과 두 가지 문제가 확인됐다:
+
+1. **글로벌 Navbar**: 단순 텍스트 링크 구조 유지 — 랜딩 `LandingNavbar`와 시각 언어 불일치
+2. **my-spaces 페이지**: 카드/탭이 랜딩과 별개 스타일 — 탭은 평면, SpaceCard는 빌딩 이모지 + 기본 레이아웃
+
+사용자 지적 후 10개 파일을 페이지 단위로 재작업.
+
+### 변경 파일 (추가 수정)
+
+| 파일 | 변경 유형 |
+|------|-----------|
+| `src/components/layout/navbar.tsx` | 전면 재작성 (Logo.png + font-serif + sticky backdrop-blur + 한글화) |
+| `src/app/my-spaces/page.tsx` | 페이지 헤더 추가 (font-serif 4xl + 서브카피) |
+| `src/components/spaces/space-list-view.tsx` | 탭 알약형 재설계 + 빈 상태 카드 강화 + 한글화 |
+| `src/components/spaces/space-card.tsx` | 빌딩 이모지 제거 + 템플릿 라벨 + font-serif 제목 + footer 메타 |
+| `src/app/login/page.tsx` | Logo 중앙 배치 + serif 헤드라인 |
+| `src/components/auth/login-form.tsx` | rounded-2xl + uppercase 라벨 + 한글화 + ring-ink/10 |
+| `src/components/auth/oauth-buttons.tsx` | cream 배경 + line border + 한글 |
+| `src/app/onboarding/page.tsx` | serif 헤드라인 |
+| `src/app/spaces/new/page.tsx` | 페이지 헤더 분리 |
+| `src/components/spaces/create-space-form.tsx` | rounded-2xl + uppercase 라벨 + 템플릿/접근권한 카드 정돈 |
+
+### 확정 패턴 명세
+
+이 재작업에서 앱 전체에 적용할 컴포넌트 패턴이 확정됐다.
+
+#### 페이지 헤더
+
+```tsx
+<h1 className="font-serif text-4xl font-light tracking-tightest text-ink">
+  {제목}
+</h1>
+<p className="text-base text-ink-soft">{서브카피}</p>
+```
+
+#### 카드
+
+```tsx
+className="rounded-2xl border border-line bg-cream shadow-[0_1px_2px_rgba(10,10,10,0.04)]"
+// hover
+className="hover:border-ink/30 hover:shadow-md transition-all"
+```
+
+#### 입력 라벨
+
+```tsx
+className="text-xs font-medium uppercase tracking-wider text-ink-muted"
+```
+
+#### 입력 필드
+
+```tsx
+className="rounded-md border border-line focus:ring-2 focus:ring-ink/10"
+```
+
+#### 탭/세그먼트 컨트롤
+
+```tsx
+// 컨테이너
+className="inline-flex bg-cream-deep border border-line rounded-full p-1"
+// 비활성 탭
+className="rounded-full px-4 py-1.5 text-sm text-ink-muted"
+// 활성 탭
+className="rounded-full px-4 py-1.5 text-sm bg-cream shadow-sm text-ink"
+```
+
+#### SpaceCard 구조
+
+빌딩 이모지 없음. 템플릿 종류를 `text-xs uppercase tracking-wider text-ink-muted` 라벨로 표기. 제목은 `font-serif text-2xl`. footer는 `border-t border-line` 구분 + 날짜/멤버 수 메타.
+
+### 한글화 추가 목록
+
+| Before | After |
+|--------|-------|
+| "My Spaces" | "내 스페이스" |
+| "Create Space" | "스페이스 만들기" |
+| "Sign in" | "로그인" |
+| "Sign in with Google" | "Google로 계속하기" |
+| "Welcome back" | "다시 오셨네요." |
+| "Welcome to FlowSpace" | "환영합니다." |
+
+### 검증
+
+`tsc` 통과, `next build` 통과.
