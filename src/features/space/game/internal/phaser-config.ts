@@ -19,9 +19,8 @@ export function createPhaserConfig(
   return {
     type: Phaser.AUTO,
     parent: options.parent,
-    // Scale.RESIZE 모드에서는 width/height가 초기값. parent 크기에 맞춰 동적으로 조정됨.
-    width: options.width ?? options.parent.clientWidth ?? 960,
-    height: options.height ?? options.parent.clientHeight ?? 640,
+    width: options.width ?? 960,
+    height: options.height ?? 640,
     backgroundColor: "#0a0a0a",
     physics: {
       default: "arcade",
@@ -31,10 +30,9 @@ export function createPhaserConfig(
       },
     },
     scale: {
-      // RESIZE: 캔버스가 parent 요소 크기에 맞춰 자동 조정.
-      // 게임 월드 좌표는 그대로, 카메라가 더 넓은 영역을 표시.
-      mode: Phaser.Scale.RESIZE,
-      autoCenter: Phaser.Scale.NO_CENTER,
+      // 진단: Scale.RESIZE 도입 후 LiveKit 카메라 타임아웃 발생 — GPU 압박 가설 검증을 위해 FIT 임시 원복
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: options.scenes,
     render: {
