@@ -1,8 +1,8 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `13ab311`
-- Last Review Date: 2026-05-06
+- Last Reviewed Commit: `a5a4e76`
+- Last Review Date: 2026-05-07
 
 ## Active Epics
 | Epic | 현재 Phase | 상태 |
@@ -29,13 +29,16 @@
 | [parts-avatar-system](./parts-avatar-system/README.md) | 2026-02-21 | 3 (Phase 1~3) |
 | [asset-integration](./asset-integration/README.md) | 2026-02-22 | 1 (연동 수정) |
 
+## Ad-hoc Work (2026-05-07)
+- **Chrome 146 화면공유 picker 검정 박스** (KNOWN ISSUE, 수용): WebGL canvas + self-capture 재귀에서 picker preview가 검정 fallback. 본인만 잠깐 보이는 시각적 잔재 (공유 영상/타 참가자 영향 없음). 폐기 가설(Scale, backgroundColor, backdrop-filter, preserveDrawingBuffer 모두 무관) + 폐기 해결책(Phaser.CANVAS=타일 줄무늬, display:none=Framebuffer 크래시) 기록. 미검증 가설(antialias:false, selfBrowserSurface) 추후 가능. test-screenshare 진단 페이지 제거 완료. (`livekit-voicevideo/14-chrome146-screenshare-picker.md`)
+
 ## Ad-hoc Work (2026-05-06)
 - 랜딩페이지 신규 구현: `/` 라우트 → 9개 섹션 랜딩. 모노크롬 디자인 시스템(cream/ink/line 토큰, Source Serif 4 + Pretendard) 최초 확정. ImageSlot 패턴으로 스크린샷 슬롯 6개 와이어프레임 유지 중. (`landing/2026-05-06-initial-implementation.md`) **→ 이후 전체 앱으로 토큰 확산 (아래 항목 참조)**
 - **디자인 시스템 전면 롤아웃**: 랜딩 토큰(cream/ink/line/brand)을 전체 앱으로 확장. 스크립트 일괄 치환 47파일(Navbar/인증/온보딩/스페이스/운영자 대시보드/인게임 UI) + 수동 보강 8파일. Phaser Scale.FIT → Scale.RESIZE (letterbox 제거, 게임 월드 좌표 영향 없음). 인게임 UI 다크 글래스모피즘(bg-ink/80~95 + backdrop-blur-md) 통일. chat/* 및 시맨틱 컬러 의도적 미적용. **→ 페이지 단위 재작업 완료 (commit 8bdbb29)**: bulk regex 한계(컬러만, 구조 미변경) 확인 후 10파일 재작업. 글로벌 Navbar 전면 재작성(Logo.png + font-serif + sticky blur), my-spaces 탭/SpaceCard 재설계, login/onboarding 헤드라인 통일, 폼 uppercase 라벨 + ring-ink/10 확정. 페이지 헤더/카드/탭/입력/SpaceCard 패턴 앱 기준 확정. tsc + build 통과. (`landing/2026-05-06-design-system-rollout.md`)
 - 인증 단순화 (GitHub OAuth 제거): GitHub provider 코드/UI 제거 → Google OAuth + Credentials 2체제 정착. Google Cloud Console OAuth Client 신규 발급, Vercel 프로덕션 env 등록 완료. 동의 화면은 테스트 모드 유지 (vercel.app = PSL 도메인, 커스텀 도메인 연결 후 Production 전환 필요) (`auth/2026-05-06-github-removal.md`)
 - Supabase 서울 마이그레이션: 시드니→서울 신규 프로젝트 + 데이터 144 rows 이전 + Prisma 스키마 드리프트 동기화. 사용자 체감 latency 개선 확인 (`oci-deployment/04-supabase-seoul-migration.md`)
 - OCI v1 스택 제거: flowspace-socket 컨테이너/이미지/Caddy 라우트 제거, LiveKit/Caddy 공유 인프라는 유지, v1 소스 1주 보존 (`oci-deployment/05-v1-removal.md`)
-- 시드니 Supabase 일시정지: 미완료 — 사용자 검증 며칠 진행 후 별도 작업으로 처리 예정 [PENDING]
+- 시드니 Supabase 영구 삭제: 사용자가 대시보드에서 직접 삭제 완료 (2026-05-07)
 - Assets 메뉴/페이지 제거: `/assets` 라우트 + `src/components/assets/` 삭제, `navigation.ts` ROUTES.ASSETS + NAV_ITEMS 제거, 홈 Dashboard Assets 카드 제거. API(`src/app/api/assets/**`) + 비즈니스 로직(`src/features/assets/**`)은 게임/에디터 의존성으로 유지. 네비바 미표시, `/assets` 직접 접근 시 404.
 - **Navbar 단일화** (commit 13ab311): LandingNavbar 삭제, 글로벌 Navbar 단일 컴포넌트 통합. 마케팅 메뉴(기능/사용법/사례/가격) 로그인 여부 무관 노출, 로그인 시 "공간" 메뉴 추가. 버튼: outline(로그인/로그아웃) vs fill(시작하기/새 스페이스). 모바일 햄버거 md 미만 풀 패널. NavbarWrapper `/` 숨김 로직 제거. (`landing/2026-05-06-design-system-rollout.md` — "Navbar 단일화" 섹션)
 
@@ -75,7 +78,8 @@ specs/
 ├── livekit-voicevideo/
 │   ├── README.md
 │   ├── 11-livekit-integration.md
-│   └── 12-membership-bugfix.md
+│   ├── 12-membership-bugfix.md
+│   └── 14-chrome146-screenshare-picker.md  ← 진단 진행중 (antialias 미검증)
 ├── comfyui-asset-pipeline/
 │   ├── README.md
 │   ├── 01~07 phase specs
