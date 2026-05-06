@@ -1,7 +1,7 @@
 /**
  * Phaser GameConfig 팩토리
  *
- * Arcade Physics, Scale.RESIZE (parent 크기에 맞춰 동적 캔버스 — 풀스크린 게임 룸)
+ * Arcade Physics, Scale.FIT (진단용 원복 — Scale.RESIZE GPU 압박 가설 검증 중)
  */
 
 import { MAP_WIDTH, MAP_HEIGHT } from "@/constants/game-constants";
