@@ -7,7 +7,7 @@
 - **Repo**: https://github.com/flowcoder2025/FlowSpace_V2.git
 
 ## Active Epic
-chibi-pipeline Phase 12 — Supabase 서울 이전 + OCI v1 제거 + GitHub OAuth 제거 완료. **다음: 충돌 영역 정밀화 → Y-sorting**
+chibi-pipeline Phase 12 — 인프라 마이그레이션 + 디자인 시스템 정립 + LiveKit Chrome 회귀 우회 완료. **다음: 충돌 영역 정밀화 → Y-sorting** (게임 본 작업), 또는 dashboard/invite 페이지 디자인 통합 + 랜딩 스크린샷
 
 ### 인프라 통합 (2026-05-06 기준)
 - **Vercel**: `flowspace-v2.vercel.app` (flowcoder 팀 Pro, 서울 리전 `icn1`)
@@ -18,7 +18,23 @@ chibi-pipeline Phase 12 — Supabase 서울 이전 + OCI v1 제거 + GitHub OAut
 - **CD**: `OCI_SSH_PRIVATE_KEY` 시크릿 미설정 → 수동 배포 중 [KNOWN ISSUE]
 - **CORS**: `CORS_ORIGINS` 콤마 구분 다중 origin
 - **SSH**: `~/.ssh/flowspace-oci` 키로 `ubuntu@144.24.72.143`
-- **롤백 자산**: 시드니 Supabase 프로젝트 `afdfkpxsfuyccdvrkqwu` ACTIVE 유지 (검증 후 일시정지 예정)
+- **롤백 자산**: 시드니 Supabase `afdfkpxsfuyccdvrkqwu` PAUSING + 로컬 `.backups/sydney-2026-05-06/` 백업 (며칠 후 영구 삭제 예정)
+- **livekit-client**: `2.16.0` 핀 고정 (`@livekit/components-react@2.9.17`) — V1 매칭
+
+### 디자인 시스템 (2026-05-06 정립)
+- **모노크롬 흑백**: `cream #FFFFFF` / `cream-deep #FAFAFA` / `ink #0A0A0A` 5단계 회색 / `line #E5E5E5`
+- **단일 액센트**: 로고 그라데이션이 유일한 컬러 포인트 (purple/magenta)
+- **타이포**: Source Serif 4 (Google) + Pretendard (CDN) — `font-serif` 헤드라인 / `font-sans` 본문
+- **버튼 일관성**: outline (border + cream bg) vs fill (brand bg + cream text)
+- **Navbar**: 단일 컴포넌트 (LandingNavbar 통합), 마케팅 메뉴 모든 사용자, 로그인 시 "공간" 추가, 모바일 햄버거
+- **인게임 UI**: 다크 글래스모피즘 (`bg-ink/80~95 + backdrop-blur-md`)
+- **chat-panel.tsx + chat/* 의도적 예외** (현재 디자인 유지)
+
+### LiveKit Chrome 146 워크어라운드 (영구 보존)
+- **증상**: `setCameraEnabled(true)` → "Timeout starting video source" hang
+- **해결**: `getUserMedia` 직접 acquire → `publishTrack(track, { source: Track.Source.Camera })`로 LiveKit 인계
+- **참조**: `specs/livekit-voicevideo/13-chrome146-publishtrack-workaround.md`
+- **추가 보강**: `cameraTogglingRef` in-flight guard + `try/finally` stream cleanup
 
 ### 치비 파이프라인 batch 리팩토링 (완료 2026-02-23)
 - **결과**: 24회 → 3회 호출, 19분 → 4.4분 (77% 단축), GRADE: PASS
@@ -39,6 +55,8 @@ chibi-pipeline Phase 12 — Supabase 서울 이전 + OCI v1 제거 + GitHub OAut
 ## Recently Completed
 | Epic | 완료일 | 핵심 산출물 |
 |------|--------|------------|
+| 랜딩 + 디자인 시스템 + Navbar 통합 | 2026-05-06 | 랜딩 신규, 27 파일 디자인 통합, 단일 Navbar (모바일 햄버거 포함) |
+| LiveKit Chrome 146 워크어라운드 | 2026-05-06 | publishTrack 직접 호출 패턴, 영구 보존 |
 | oci-deployment Phase 4~5 | 2026-05-06 | Supabase 서울 마이그레이션 + OCI v1 제거 |
 | 인증 단순화 | 2026-05-06 | GitHub OAuth 제거 + Google OAuth 활성화 |
 | 치비 파이프라인 batch 리팩토링 | 2026-02-23 | Phase 10, 77% 속도 향상, Rembg AI 배경 제거 |

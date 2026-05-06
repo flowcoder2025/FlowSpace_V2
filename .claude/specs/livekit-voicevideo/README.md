@@ -9,6 +9,8 @@ flow_metaverse의 LiveKit 음성/화상/화면공유/녹화 시스템을 FlowSpa
 | Phase | 이름 | 상태 |
 |-------|------|------|
 | 11 | LiveKit 모듈 + API + UI + 통합 | ✅ 완료 |
+| 12 | 멤버십 자동 생성 버그픽스 | ✅ 완료 (2026-04-19) |
+| 13 | Chrome 146 카메라 hang publishTrack 우회 | ✅ 완료 (2026-05-06) |
 
 ## 아키텍처
 - `LiveKitRoomProvider` → 토큰 페칭 + LiveKitRoom 컨텍스트
