@@ -18,7 +18,7 @@ import {
   type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
-import type { RoomOptions } from "livekit-client";
+import { VideoPresets, type RoomOptions } from "livekit-client";
 import { LiveKitMediaInternalProvider } from "./LiveKitMediaContext";
 import {
   LIVEKIT_URL,
@@ -205,6 +205,14 @@ export function LiveKitRoomProvider({
     (): RoomOptions => ({
       adaptiveStream: false,
       dynacast: true,
+      // 카메라 초기화 시간 단축 (Windows + USB 웹캠 환경에서
+      // 기본 720p 요청 시 getUserMedia 10초 타임아웃 발생 사례 대응)
+      videoCaptureDefaults: {
+        resolution: VideoPresets.h540.resolution, // 960x540 @ 25fps
+      },
+      publishDefaults: {
+        videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h540],
+      },
     }),
     []
   );
