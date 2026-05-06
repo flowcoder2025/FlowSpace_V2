@@ -758,35 +758,32 @@ export function LiveKitMediaInternalProvider({
 
       const newState = !localParticipant.isCameraEnabled;
 
-      // Camera pre-warm: Chrome 146 환경에서 LiveKit Client 내부 10초 타임아웃 우회.
-      // 미리 getUserMedia로 카메라 디바이스를 깨워둔 후 즉시 release →
-      // LiveKit이 재호출 시 빠르게 응답.
-      if (newState && typeof navigator !== "undefined") {
-        const warmupStart = performance.now();
-        try {
-          const warmupStream = await Promise.race([
-            navigator.mediaDevices.getUserMedia({ video: true }),
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () => reject(new Error("Pre-warm getUserMedia 8s timeout")),
-                8000
-              )
-            ),
-          ]);
-          warmupStream.getTracks().forEach((t) => t.stop());
-          const elapsed = Math.round(performance.now() - warmupStart);
-          console.log(`[Camera] Pre-warm OK (${elapsed}ms)`);
-        } catch (warmupError) {
-          const elapsed = Math.round(performance.now() - warmupStart);
-          console.error(
-            `[Camera] Pre-warm failed after ${elapsed}ms:`,
-            warmupError
-          );
-          throw warmupError;
+      if (newState) {
+        // Chrome 146 워크어라운드: LiveKit 내부 setCameraEnabled의
+        // release-then-reacquire 패턴이 Chrome 146에서 hang. 직접 acquire한
+        // MediaStreamTrack을 publishTrack으로 LiveKit에 전달 (release 없음).
+        const acquireStart = performance.now();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+        const videoTrack = stream.getVideoTracks()[0];
+        const elapsed = Math.round(performance.now() - acquireStart);
+        console.log(`[Camera] Direct acquire OK (${elapsed}ms)`);
+
+        await localParticipant.publishTrack(videoTrack, {
+          source: Track.Source.Camera,
+        });
+      } else {
+        // 카메라 끄기: 기존 publication 찾아서 unpublish (track 정지)
+        const publications = Array.from(
+          localParticipant.trackPublications.values()
+        );
+        for (const pub of publications) {
+          if (pub.source === Track.Source.Camera && pub.track) {
+            await localParticipant.unpublishTrack(pub.track, true);
+          }
         }
       }
-
-      await localParticipant.setCameraEnabled(newState);
 
       // iOS Safari touch event recovery
       if (
