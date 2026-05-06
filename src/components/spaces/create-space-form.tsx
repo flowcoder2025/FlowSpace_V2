@@ -4,15 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const TEMPLATES = [
-  { key: "OFFICE", name: "Office", icon: "🏢", desc: "Team collaboration" },
-  { key: "CLASSROOM", name: "Classroom", icon: "🏫", desc: "Teaching & learning" },
-  { key: "LOUNGE", name: "Lounge", icon: "🛋️", desc: "Casual hangout" },
+  { key: "OFFICE", label: "사무실", desc: "팀 협업 공간" },
+  { key: "CLASSROOM", label: "강의실", desc: "학습과 교육" },
+  { key: "LOUNGE", label: "라운지", desc: "편안한 모임" },
 ];
 
 const ACCESS_TYPES = [
-  { value: "PUBLIC", label: "Public", desc: "Anyone can join" },
-  { value: "PASSWORD", label: "Password", desc: "Requires password to join" },
-  { value: "PRIVATE", label: "Private", desc: "Invite only" },
+  { value: "PUBLIC", label: "공개", desc: "누구나 입장 가능" },
+  { value: "PASSWORD", label: "비밀번호", desc: "비밀번호로 입장" },
+  { value: "PRIVATE", label: "비공개", desc: "초대 받은 사람만" },
 ];
 
 export function CreateSpaceForm() {
@@ -47,26 +47,29 @@ export function CreateSpaceForm() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "Failed to create space");
+        setError(data.error || "스페이스 생성 실패");
         return;
       }
 
       router.push("/my-spaces");
       router.refresh();
     } catch {
-      setError("An unexpected error occurred");
+      setError("예상치 못한 오류가 발생했습니다");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="rounded-2xl border border-line bg-cream p-8 shadow-[0_1px_2px_rgba(10,10,10,0.04)]">
+      <form onSubmit={handleSubmit} className="space-y-7">
         {/* Name */}
         <div>
-          <label htmlFor="space-name" className="mb-1 block text-sm font-medium text-ink-soft">
-            Space Name
+          <label
+            htmlFor="space-name"
+            className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted"
+          >
+            스페이스 이름
           </label>
           <input
             id="space-name"
@@ -74,46 +77,50 @@ export function CreateSpaceForm() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="My Awesome Space"
-            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
+            placeholder="우리 팀 사무실"
+            className="w-full rounded-md border border-line bg-cream px-3 py-2.5 text-sm placeholder:text-ink-light focus:border-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/10"
           />
         </div>
 
         {/* Description */}
         <div>
-          <label htmlFor="space-desc" className="mb-1 block text-sm font-medium text-ink-soft">
-            Description
+          <label
+            htmlFor="space-desc"
+            className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted"
+          >
+            설명 <span className="text-ink-light">(선택)</span>
           </label>
           <textarea
             id="space-desc"
             rows={2}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What's this space for? (optional)"
-            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
+            placeholder="이 공간을 어떻게 사용하시나요?"
+            className="w-full resize-none rounded-md border border-line bg-cream px-3 py-2.5 text-sm placeholder:text-ink-light focus:border-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/10"
           />
         </div>
 
         {/* Template */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-ink-soft">
-            Template
-          </label>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-ink-muted">
+            템플릿
+          </p>
           <div className="grid grid-cols-3 gap-3">
             {TEMPLATES.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 onClick={() => setTemplateKey(t.key)}
-                className={`flex flex-col items-center rounded-lg border-2 p-3 transition-colors ${
+                className={`rounded-lg border p-4 text-left transition-all ${
                   templateKey === t.key
-                    ? "border-ink bg-cream-deep"
-                    : "border-line hover:border-line"
+                    ? "border-ink bg-cream-deep/60"
+                    : "border-line hover:border-ink/30 hover:bg-cream-deep/30"
                 }`}
               >
-                <span className="text-2xl">{t.icon}</span>
-                <span className="mt-1 text-sm font-medium">{t.name}</span>
-                <span className="text-xs text-ink-light">{t.desc}</span>
+                <p className="font-serif text-base font-medium text-ink">
+                  {t.label}
+                </p>
+                <p className="mt-1 text-xs text-ink-muted">{t.desc}</p>
               </button>
             ))}
           </div>
@@ -121,17 +128,17 @@ export function CreateSpaceForm() {
 
         {/* Access Type */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-ink-soft">
-            Access
-          </label>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-ink-muted">
+            접근 권한
+          </p>
           <div className="space-y-2">
             {ACCESS_TYPES.map((a) => (
               <label
                 key={a.value}
-                className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                className={`flex cursor-pointer items-center gap-3 rounded-md border p-3.5 transition-colors ${
                   accessType === a.value
-                    ? "border-ink bg-cream-deep"
-                    : "border-line hover:border-line"
+                    ? "border-ink bg-cream-deep/60"
+                    : "border-line hover:border-ink/30"
                 }`}
               >
                 <input
@@ -140,11 +147,11 @@ export function CreateSpaceForm() {
                   value={a.value}
                   checked={accessType === a.value}
                   onChange={(e) => setAccessType(e.target.value)}
-                  className="accent-blue-600"
+                  className="size-4 accent-ink"
                 />
                 <div>
-                  <span className="text-sm font-medium">{a.label}</span>
-                  <p className="text-xs text-ink-light">{a.desc}</p>
+                  <p className="text-sm font-medium text-ink">{a.label}</p>
+                  <p className="text-xs text-ink-muted">{a.desc}</p>
                 </div>
               </label>
             ))}
@@ -154,8 +161,11 @@ export function CreateSpaceForm() {
         {/* Password */}
         {accessType === "PASSWORD" && (
           <div>
-            <label htmlFor="space-pw" className="mb-1 block text-sm font-medium text-ink-soft">
-              Space Password
+            <label
+              htmlFor="space-pw"
+              className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted"
+            >
+              비밀번호
             </label>
             <input
               id="space-pw"
@@ -163,32 +173,32 @@ export function CreateSpaceForm() {
               required
               value={accessSecret}
               onChange={(e) => setAccessSecret(e.target.value)}
-              placeholder="Set a password for this space"
-              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
+              placeholder="이 공간의 입장 비밀번호"
+              className="w-full rounded-md border border-line bg-cream px-3 py-2.5 text-sm placeholder:text-ink-light focus:border-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/10"
             />
           </div>
         )}
 
         {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </p>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 pt-2">
           <button
             type="button"
             onClick={() => router.back()}
-            className="flex-1 rounded-lg border border-line py-2.5 text-sm font-medium text-ink-soft hover:bg-cream-deep"
+            className="flex-1 rounded-md border border-line py-3 text-sm font-medium text-ink-soft transition-colors hover:border-ink/30 hover:bg-cream-deep/50"
           >
-            Cancel
+            취소
           </button>
           <button
             type="submit"
             disabled={loading || !name.trim()}
-            className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-medium text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 rounded-md bg-brand py-3 text-sm font-medium text-cream transition-colors hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Creating..." : "Create Space"}
+            {loading ? "생성 중..." : "스페이스 만들기"}
           </button>
         </div>
       </form>

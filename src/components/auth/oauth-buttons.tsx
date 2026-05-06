@@ -21,7 +21,7 @@ export function OAuthButtons({ callbackUrl }: OAuthButtonsProps) {
         type="button"
         onClick={() => handleOAuth("google")}
         disabled={loading !== null}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-line bg-white px-4 py-2.5 text-sm font-medium text-ink-soft transition-colors hover:bg-cream-deep disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-3 rounded-md border border-line bg-cream px-4 py-3 text-sm font-medium text-ink transition-colors hover:border-ink/30 hover:bg-cream-deep disabled:cursor-not-allowed disabled:opacity-50"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24">
           <path
@@ -41,7 +41,7 @@ export function OAuthButtons({ callbackUrl }: OAuthButtonsProps) {
             fill="#EA4335"
           />
         </svg>
-        {loading === "google" ? "Connecting..." : "Continue with Google"}
+        {loading === "google" ? "연결 중..." : "Google 계정으로 계속"}
       </button>
     </div>
   );

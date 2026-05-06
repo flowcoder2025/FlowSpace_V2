@@ -65,9 +65,9 @@ export function LoginForm() {
   };
 
   return (
-    <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-line bg-cream p-8 shadow-[0_1px_2px_rgba(10,10,10,0.04),0_8px_24px_rgba(10,10,10,0.04)]">
       {/* Tab */}
-      <div className="mb-6 flex rounded-lg bg-cream-deep p-1">
+      <div className="mb-6 inline-flex w-full rounded-lg border border-line bg-cream-deep/40 p-1">
         <button
           type="button"
           onClick={() => {
@@ -76,11 +76,11 @@ export function LoginForm() {
           }}
           className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
             mode === "login"
-              ? "bg-white text-ink shadow-sm"
-              : "text-ink-muted hover:text-ink-soft"
+              ? "bg-cream text-ink shadow-sm"
+              : "text-ink-muted hover:text-ink"
           }`}
         >
-          Login
+          로그인
         </button>
         <button
           type="button"
@@ -90,11 +90,11 @@ export function LoginForm() {
           }}
           className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
             mode === "register"
-              ? "bg-white text-ink shadow-sm"
-              : "text-ink-muted hover:text-ink-soft"
+              ? "bg-cream text-ink shadow-sm"
+              : "text-ink-muted hover:text-ink"
           }`}
         >
-          Register
+          회원가입
         </button>
       </div>
 
@@ -104,17 +104,17 @@ export function LoginForm() {
           <div>
             <label
               htmlFor="name"
-              className="mb-1 block text-sm font-medium text-ink-soft"
+              className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted"
             >
-              Name
+              이름
             </label>
             <input
               id="name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Display name (optional)"
-              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
+              placeholder="표시 이름 (선택)"
+              className="w-full rounded-md border border-line bg-cream px-3 py-2.5 text-sm placeholder:text-ink-light focus:border-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/10"
             />
           </div>
         )}
@@ -122,9 +122,9 @@ export function LoginForm() {
         <div>
           <label
             htmlFor="email"
-            className="mb-1 block text-sm font-medium text-ink-soft"
+            className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted"
           >
-            Email
+            이메일
           </label>
           <input
             id="email"
@@ -133,16 +133,16 @@ export function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
+            className="w-full rounded-md border border-line bg-cream px-3 py-2.5 text-sm placeholder:text-ink-light focus:border-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/10"
           />
         </div>
 
         <div>
           <label
             htmlFor="password"
-            className="mb-1 block text-sm font-medium text-ink-soft"
+            className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted"
           >
-            Password
+            비밀번호
           </label>
           <input
             id="password"
@@ -151,15 +151,13 @@ export function LoginForm() {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder={
-              mode === "register" ? "8 characters minimum" : "Your password"
-            }
-            className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink/20"
+            placeholder={mode === "register" ? "최소 8자" : "비밀번호"}
+            className="w-full rounded-md border border-line bg-cream px-3 py-2.5 text-sm placeholder:text-ink-light focus:border-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/10"
           />
         </div>
 
         {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </p>
         )}
@@ -167,20 +165,20 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-brand py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-md bg-brand py-3 text-sm font-medium text-cream transition-colors hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading
-            ? "Processing..."
+            ? "처리 중..."
             : mode === "login"
-              ? "Sign In"
-              : "Create Account"}
+              ? "로그인"
+              : "계정 만들기"}
         </button>
       </form>
 
       {/* Divider */}
-      <div className="my-6 flex items-center gap-3">
+      <div className="my-7 flex items-center gap-3">
         <div className="h-px flex-1 bg-line" />
-        <span className="text-xs text-ink-light">OR</span>
+        <span className="text-xs uppercase tracking-widest text-ink-light">또는</span>
         <div className="h-px flex-1 bg-line" />
       </div>
 

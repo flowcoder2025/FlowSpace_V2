@@ -7,16 +7,16 @@ export default async function NewSpacePage() {
   if (!session?.user) redirect("/login");
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-cream-deep p-4">
-      <div className="w-full max-w-lg">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-ink">Create Space</h1>
-          <p className="mt-2 text-ink-muted">
-            Set up a new virtual space for your team
-          </p>
-        </div>
-        <CreateSpaceForm />
-      </div>
+    <main className="mx-auto max-w-2xl px-6 py-12 lg:px-8 lg:py-16">
+      <header className="mb-10">
+        <h1 className="font-serif text-4xl font-medium tracking-tightest text-ink sm:text-5xl">
+          새 스페이스
+        </h1>
+        <p className="mt-3 text-base text-ink-soft">
+          템플릿을 고르고, 팀과 함께 사용할 가상 공간을 만드세요.
+        </p>
+      </header>
+      <CreateSpaceForm />
     </main>
   );
 }

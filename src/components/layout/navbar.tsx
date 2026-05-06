@@ -2,66 +2,47 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
-import { ROUTES, NAV_ITEMS } from "@/constants/navigation";
+import { ROUTES } from "@/constants/navigation";
 import type { ComfyUIStatus } from "@/lib/comfyui";
 
 export function Navbar() {
-  const pathname = usePathname();
   const { data: session } = useSession();
 
   return (
-    <nav className="border-b border-line bg-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-        {/* Left: Logo */}
-        <Link href={ROUTES.HOME} className="text-lg font-bold text-ink">
-          FlowSpace
+    <header className="sticky top-0 z-40 border-b border-line/60 bg-cream/85 backdrop-blur-md">
+      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
+        <Link href={ROUTES.HOME} className="flex items-center gap-2 text-ink">
+          <Image src="/Logo.png" alt="FlowSpace" width={32} height={32} priority />
+          <span className="font-serif text-xl font-medium tracking-tight">FlowSpace</span>
         </Link>
 
-        {/* Center: Nav links */}
-        <div className="flex items-center gap-6">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`text-sm font-medium transition-colors ${
-                pathname === item.href
-                  ? "text-ink"
-                  : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-
-        {/* Right: Auth */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <ComfyUIStatusDot />
           {session?.user ? (
             <>
-              <span className="text-sm text-ink-muted">
+              <span className="hidden text-sm text-ink-soft sm:inline">
                 {session.user.name || session.user.email}
               </span>
               <button
                 onClick={() => signOut({ callbackUrl: ROUTES.HOME })}
-                className="text-sm text-ink-muted hover:text-ink-soft"
+                className="text-sm text-ink-muted transition-colors hover:text-ink"
               >
-                Logout
+                로그아웃
               </button>
             </>
           ) : (
             <Link
               href={ROUTES.LOGIN}
-              className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand-deep"
+              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-brand-deep"
             >
-              Sign In
+              로그인
             </Link>
           )}
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 }
 
@@ -71,7 +52,6 @@ function ComfyUIStatusDot() {
   const [status, setStatus] = useState<ComfyUIStatus | null>(null);
 
   useEffect(() => {
-    // Only show in development
     if (process.env.NODE_ENV !== "development") return;
 
     let mounted = true;
@@ -83,7 +63,7 @@ function ComfyUIStatusDot() {
           setStatus(await res.json());
         }
       } catch {
-        // Silently ignore fetch errors
+        // Silently ignore
       }
     }
 
@@ -98,11 +78,7 @@ function ComfyUIStatusDot() {
   if (!status) return null;
 
   const dotColor =
-    status.resolvedMode === "real"
-      ? "bg-green-400"
-      : status.connected
-        ? "bg-yellow-400"
-        : "bg-yellow-400";
+    status.resolvedMode === "real" ? "bg-emerald-400" : "bg-amber-400";
 
   const title =
     status.resolvedMode === "real"

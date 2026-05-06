@@ -16,84 +16,89 @@ interface SpaceCardProps {
   };
 }
 
-const TEMPLATE_ICONS: Record<string, string> = {
-  OFFICE: "🏢",
-  CLASSROOM: "🏫",
-  LOUNGE: "🛋️",
+const TEMPLATE_LABELS: Record<string, string> = {
+  OFFICE: "사무실",
+  CLASSROOM: "강의실",
+  LOUNGE: "라운지",
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  OWNER: "Owner",
-  STAFF: "Staff",
-  PARTICIPANT: "Member",
+  OWNER: "오너",
+  STAFF: "스태프",
+  PARTICIPANT: "참여자",
+};
+
+const ACCESS_LABELS: Record<string, string> = {
+  PUBLIC: "공개",
+  PASSWORD: "비밀번호",
+  PRIVATE: "비공개",
 };
 
 export function SpaceCard({ space }: SpaceCardProps) {
   const router = useRouter();
+  const isAdmin = space.myRole === "OWNER" || space.myRole === "STAFF";
+  const templateLabel =
+    TEMPLATE_LABELS[space.template.key] ?? space.template.name;
 
   return (
-    <div
+    <article
       onClick={() => router.push(`/space/${space.id}`)}
-      className="group cursor-pointer rounded-xl border border-line bg-white p-5 shadow-sm transition-all hover:border-blue-300 hover:shadow-md"
+      className="group flex cursor-pointer flex-col rounded-xl border border-line bg-cream p-6 transition-all hover:border-ink/30 hover:shadow-[0_4px_20px_rgba(10,10,10,0.04)]"
     >
-      {/* Header */}
-      <div className="mb-3 flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">
-            {TEMPLATE_ICONS[space.template.key] || "🌐"}
-          </span>
-          <div>
-            <h3 className="font-semibold text-ink group-hover:text-ink">
-              {space.name}
-            </h3>
-            <span className="text-xs text-ink-light">{space.template.name}</span>
-          </div>
-        </div>
-
+      {/* Header — Template label + Role badge */}
+      <div className="flex items-start justify-between">
+        <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+          {templateLabel}
+        </p>
         {space.myRole && (
-          <span className="rounded-full bg-cream-deep px-2 py-0.5 text-xs font-medium text-ink">
-            {ROLE_LABELS[space.myRole] || space.myRole}
+          <span className="inline-flex items-center rounded-full border border-line bg-cream-deep/60 px-2.5 py-0.5 text-[11px] font-medium text-ink-soft">
+            {ROLE_LABELS[space.myRole] ?? space.myRole}
           </span>
         )}
       </div>
 
+      {/* Title */}
+      <h3 className="mt-3 font-serif text-2xl font-medium tracking-tight text-ink line-clamp-2">
+        {space.name}
+      </h3>
+
       {/* Description */}
-      {space.description && (
-        <p className="mb-3 line-clamp-2 text-sm text-ink-muted">
+      {space.description ? (
+        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ink-muted">
           {space.description}
         </p>
+      ) : (
+        <p className="mt-2 text-sm text-ink-light">설명 없음</p>
       )}
 
-      {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-ink-light">
-        <span>
-          {space.memberCount}/{space.maxUsers} members
-        </span>
-        <div className="flex items-center gap-2">
-          {(space.myRole === "OWNER" || space.myRole === "STAFF") && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/dashboard/spaces/${space.id}`);
-              }}
-              className="rounded-full bg-cream-deep px-2 py-0.5 text-ink-muted hover:bg-line transition-colors"
-            >
-              Dashboard
-            </button>
-          )}
-          <span
-            className={`rounded-full px-2 py-0.5 ${
-              space.accessType === "PUBLIC"
-                ? "bg-green-50 text-green-600"
-                : space.accessType === "PASSWORD"
-                  ? "bg-yellow-50 text-yellow-600"
-                  : "bg-red-50 text-red-600"
-            }`}
-          >
-            {space.accessType.toLowerCase()}
+      {/* Footer — meta + actions */}
+      <div className="mt-6 flex items-center justify-between border-t border-line pt-4">
+        <div className="flex items-center gap-3 text-xs text-ink-muted">
+          <span>
+            멤버 <span className="font-medium text-ink-soft">{space.memberCount}</span>
+            <span className="text-ink-light">/{space.maxUsers}</span>
           </span>
+          <span className="text-line">·</span>
+          <AccessBadge type={space.accessType} />
         </div>
+
+        {isAdmin && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/dashboard/spaces/${space.id}`);
+            }}
+            className="rounded-md px-2 py-1 text-xs font-medium text-ink-muted transition-colors hover:bg-cream-deep hover:text-ink"
+          >
+            관리
+          </button>
+        )}
       </div>
-    </div>
+    </article>
   );
+}
+
+function AccessBadge({ type }: { type: string }) {
+  const label = ACCESS_LABELS[type] ?? type.toLowerCase();
+  return <span>{label}</span>;
 }
