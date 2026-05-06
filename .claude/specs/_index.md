@@ -28,6 +28,9 @@
 | [parts-avatar-system](./parts-avatar-system/README.md) | 2026-02-21 | 3 (Phase 1~3) |
 | [asset-integration](./asset-integration/README.md) | 2026-02-22 | 1 (연동 수정) |
 
+## Ad-hoc Work (2026-05-06)
+- 인증 단순화 (GitHub OAuth 제거): GitHub provider 코드/UI 제거 → Google OAuth + Credentials 2체제 정착. Google Cloud Console OAuth Client 신규 발급, Vercel 프로덕션 env 등록 완료. 동의 화면은 테스트 모드 유지 (vercel.app = PSL 도메인, 커스텀 도메인 연결 후 Production 전환 필요) (`auth/2026-05-06-github-removal.md`)
+
 ## Ad-hoc Work (2026-04-19)
 - LiveKit 멤버십 자동 생성: PUBLIC 스페이스 직접 입장 시 spaceMember 자동 생성 → LiveKit "not a member" 에러 수정 (`livekit-voicevideo/12-membership-bugfix.md`)
 - Vercel 서울 리전 전환: icn1, Hobby→Pro 팀 이관, URL 유지 (`oci-deployment/03-vercel-seoul-region.md`)
@@ -49,6 +52,8 @@
 ```
 specs/
 ├── _index.md
+├── auth/
+│   └── 2026-05-06-github-removal.md
 ├── oci-deployment/
 │   ├── README.md
 │   ├── 01-socket-infra.md

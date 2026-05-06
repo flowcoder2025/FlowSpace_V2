@@ -1,5 +1,4 @@
 import Google from "next-auth/providers/google";
-import GitHub from "next-auth/providers/github";
 import type { NextAuthConfig } from "next-auth";
 
 /**
@@ -18,14 +17,6 @@ export const authConfig = {
           Google({
             clientId: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-          }),
-        ]
-      : []),
-    ...(process.env.GITHUB_CLIENT_ID
-      ? [
-          GitHub({
-            clientId: process.env.GITHUB_CLIENT_ID,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET!,
           }),
         ]
       : []),
