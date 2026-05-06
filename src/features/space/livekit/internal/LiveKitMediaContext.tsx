@@ -757,6 +757,35 @@ export function LiveKitMediaInternalProvider({
       }
 
       const newState = !localParticipant.isCameraEnabled;
+
+      // Camera pre-warm: Chrome 146 환경에서 LiveKit Client 내부 10초 타임아웃 우회.
+      // 미리 getUserMedia로 카메라 디바이스를 깨워둔 후 즉시 release →
+      // LiveKit이 재호출 시 빠르게 응답.
+      if (newState && typeof navigator !== "undefined") {
+        const warmupStart = performance.now();
+        try {
+          const warmupStream = await Promise.race([
+            navigator.mediaDevices.getUserMedia({ video: true }),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Pre-warm getUserMedia 8s timeout")),
+                8000
+              )
+            ),
+          ]);
+          warmupStream.getTracks().forEach((t) => t.stop());
+          const elapsed = Math.round(performance.now() - warmupStart);
+          console.log(`[Camera] Pre-warm OK (${elapsed}ms)`);
+        } catch (warmupError) {
+          const elapsed = Math.round(performance.now() - warmupStart);
+          console.error(
+            `[Camera] Pre-warm failed after ${elapsed}ms:`,
+            warmupError
+          );
+          throw warmupError;
+        }
+      }
+
       await localParticipant.setCameraEnabled(newState);
 
       // iOS Safari touch event recovery
