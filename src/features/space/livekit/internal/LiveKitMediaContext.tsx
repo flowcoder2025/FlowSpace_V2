@@ -391,6 +391,7 @@ export function LiveKitMediaInternalProvider({
   // ============================================
   const audioUnlockedRef = useRef(false);
   const mediaSessionActivatedRef = useRef(false);
+  const cameraTogglingRef = useRef(false);
 
   const isIOSSafari = useMemo(() => {
     if (typeof window === "undefined" || typeof navigator === "undefined")
@@ -747,6 +748,15 @@ export function LiveKitMediaInternalProvider({
       return false;
     }
 
+    // In-flight 중복 호출 차단 (getUserMedia가 수초 걸리는 동안 재클릭 방지)
+    if (cameraTogglingRef.current) {
+      console.warn("[Camera] toggle ignored — in-flight");
+      return false;
+    }
+    cameraTogglingRef.current = true;
+
+    let acquiredStream: MediaStream | null = null;
+
     try {
       setMediaError(null);
 
@@ -763,16 +773,18 @@ export function LiveKitMediaInternalProvider({
         // release-then-reacquire 패턴이 Chrome 146에서 hang. 직접 acquire한
         // MediaStreamTrack을 publishTrack으로 LiveKit에 전달 (release 없음).
         const acquireStart = performance.now();
-        const stream = await navigator.mediaDevices.getUserMedia({
+        acquiredStream = await navigator.mediaDevices.getUserMedia({
           video: true,
         });
-        const videoTrack = stream.getVideoTracks()[0];
+        const videoTrack = acquiredStream.getVideoTracks()[0];
         const elapsed = Math.round(performance.now() - acquireStart);
         console.log(`[Camera] Direct acquire OK (${elapsed}ms)`);
 
         await localParticipant.publishTrack(videoTrack, {
           source: Track.Source.Camera,
         });
+        // publishTrack 성공 후 LiveKit이 track lifecycle 관리
+        acquiredStream = null;
       } else {
         // 카메라 끄기: 기존 publication 찾아서 unpublish (track 정지)
         const publications = Array.from(
@@ -804,6 +816,12 @@ export function LiveKitMediaInternalProvider({
       console.error("[LiveKitMediaContext] Camera toggle error:", error);
       setMediaError(parseMediaError(error));
       return false;
+    } finally {
+      // publishTrack 실패 등 에러 시 stream 누수 방지
+      if (acquiredStream) {
+        acquiredStream.getTracks().forEach((t) => t.stop());
+      }
+      cameraTogglingRef.current = false;
     }
   }, [localParticipant, room, parseMediaError, playAllAudioElements]);
 
