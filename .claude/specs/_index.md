@@ -1,8 +1,8 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `06cf9c5`
-- Last Review Date: 2026-04-19
+- Last Reviewed Commit: `4c64f50`
+- Last Review Date: 2026-05-06
 
 ## Active Epics
 | Epic | 현재 Phase | 상태 |
@@ -12,6 +12,7 @@
 ## Recently Completed
 | Epic | 완료일 | 핵심 결과 |
 |------|--------|-----------|
+| [oci-deployment](./oci-deployment/README.md) Phase 4~5 | 2026-05-06 | Supabase 서울 이전 + v1 OCI 스택 제거 |
 | [oci-deployment](./oci-deployment/README.md) Phase 2~3 | 2026-04-19 | Prisma Docker 런타임 + 싱글턴, Vercel 서울 리전 |
 | [oci-deployment](./oci-deployment/README.md) Phase 1 | 2026-03-06 | Socket.io OCI 배포, CD 자동화, CORS 다중 origin |
 | [chibi-pipeline](./chibi-pipeline/README.md) Phase 1~11 | 2026-02-23 | batch v2, 77% 속도 향상 |
@@ -30,6 +31,9 @@
 
 ## Ad-hoc Work (2026-05-06)
 - 인증 단순화 (GitHub OAuth 제거): GitHub provider 코드/UI 제거 → Google OAuth + Credentials 2체제 정착. Google Cloud Console OAuth Client 신규 발급, Vercel 프로덕션 env 등록 완료. 동의 화면은 테스트 모드 유지 (vercel.app = PSL 도메인, 커스텀 도메인 연결 후 Production 전환 필요) (`auth/2026-05-06-github-removal.md`)
+- Supabase 서울 마이그레이션: 시드니→서울 신규 프로젝트 + 데이터 144 rows 이전 + Prisma 스키마 드리프트 동기화. 사용자 체감 latency 개선 확인 (`oci-deployment/04-supabase-seoul-migration.md`)
+- OCI v1 스택 제거: flowspace-socket 컨테이너/이미지/Caddy 라우트 제거, LiveKit/Caddy 공유 인프라는 유지, v1 소스 1주 보존 (`oci-deployment/05-v1-removal.md`)
+- 시드니 Supabase 일시정지: 미완료 — 사용자 검증 며칠 진행 후 별도 작업으로 처리 예정 [PENDING]
 
 ## Ad-hoc Work (2026-04-19)
 - LiveKit 멤버십 자동 생성: PUBLIC 스페이스 직접 입장 시 spaceMember 자동 생성 → LiveKit "not a member" 에러 수정 (`livekit-voicevideo/12-membership-bugfix.md`)
@@ -58,7 +62,9 @@ specs/
 │   ├── README.md
 │   ├── 01-socket-infra.md
 │   ├── 02-prisma-runtime-singleton.md
-│   └── 03-vercel-seoul-region.md
+│   ├── 03-vercel-seoul-region.md
+│   ├── 04-supabase-seoul-migration.md
+│   └── 05-v1-removal.md
 ├── livekit-voicevideo/
 │   ├── README.md
 │   ├── 11-livekit-integration.md
