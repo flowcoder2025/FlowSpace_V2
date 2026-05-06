@@ -1,7 +1,7 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `4c64f50`
+- Last Reviewed Commit: `13ab311`
 - Last Review Date: 2026-05-06
 
 ## Active Epics
@@ -37,6 +37,7 @@
 - OCI v1 스택 제거: flowspace-socket 컨테이너/이미지/Caddy 라우트 제거, LiveKit/Caddy 공유 인프라는 유지, v1 소스 1주 보존 (`oci-deployment/05-v1-removal.md`)
 - 시드니 Supabase 일시정지: 미완료 — 사용자 검증 며칠 진행 후 별도 작업으로 처리 예정 [PENDING]
 - Assets 메뉴/페이지 제거: `/assets` 라우트 + `src/components/assets/` 삭제, `navigation.ts` ROUTES.ASSETS + NAV_ITEMS 제거, 홈 Dashboard Assets 카드 제거. API(`src/app/api/assets/**`) + 비즈니스 로직(`src/features/assets/**`)은 게임/에디터 의존성으로 유지. 네비바 미표시, `/assets` 직접 접근 시 404.
+- **Navbar 단일화** (commit 13ab311): LandingNavbar 삭제, 글로벌 Navbar 단일 컴포넌트 통합. 마케팅 메뉴(기능/사용법/사례/가격) 로그인 여부 무관 노출, 로그인 시 "공간" 메뉴 추가. 버튼: outline(로그인/로그아웃) vs fill(시작하기/새 스페이스). 모바일 햄버거 md 미만 풀 패널. NavbarWrapper `/` 숨김 로직 제거. (`landing/2026-05-06-design-system-rollout.md` — "Navbar 단일화" 섹션)
 
 ## Ad-hoc Work (2026-04-19)
 - LiveKit 멤버십 자동 생성: PUBLIC 스페이스 직접 입장 시 spaceMember 자동 생성 → LiveKit "not a member" 에러 수정 (`livekit-voicevideo/12-membership-bugfix.md`)

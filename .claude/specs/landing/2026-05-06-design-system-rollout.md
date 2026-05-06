@@ -336,3 +336,92 @@ className="rounded-full px-4 py-1.5 text-sm bg-cream shadow-sm text-ink"
 ### 검증
 
 `tsc` 통과, `next build` 통과.
+
+---
+
+## 후속: Navbar 단일화 (commit 13ab311, 2026-05-06)
+
+**업데이트**: 2026-05-06
+
+### 배경
+
+위 재작업(commit 8bdbb29)에서 글로벌 Navbar를 재작성했으나, LandingNavbar가 별개 컴포넌트로 남아 있어 두 가지 문제가 유지됐다:
+
+1. **동선 단절**: 로그인 사용자가 "가격" 섹션을 보려면 로그아웃해야 함 (LandingNavbar는 비로그인 시에만 보임)
+2. **컴포넌트 중복**: 동일 시각 언어를 가진 Navbar가 2개 공존 — 유지보수 부담
+
+사용자 의견 반영해 LandingNavbar를 삭제하고 글로벌 Navbar 단일 컴포넌트로 통합.
+
+### 변경 파일
+
+| 파일 | 변경 유형 |
+|------|-----------|
+| `src/components/layout/navbar.tsx` | 전면 재작성 — 마케팅 메뉴 + 공간 메뉴 + 모바일 햄버거 통합 |
+| `src/components/layout/navbar-wrapper.tsx` | `/` 숨김 로직 제거 |
+| `src/components/landing/index.ts` | `LandingNavbar` export 제거 |
+| `src/app/page.tsx` | `<LandingNavbar />` import 및 렌더링 제거 |
+| `src/components/landing/internal/landing-navbar.tsx` | 파일 삭제 |
+
+### 메뉴 노출 정책
+
+| 메뉴 | 비로그인 | 로그인 | 게임 룸 (`/space/*`) |
+|------|---------|--------|----------------------|
+| 기능 / 사용법 / 사례 / 가격 | O | O | — (숨김) |
+| 공간 | — | O (active 시 밑줄) | — (숨김) |
+| 로그인 + 시작하기 | O | — | — |
+| 로그아웃 + 새 스페이스 | — | O | — |
+
+마케팅 앵커 링크는 `/#features` 형태(절대 경로) — 어느 페이지에서든 랜딩으로 이동 후 스크롤.
+
+`NAVBAR_HIDDEN_ROUTES`에 `/space/` 포함, `/` 숨김 조건은 제거됨.
+
+### 버튼 디자인 명세
+
+```
+outline (보조 액션)
+  border border-line bg-cream + hover:border-ink/30 hover:bg-cream-deep
+  → 로그인 버튼, 로그아웃 버튼
+
+fill (주요 액션)
+  bg-brand text-cream + hover:bg-brand-deep
+  → 시작하기 →, 새 스페이스 +
+```
+
+### active 밑줄 패턴 (공간 메뉴)
+
+```tsx
+function isAppRoute(pathname: string): boolean {
+  return (
+    pathname === "/my-spaces" ||
+    pathname.startsWith("/spaces") ||
+    pathname.startsWith("/dashboard")
+  );
+}
+
+// active 시
+"relative text-sm font-medium text-ink after:absolute after:left-0 after:right-0 after:-bottom-[22px] after:h-[1.5px] after:bg-ink"
+```
+
+### 모바일 햄버거 패턴
+
+```
+breakpoint: md 미만에서 표시 (md:hidden)
+버튼: p-2 rounded-md, ☰ ↔ ✕ 아이콘 전환 (aria-expanded 포함)
+패널: border-t border-line bg-cream, max-w-7xl px-6 py-4
+  - 마케팅 링크 block rounded-md px-3 py-2.5
+  - 공간 링크 (active 시 bg-cream-deep + font-medium)
+  - 구분선 border-t border-line mt-3 pt-3
+  - 사용자 이름 text-xs text-ink-muted
+  - 액션 버튼 w-full text-center (outline/fill 동일 규칙)
+링크/버튼 클릭 시 onClick={() => setMobileOpen(false)} 패널 닫기
+```
+
+### LandingNavbar 삭제 근거
+
+- 기능 범위가 완전히 글로벌 Navbar에 흡수됨
+- 마케팅 앵커를 절대경로(`/#`)로 변경해 랜딩 밖에서도 동작
+- 삭제 후 `landing/index.ts` barrel에서 export 제거, `page.tsx`에서 사용처 제거
+
+### 검증
+
+`tsc` / `lint` / `next build` 통과.
