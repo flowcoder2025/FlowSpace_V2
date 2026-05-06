@@ -34,6 +34,7 @@
 - Supabase 서울 마이그레이션: 시드니→서울 신규 프로젝트 + 데이터 144 rows 이전 + Prisma 스키마 드리프트 동기화. 사용자 체감 latency 개선 확인 (`oci-deployment/04-supabase-seoul-migration.md`)
 - OCI v1 스택 제거: flowspace-socket 컨테이너/이미지/Caddy 라우트 제거, LiveKit/Caddy 공유 인프라는 유지, v1 소스 1주 보존 (`oci-deployment/05-v1-removal.md`)
 - 시드니 Supabase 일시정지: 미완료 — 사용자 검증 며칠 진행 후 별도 작업으로 처리 예정 [PENDING]
+- Assets 메뉴/페이지 제거: `/assets` 라우트 + `src/components/assets/` 삭제, `navigation.ts` ROUTES.ASSETS + NAV_ITEMS 제거, 홈 Dashboard Assets 카드 제거. API(`src/app/api/assets/**`) + 비즈니스 로직(`src/features/assets/**`)은 게임/에디터 의존성으로 유지. 네비바 미표시, `/assets` 직접 접근 시 404.
 
 ## Ad-hoc Work (2026-04-19)
 - LiveKit 멤버십 자동 생성: PUBLIC 스페이스 직접 입장 시 spaceMember 자동 생성 → LiveKit "not a member" 에러 수정 (`livekit-voicevideo/12-membership-bugfix.md`)

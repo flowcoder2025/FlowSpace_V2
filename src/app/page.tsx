@@ -21,12 +21,6 @@ function Dashboard({ userName }: { userName: string }) {
       color: "bg-blue-50 hover:bg-blue-100 border-blue-200",
     },
     {
-      title: "Assets",
-      description: "AI 생성 에셋 관리",
-      href: ROUTES.ASSETS,
-      color: "bg-purple-50 hover:bg-purple-100 border-purple-200",
-    },
-    {
       title: "Create Space",
       description: "새 공간 만들기",
       href: ROUTES.SPACES_NEW,
@@ -41,7 +35,7 @@ function Dashboard({ userName }: { userName: string }) {
       </h1>
       <p className="mt-2 text-gray-600">무엇을 하시겠습니까?</p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {actions.map((action) => (
           <Link
             key={action.href}
