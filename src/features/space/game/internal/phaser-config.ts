@@ -1,7 +1,7 @@
 /**
  * Phaser GameConfig 팩토리
  *
- * Arcade Physics, Scale.FIT (진단용 원복 — Scale.RESIZE GPU 압박 가설 검증 중)
+ * Arcade Physics, Scale.RESIZE (parent 크기에 맞춰 동적 캔버스 — 풀스크린 게임 룸)
  */
 
 import { MAP_WIDTH, MAP_HEIGHT } from "@/constants/game-constants";
@@ -19,8 +19,9 @@ export function createPhaserConfig(
   return {
     type: Phaser.AUTO,
     parent: options.parent,
-    width: options.width ?? 960,
-    height: options.height ?? 640,
+    // Scale.RESIZE 모드에서는 width/height가 초기값. parent 크기에 맞춰 동적으로 조정됨.
+    width: options.width ?? options.parent.clientWidth ?? 960,
+    height: options.height ?? options.parent.clientHeight ?? 640,
     backgroundColor: "#0a0a0a",
     physics: {
       default: "arcade",
@@ -30,9 +31,10 @@ export function createPhaserConfig(
       },
     },
     scale: {
-      // 진단: Scale.RESIZE 도입 후 LiveKit 카메라 타임아웃 발생 — GPU 압박 가설 검증을 위해 FIT 임시 원복
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
+      // RESIZE: 캔버스가 parent 요소 크기에 맞춰 자동 조정.
+      // 게임 월드 좌표는 그대로, 카메라가 더 넓은 영역을 표시.
+      mode: Phaser.Scale.RESIZE,
+      autoCenter: Phaser.Scale.NO_CENTER,
     },
     scene: options.scenes,
     render: {
