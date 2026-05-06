@@ -53,3 +53,7 @@ public/assets/generated/maps/
 bin/
 
 .vercel
+
+.vercel
+.env*.local
+.backups/
