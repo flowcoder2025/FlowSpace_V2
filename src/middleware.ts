@@ -4,12 +4,19 @@ import { NextResponse } from "next/server";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PATHS = ["/", "/login", "/api/auth", "/api/guest"];
+// prefix는 정확히 그 경로이거나 그 하위 경로일 때만 public (예: "/login"은
+// "/login", "/login/..."만 매칭하고 "/login-anything"은 비공개로 유지).
+const PUBLIC_PREFIXES = ["/login", "/api/auth", "/api/guest"];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  // 루트는 exact 매칭만 (startsWith("/")가 모든 경로를 통과시키던 no-op 제거)
+  const isPublic =
+    pathname === "/" ||
+    PUBLIC_PREFIXES.some(
+      (p) => pathname === p || pathname.startsWith(`${p}/`)
+    );
   const isStaticAsset =
     pathname.startsWith("/_next") || pathname.startsWith("/favicon");
 

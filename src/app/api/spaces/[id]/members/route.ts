@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  canActOn,
+  isChatRestriction,
+  isSpaceRole,
+} from "@/lib/space-role";
+import type { SpaceRole } from "@prisma/client";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -16,11 +22,24 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     const { id } = await params;
 
+    // 멤버 목록은 해당 공간 멤버(또는 superAdmin)에게만 노출
+    const isSuperAdmin = session.user.isSuperAdmin === true;
+    if (!isSuperAdmin) {
+      const myMember = await prisma.spaceMember.findUnique({
+        where: { spaceId_userId: { spaceId: id, userId: session.user.id } },
+        select: { id: true },
+      });
+      if (!myMember) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const members = await prisma.spaceMember.findMany({
       where: { spaceId: id },
       include: {
-        user: { select: { id: true, name: true, email: true, image: true, avatarConfig: true } },
-        guestSession: { select: { id: true, nickname: true, avatar: true } },
+        // email/avatarConfig 등 PII·관리 식별자 미노출 (공개 표시용 필드만)
+        user: { select: { id: true, name: true, image: true } },
+        guestSession: { select: { nickname: true, avatar: true } },
       },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
     });
@@ -131,6 +150,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
 
     const { id } = await params;
+    const isSuperAdmin = session.user.isSuperAdmin === true;
     const body = (await request.json()) as {
       memberId: string;
       role?: string;
@@ -145,24 +165,52 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
-    // 권한 확인
+    // 호출자 권한 확인 (OWNER/STAFF 또는 superAdmin)
     const myMember = await prisma.spaceMember.findUnique({
       where: { spaceId_userId: { spaceId: id, userId: session.user.id } },
     });
 
-    if (!myMember || !["OWNER", "STAFF"].includes(myMember.role)) {
+    if (!isSuperAdmin && (!myMember || (myMember.role !== "OWNER" && myMember.role !== "STAFF"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const actorRole = (myMember?.role ?? "OWNER") as SpaceRole;
+
+    // enum allowlist 검증 (임의 값 주입 차단)
+    if (body.role !== undefined && !isSpaceRole(body.role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+    if (body.restriction !== undefined && !isChatRestriction(body.restriction)) {
+      return NextResponse.json({ error: "Invalid restriction" }, { status: 400 });
+    }
+
+    // 대상 멤버가 이 공간 소속인지 검증 (cross-space IDOR 차단)
+    const target = await prisma.spaceMember.findUnique({
+      where: { id: body.memberId },
+      select: { id: true, spaceId: true, role: true },
+    });
+    if (!target || target.spaceId !== id) {
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+
+    // 역할 계층: 호출자 역할이 대상보다 상위일 때만 제재/변경 가능
+    if (!canActOn(actorRole, target.role, isSuperAdmin)) {
+      return NextResponse.json(
+        { error: "Cannot modify a member of equal or higher role" },
+        { status: 403 }
+      );
     }
 
     const data: Record<string, unknown> = {};
     if (body.role !== undefined) {
-      if (myMember.role !== "OWNER") {
+      const desiredRole = body.role as SpaceRole;
+      // 부여하려는 역할도 호출자보다 하위여야 함 (OWNER 부여는 superAdmin만)
+      if (!canActOn(actorRole, desiredRole, isSuperAdmin)) {
         return NextResponse.json(
-          { error: "Only OWNER can change roles" },
+          { error: "Cannot assign a role equal to or higher than your own" },
           { status: 403 }
         );
       }
-      data.role = body.role;
+      data.role = desiredRole;
     }
     if (body.restriction !== undefined) {
       data.restriction = body.restriction;
@@ -171,7 +219,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
 
     const updated = await prisma.spaceMember.update({
-      where: { id: body.memberId },
+      where: { id: target.id },
       data,
     });
 

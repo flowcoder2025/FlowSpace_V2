@@ -1,0 +1,21 @@
+# WI-001-fix .pass — 듀얼 블라인드 검증 통과 마커
+# 게이트 규칙: 수용 기준 충족 + P0/P1·fixNow 없음 + 기계 게이트 통과
+wi = WI-001-fix
+verdict = PASS
+generatedAt = 2026-06-19
+sourceFingerprint = 3f4c21770756bce361eab34040b5f78d76fe69507ae8c1c12b780504605d4bd8
+
+# 기계 게이트 (세션 실측)
+tsc = PASS
+lint = PASS (warning 1, 기존 LiveKitMediaContext)
+vitest = PASS (52/52)
+build = PASS
+
+# 듀얼 블라인드 검증
+codex = PASS (8건 CLOSED; codex thread 019edc1e-498a-7851-8606-6c6ab4555b12)
+evaluator = PASS (weightedTotal 9.375; .flowset/eval-results/WI-001-fix.eval.json)
+blockingP0P1 = 0
+
+# 후속 분리 (비차단)
+WI-005-fix = 접속 중 소켓 ban/kick 실시간 추방 (codex 신규 P2, 크로스프로세스 설계 — 분리 합의)
+deferredP3 = admin GET 응답 정형화 / accessSecret 평문·비상수시간 비교(전역) / favicon startsWith 분기

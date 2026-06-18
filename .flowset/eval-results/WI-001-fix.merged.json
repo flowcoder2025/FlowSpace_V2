@@ -1,30 +1,33 @@
 {
   "wi": "WI-001-fix",
   "generatedAt": "2026-06-19",
+  "phase": "post-implementation",
   "sources": {
     "codex": ".flowset/eval-results/WI-001-fix.codex.json",
     "evaluator": ".flowset/eval-results/WI-001-fix.eval.json"
   },
   "convergence": {
-    "both": 3,
-    "codexOnly": 5,
-    "evaluatorOnly": 0,
-    "note": "codex가 보안·라우팅 축에서 evaluator(Claude)보다 5건 더 적출 — cross-space IDOR(P0)·accessSecret 노출·PII 유출·guest 우회·middleware no-op. 듀얼 검증의 보완성 입증."
+    "note": "구현 후 듀얼 블라인드 재검증. codex(스레드 019edc1e)·evaluator 모두 8개 수용 기준 CLOSED 확인. codex가 신규 P2(접속 중 소켓 ban/kick 실시간 추방 누락) 적출 → WI-005-fix로 분리 합의(스코프: 진입/요청 경계 인가 vs 접속 후 권한 전파). evaluator는 P3 3건(전부 defer)만 적출.",
+    "codexVerdict": "PASS (8건 CLOSED, 신규 P2는 WI-005로 분리 합의)",
+    "evaluatorVerdict": "PASS (weightedTotal 9.375)"
   },
   "issues": [
-    { "severity": "P0", "location": "server/handlers/room.ts:23", "title": "socket join:space 무인가", "sources": ["codex", "evaluator"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
-    { "severity": "P0", "location": "src/app/api/spaces/[id]/members/route.ts:173", "title": "members PATCH cross-space IDOR", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
-    { "severity": "P1", "location": "src/app/api/spaces/[id]/route.ts:36", "title": "GET accessSecret/inviteCode 노출", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
-    { "severity": "P1", "location": "src/app/api/spaces/[id]/members/route.ts:19", "title": "GET 멤버 PII(email/memberId) 유출", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
-    { "severity": "P1", "location": "src/app/api/guest/route.ts:40", "title": "guest PASSWORD 우회", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
-    { "severity": "P1", "location": "src/middleware.ts:12", "title": "middleware startsWith('/') no-op", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
-    { "severity": "P1", "location": "server/middleware/auth.ts:12", "title": "AUTH_SECRET fail-open", "sources": ["codex", "evaluator"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
-    { "severity": "P1", "location": "src/app/api/spaces/[id]/admin/members/route.ts:87 + members/route.ts:167", "title": "역할 계층 미적용 (STAFF가 상위/동급 제재)", "sources": ["codex", "evaluator"], "adjudication": "CONFIRMED", "status": "MUST-FIX" }
+    { "severity": "P0", "location": "server/handlers/room.ts:23", "title": "socket join:space 무인가", "adjudication": "CLOSED", "evidence": "join 전 space ACTIVE + spaceMember + BANNED 동기 검증 후에만 socket.join/role 설정. fire-and-forget loadMemberInfo 제거. space:error 이벤트 추가." },
+    { "severity": "P0", "location": "src/app/api/spaces/[id]/members/route.ts:173", "title": "members PATCH cross-space IDOR", "adjudication": "CLOSED", "evidence": "target.spaceId===id 검증(아니면 404) + role/restriction enum allowlist + 역할 계층 가드." },
+    { "severity": "P1", "location": "src/app/api/spaces/[id]/route.ts:36", "title": "GET accessSecret/inviteCode/ownerId 노출", "adjudication": "CLOSED", "evidence": "select allowlist + 명시적 응답 구성. accessSecret/inviteCode/ownerId 미반환. 비공개 공간 멤버/오너/superAdmin 게이트." },
+    { "severity": "P1", "location": "src/app/api/spaces/[id]/members/route.ts:19", "title": "GET 멤버 PII(email) 유출", "adjudication": "CLOSED", "evidence": "멤버십/superAdmin 게이트 + user select를 id/name/image로 축소(email/avatarConfig 제거)." },
+    { "severity": "P1", "location": "src/app/api/guest/route.ts:40", "title": "guest PASSWORD 우회", "adjudication": "CLOSED", "evidence": "accessType==='PASSWORD' 시 body.accessSecret 필수 + space.accessSecret 일치 검증(members POST와 동일 정책)." },
+    { "severity": "P1", "location": "src/middleware.ts:12", "title": "middleware startsWith('/') no-op", "adjudication": "CLOSED", "evidence": "루트 pathname==='/' exact + PUBLIC_PREFIXES는 exact-or-subpath(p 또는 p+'/'). 모든 경로 통과 no-op 제거." },
+    { "severity": "P1", "location": "server/middleware/auth.ts:12", "title": "AUTH_SECRET fail-open", "adjudication": "CLOSED", "evidence": "공유 getAuthSecret() — 미설정/32자 미만 throw. socket verify는 연결 거부, token route는 500. socket/token route도 동일 키 경로 적용." },
+    { "severity": "P1", "location": "src/app/api/spaces/[id]/admin/members/route.ts:87 + members/route.ts:167", "title": "역할 계층 미적용", "adjudication": "CLOSED", "evidence": "공유 canActOn(actor>target, superAdmin 예외)을 양 PATCH의 액션 게이트 + 부여 역할 검사에 적용. STAFF 동급/상위 제재 차단." }
+  ],
+  "newFindings": [
+    { "severity": "P2", "source": "codex", "location": "src/app/api/spaces/[id]/admin/members/route.ts (ban/kick) ↔ server/handlers/*", "title": "접속 중 소켓 ban/kick 실시간 추방 누락", "disposition": "DEFERRED → WI-005-fix", "rationale": "Next HTTP(3000)·socket.io(3001) 메모리 비공유 → 단순 패치 불가(Redis/pub-sub·내부훅·액션별 DB재조회 중 택1, 별도 설계). reconnect는 WI-001 join 게이트가 차단하므로 노출 창 한정. P0/P1 아님." }
   ],
   "gateDecision": {
-    "passEligible": false,
-    "reason": "P0 2건 + P1 6건 미해결 (fixNow:true). .pass 생성 금지.",
-    "blockingCount": { "P0": 2, "P1": 6 },
-    "machineGates": { "tsc": "PASS", "lint": "PASS", "vitest": "PASS(52/52)", "build": "PASS" }
+    "passEligible": true,
+    "reason": "수용 기준 8항목 CLOSED. P0/P1 또는 fixNow:true 잔여 없음. 신규 P2는 WI-005-fix로 분리 합의. P3 3건 전부 defer.",
+    "blockingCount": { "P0": 0, "P1": 0 },
+    "machineGates": { "tsc": "PASS", "lint": "PASS(warning 1, 기존)", "vitest": "PASS(52/52)", "build": "PASS" }
   }
 }

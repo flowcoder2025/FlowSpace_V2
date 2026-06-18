@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canActOn, isSpaceRole } from "@/lib/space-role";
 import type { SpaceRole, ChatRestriction } from "@prisma/client";
 
 interface RouteParams {
@@ -53,17 +54,19 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
 
     const { id: spaceId } = await params;
+    const isSuperAdmin = session.user.isSuperAdmin === true;
 
     const self = await prisma.spaceMember.findUnique({
       where: { spaceId_userId: { spaceId, userId: session.user.id } },
       select: { role: true },
     });
-    if (!self && !session.user.isSuperAdmin) {
+    if (!self && !isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (self && self.role !== "OWNER" && self.role !== "STAFF" && !session.user.isSuperAdmin) {
+    if (self && self.role !== "OWNER" && self.role !== "STAFF" && !isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    const actorRole = (self?.role ?? "OWNER") as SpaceRole;
 
     const body = await request.json();
     const { memberId, action, role } = body as {
@@ -85,8 +88,17 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
 
     // OWNER는 변경 불가
-    if (target.role === "OWNER" && !session.user.isSuperAdmin) {
+    if (target.role === "OWNER" && !isSuperAdmin) {
       return NextResponse.json({ error: "Cannot modify the space owner" }, { status: 403 });
+    }
+
+    // 역할 계층: 호출자 역할이 대상보다 상위일 때만 제재/변경 가능
+    // (STAFF가 동급 STAFF를 ban/kick/mute 하는 것을 차단)
+    if (!canActOn(actorRole, target.role, isSuperAdmin)) {
+      return NextResponse.json(
+        { error: "Cannot modify a member of equal or higher role" },
+        { status: 403 }
+      );
     }
 
     let updatedRestriction: ChatRestriction | undefined;
@@ -98,13 +110,20 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         if (!role) {
           return NextResponse.json({ error: "role is required for changeRole" }, { status: 400 });
         }
+        // enum allowlist (임의 값 주입 차단)
+        if (!isSpaceRole(role)) {
+          return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+        }
         // OWNER 역할은 superAdmin만 부여 가능
-        if (role === "OWNER" && !session.user.isSuperAdmin) {
+        if (role === "OWNER" && !isSuperAdmin) {
           return NextResponse.json({ error: "Only superAdmin can assign OWNER role" }, { status: 403 });
         }
-        // STAFF는 STAFF/OWNER 역할 부여 불가 (PARTICIPANT만 가능)
-        if (self?.role === "STAFF" && role !== "PARTICIPANT") {
-          return NextResponse.json({ error: "STAFF can only assign PARTICIPANT role" }, { status: 403 });
+        // 부여하려는 역할도 호출자보다 하위여야 함 (STAFF→STAFF/OWNER 차단)
+        if (!canActOn(actorRole, role, isSuperAdmin)) {
+          return NextResponse.json(
+            { error: "Cannot assign a role equal to or higher than your own" },
+            { status: 403 }
+          );
         }
         updatedRole = role;
         break;

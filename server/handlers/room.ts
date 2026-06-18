@@ -20,23 +20,68 @@ function getSpacePlayers(spaceId: string): Map<string, PlayerData> {
 }
 
 export function handleRoom(io: IO, socket: TypedSocket) {
-  socket.on("join:space", ({ spaceId, nickname, avatar }) => {
+  socket.on("join:space", async ({ spaceId, nickname, avatar }) => {
     // 인증된 userId 사용 (클라이언트 값 무시)
     const userId = socket.data.userId;
     if (!userId) return;
 
-    // Socket.io room 참가
+    // join 전 동기 인가 검증: 공간 존재/활성 + 멤버십 + BANNED 차단.
+    // 통과하기 전에는 socket.join / role / presence 등록을 하지 않는다.
+    let role: "OWNER" | "STAFF" | "PARTICIPANT";
+    let restriction: "NONE" | "MUTED" | "BANNED";
+    let memberId: string;
+    try {
+      const prisma = await getPrisma();
+
+      const space = await prisma.space.findUnique({
+        where: { id: spaceId },
+        select: { id: true, status: true },
+      });
+      if (!space || space.status !== "ACTIVE") {
+        socket.emit("space:error", {
+          code: "SPACE_NOT_FOUND",
+          message: "공간을 찾을 수 없거나 비활성 상태입니다.",
+        });
+        return;
+      }
+
+      const member = await prisma.spaceMember.findUnique({
+        where: { spaceId_userId: { spaceId, userId } },
+        select: { id: true, role: true, restriction: true },
+      });
+      if (!member) {
+        socket.emit("space:error", {
+          code: "NOT_A_MEMBER",
+          message: "이 공간의 멤버가 아닙니다.",
+        });
+        return;
+      }
+      if (member.restriction === "BANNED") {
+        socket.emit("space:error", {
+          code: "BANNED",
+          message: "이 공간에서 차단되었습니다.",
+        });
+        return;
+      }
+
+      memberId = member.id;
+      role = member.role as "OWNER" | "STAFF" | "PARTICIPANT";
+      restriction = member.restriction as "NONE" | "MUTED" | "BANNED";
+    } catch (err) {
+      console.error("[Room] join authorization failed:", err);
+      socket.emit("space:error", {
+        code: "JOIN_FAILED",
+        message: "입장 처리 중 오류가 발생했습니다.",
+      });
+      return;
+    }
+
+    // 인가 통과 후에만 room 참가 + 검증된 권한 정보 설정
     socket.join(spaceId);
     socket.data.spaceId = spaceId;
-
-    // 기본 role/restriction 설정 (DB 조회 전 기본값)
-    socket.data.role = socket.data.role ?? "PARTICIPANT";
-    socket.data.restriction = socket.data.restriction ?? "NONE";
-
-    // DB에서 멤버 정보 비동기 로드
-    loadMemberInfo(spaceId, userId, socket).catch((err) =>
-      console.error("[Room] Failed to load member info:", err)
-    );
+    socket.data.memberId = memberId;
+    socket.data.role = role;
+    socket.data.restriction = restriction;
 
     const player: PlayerData = {
       userId,
@@ -90,24 +135,4 @@ function leaveSpace(io: IO, socket: TypedSocket, spaceId: string) {
   }
 
   console.log(`[Room] ${userId} left ${spaceId} (${players.size} players)`);
-}
-
-/** DB에서 SpaceMember 정보 로드하여 socket.data에 할당 */
-async function loadMemberInfo(spaceId: string, userId: string, socket: TypedSocket): Promise<void> {
-  try {
-    const prisma = await getPrisma();
-
-    const member = await prisma.spaceMember.findUnique({
-      where: { spaceId_userId: { spaceId, userId } },
-      select: { id: true, role: true, restriction: true },
-    });
-
-    if (member) {
-      socket.data.memberId = member.id;
-      socket.data.role = member.role as "OWNER" | "STAFF" | "PARTICIPANT";
-      socket.data.restriction = member.restriction as "NONE" | "MUTED" | "BANNED";
-    }
-  } catch (err) {
-    console.error("[Room] Prisma member load error:", err);
-  }
 }

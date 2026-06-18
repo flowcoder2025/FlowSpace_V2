@@ -1,4 +1,5 @@
 import { jwtVerify } from "jose";
+import { getAuthSecret } from "../../src/lib/auth-secret";
 
 interface SocketTokenPayload {
   userId: string;
@@ -9,7 +10,8 @@ interface SocketTokenPayload {
 export async function verifySocketToken(
   token: string
 ): Promise<SocketTokenPayload> {
-  const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
+  // AUTH_SECRET 미설정/단문이면 throw → io.use catch → 연결 거부 (fail-closed)
+  const secret = getAuthSecret();
   const { payload } = await jwtVerify(token, secret);
 
   if (!payload.userId || typeof payload.userId !== "string") {
