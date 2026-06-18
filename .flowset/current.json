@@ -1,12 +1,12 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-002-fix",
   "lastWI": "WI-001-fix",
-  "type": null,
-  "status": "IDLE",
+  "type": "fix",
+  "status": "VERIFY",
   "integrationBranch": "develop",
-  "branch": "develop",
-  "startedAt": null,
+  "branch": "fix/WI-002-fix-phaser-shutdown-leak",
+  "startedAt": "2026-06-19",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "f8e7ba2",
-  "note": "WI-001-fix develop 머지 완료(PR#1, merge f8e7ba2). 다음 세션: WI-002-fix를 develop에서 분기해 ACTIVE 설정."
+  "lastVerifiedCommit": "8e3358f",
+  "note": "WI-002-fix 검증 완료. 기계게이트 4/4 PASS + 듀얼검증 3라운드(codex PASS·evaluator WARNING 9.6, P3 1건 defer) + .pass 생성. 다음: push → develop PR → 머지. P3(onerror dangling Promise)는 WI-006-fix로 분리."
 }

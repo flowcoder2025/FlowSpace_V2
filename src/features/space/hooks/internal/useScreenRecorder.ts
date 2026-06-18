@@ -9,7 +9,7 @@
  * - File System Access API / 다운로드 폴백
  */
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 // ============================================
 // Types
@@ -156,6 +156,53 @@ export function useScreenRecorder({
     typeof setTimeout
   > | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  /** 마운트 상태 — 언마운트 후 진행 중인 onstop의 setState/저장 흐름 차단 */
+  const mountedRef = useRef(true);
+  /** stopRecording Promise의 resolve — onstop 제거/미발화 시 cleanup이 반드시 settle */
+  const pendingStopResolveRef = useRef<(() => void) | null>(null);
+
+  // 언마운트 정리 — 진행 중 녹화/타이머/오디오 자원 회수 (abort/discard 성격).
+  // 훅이 소유하지 않은 원본 트랙(screenTrack, audioTracks)은 stop하지 않는다 (화면공유 유지).
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (notificationTimerRef.current) {
+        clearTimeout(notificationTimerRef.current);
+        notificationTimerRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      const recorder = mediaRecorderRef.current;
+      if (recorder) {
+        // 핸들러는 state와 무관하게 제거 — 이미 stop()되어 inactive지만 onstop이
+        // dispatch 전이거나 await 중일 수 있음. 진행 중 onstop은 mountedRef 가드로 차단.
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        recorder.onerror = null;
+        if (recorder.state !== "inactive") {
+          try {
+            recorder.stop();
+          } catch {
+            // 이미 중단됨
+          }
+        }
+      }
+      mediaRecorderRef.current = null;
+      chunksRef.current = [];
+      // onstop을 떼어내 미발화로 끝나는 경우에도 await 중인 stopRecording Promise를 settle
+      if (pendingStopResolveRef.current) {
+        pendingStopResolveRef.current();
+        pendingStopResolveRef.current = null;
+      }
+    };
+  }, []);
 
   const showNotification = useCallback(
     (type: NotificationType, message: string) => {
@@ -289,6 +336,8 @@ export function useScreenRecorder({
     }
 
     return new Promise<void>((resolve) => {
+      // cleanup이 onstop을 떼어내도 Promise를 settle할 수 있도록 resolve 보관
+      pendingStopResolveRef.current = resolve;
       recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, {
           type: "video/webm",
@@ -298,6 +347,14 @@ export function useScreenRecorder({
         const result = await saveFile(blob, fileName);
 
         chunksRef.current = [];
+        pendingStopResolveRef.current = null;
+
+        // await(저장 다이얼로그) 동안 언마운트되었으면 state 갱신/알림 중단
+        if (!mountedRef.current) {
+          resolve();
+          return;
+        }
+
         setRecordingState("idle");
         setRecordingTime(0);
 

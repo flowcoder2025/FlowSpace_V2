@@ -29,6 +29,8 @@ export class MainScene extends Phaser.Scene {
   private cameraController!: CameraController;
   private objectManager!: ObjectManager;
   private editorSystem!: EditorSystem;
+  /** cleanup 멱등 가드 — SHUTDOWN/DESTROY 중복 발생 시 이중 정리 방지 */
+  private cleanedUp = false;
 
   constructor() {
     super({ key: SCENE_KEYS.MAIN });
@@ -59,6 +61,15 @@ export class MainScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Phaser SceneManager는 init/preload/create/update만 자동 연결한다.
+    // scene.shutdown()은 자동 호출되지 않으므로 생명주기 이벤트에 직접 연결한다.
+    // - SHUTDOWN: scene.stop/restart 시 발생
+    // - DESTROY:  game.destroy(true) 시 발생 (실제 teardown 경로, SHUTDOWN 미발생)
+    // 둘 중 하나만 발생하지만 양쪽을 once로 받고 cleanup에서 반대편을 해제한다.
+    this.cleanedUp = false;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
+    this.events.once(Phaser.Scenes.Events.DESTROY, this.shutdown, this);
+
     try {
       this.initWorld();
       this.initTilemap();
@@ -276,8 +287,15 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
-  /** 씬 종료 시 정리 */
+  /** 씬 종료 시 정리 (SHUTDOWN/DESTROY 이벤트 핸들러) */
   shutdown(): void {
+    if (this.cleanedUp) return;
+    this.cleanedUp = true;
+
+    // 반대편 생명주기 리스너 해제 — SHUTDOWN 후 재시작 시 DESTROY once 리스너 누적 방지
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
+    this.events.off(Phaser.Scenes.Events.DESTROY, this.shutdown, this);
+
     eventBridge.off(GameEvents.PLAYER_AVATAR_UPDATED, this.onLocalAvatarUpdated);
     eventBridge.off(GameEvents.ASSET_GENERATED, this.onAssetGenerated);
     this.localPlayer?.destroy();
