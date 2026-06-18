@@ -1,11 +1,12 @@
 {
-  "activeWI": "WI-001-fix",
-  "type": "fix",
-  "status": "VERIFY",
-  "startedAt": "2026-06-19",
+  "activeWI": null,
+  "lastWI": "WI-001-fix",
+  "type": null,
+  "status": "IDLE",
   "integrationBranch": "develop",
-  "branch": "fix/WI-001-fix-auth-authz",
+  "branch": "develop",
+  "startedAt": null,
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "gatesPassed": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "80a3adb"
+  "lastVerifiedCommit": "f8e7ba2",
+  "note": "WI-001-fix develop 머지 완료(PR#1, merge f8e7ba2). 다음 세션: WI-002-fix를 develop에서 분기해 ACTIVE 설정."
 }

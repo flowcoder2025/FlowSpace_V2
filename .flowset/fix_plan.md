@@ -5,26 +5,7 @@
 > 초기 시드 = 2026-06-19 듀얼 블라인드 검증(codex CLI + Claude) 확정 결함.
 
 ## Active WI
-- **ID**: WI-001-fix
-- **Type**: fix (보안)
-- **Status**: VERIFY (구현·기계게이트·듀얼검증 완료, `.pass` 생성됨 → develop 머지 대기)
-- **Branch**: `fix/WI-001-fix-auth-authz` (develop에서 분기)
-- **Goal**: 인증/인가 우회 및 데이터 노출 결함 차단
-- **Scope**:
-  - `server/handlers/room.ts` (socket join 인가)
-  - `src/app/api/spaces/[id]/route.ts`, `src/app/api/spaces/[id]/members/route.ts` (응답 노출·IDOR)
-  - `src/app/api/guest/route.ts` (PASSWORD 우회)
-  - `src/middleware.ts`, `server/middleware/auth.ts`, `src/app/api/socket/token/route.ts` (인증 경계)
-  - `src/app/api/spaces/[id]/admin/members/route.ts` (역할 계층)
-- **Acceptance**:
-  - `join:space`가 socket 세션 기준 멤버십/접근권(PRIVATE·PASSWORD·BANNED) 동기 검증 후에만 join
-  - members PATCH가 `target.spaceId === id` 경계 검증 (cross-space IDOR 차단)
-  - GET 응답에서 `accessSecret`·email 등 비공개 필드 노출 금지 (select allowlist)
-  - guest 생성 시 PASSWORD 공간은 accessSecret 검증
-  - `middleware.ts` 루트는 `pathname === "/"` exact 매칭 (startsWith no-op 제거)
-  - `AUTH_SECRET` 미설정 시 fail-closed
-  - admin member action(ban/kick/mute)에 "호출자 역할 ≤ 대상 역할" 공통 가드
-- **Required gates**: `npx tsc --noEmit` · `npm run lint` · `npx vitest run` · `npm run build` · dual review(codex+evaluator) · `.flowset/eval-results/WI-001-fix.pass`
+- (없음) — WI-001-fix develop 머지 완료. 다음 세션에서 WI-002-fix를 develop에서 분기해 ACTIVE 설정.
 
 ## Queue
 | WI | Type | Status | Goal | Notes |
@@ -35,4 +16,4 @@
 | WI-005-fix | fix | READY | 접속 중 소켓 ban/kick 실시간 추방 (dashboard 제재 시 현재 연결 즉시 종료/room 제거). Next HTTP↔socket.io 크로스프로세스 채널(Redis pub-sub/내부훅/액션별 DB재조회 택1) 설계 필요 | WI-001 듀얼검증서 codex 신규 P2 분리. reconnect는 WI-001 join 게이트가 이미 차단 |
 
 ## Done
-- **WI-001-fix** (보안) — 인증/인가 우회·데이터 노출 8건 차단. 기계게이트 4/4 PASS + 듀얼검증(codex PASS·evaluator PASS 9.375) + `.pass` 생성. 구현: join 동기인가, members IDOR, GET select allowlist, 멤버 PII 게이트, guest PASSWORD, middleware exact, AUTH_SECRET fail-closed, 역할계층 canActOn. (develop 머지 대기)
+- **WI-001-fix** (보안) — 인증/인가 우회·데이터 노출 8건 차단. 기계게이트 4/4 PASS + 듀얼검증(codex PASS·evaluator PASS 9.375) + `.pass` 생성. 구현: join 동기인가, members IDOR, GET select allowlist, 멤버 PII 게이트, guest PASSWORD, middleware exact, AUTH_SECRET fail-closed, 역할계층 canActOn. **develop 머지 완료 (PR#1, merge `f8e7ba2`)**.
