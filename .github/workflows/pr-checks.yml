@@ -1,0 +1,39 @@
+name: pr-checks (flowset semantic gate)
+
+# .flowset 의미 게이트: ACTIVE WI에 대한 검증 통과 마커(.pass) 존재 확인.
+# 기계 게이트(tsc/lint/vitest/build)는 기존 ci.yml이 담당 — 여기선 의미 게이트만.
+# 도입 초기에는 GitHub branch protection에서 "required check"로 올리지 말 것(비강제 관찰 → 마찰/오탐 안정 후 승격).
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  flowset-semantic-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify .pass for active WI
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f .flowset/current.json ]; then
+            echo "no .flowset/current.json — flowset process not in use; skipping."
+            exit 0
+          fi
+          WI=$(node -p "require('./.flowset/current.json').activeWI || ''")
+          STATUS=$(node -p "require('./.flowset/current.json').status || ''")
+          if [ -z "$WI" ] || { [ "$STATUS" != "ACTIVE" ] && [ "$STATUS" != "VERIFY" ]; }; then
+            echo "no active WI (status='$STATUS') — semantic gate skipped."
+            exit 0
+          fi
+          PASS=".flowset/eval-results/$WI.pass"
+          if [ ! -f "$PASS" ]; then
+            echo "::error::flowset semantic gate FAILED — $PASS is missing."
+            echo "Run dual verification (codex + evaluator), confirm .merged.json has no P0/P1/fixNow,"
+            echo "and create $PASS before merging. See .claude/process/03,04,07."
+            exit 1
+          fi
+          echo "flowset semantic gate OK — $PASS present:"
+          cat "$PASS"
