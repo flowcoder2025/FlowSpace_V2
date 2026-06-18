@@ -1,10 +1,11 @@
 {
   "activeWI": "WI-001-fix",
   "type": "fix",
-  "status": "ACTIVE",
+  "status": "VERIFY",
   "startedAt": "2026-06-19",
   "integrationBranch": "develop",
   "branch": "fix/WI-001-fix-auth-authz",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
+  "gatesPassed": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": null
 }

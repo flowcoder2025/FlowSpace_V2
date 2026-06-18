@@ -15,11 +15,24 @@ export async function GET(_request: Request, { params }: RouteParams) {
     }
 
     const { id } = await params;
+    // select allowlist — accessSecret/inviteCode/ownerId 등 비공개 필드 미반환.
+    // ownerId는 접근 게이트 판단용으로만 조회 후 응답에서 제외한다.
     const space = await prisma.space.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        accessType: true,
+        maxUsers: true,
+        status: true,
+        logoUrl: true,
+        primaryColor: true,
+        loadingMessage: true,
+        createdAt: true,
+        ownerId: true,
         template: { select: { key: true, name: true, assetsPath: true } },
-        owner: { select: { id: true, name: true, image: true } },
+        owner: { select: { name: true, image: true } },
         _count: { select: { members: true, chatMessages: true } },
         members: {
           where: { userId: session.user.id },
@@ -33,10 +46,29 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Space not found" }, { status: 404 });
     }
 
+    // 비공개(PRIVATE/PASSWORD) 공간은 멤버/오너/superAdmin에게만 노출
+    const isMember = space.members.length > 0;
+    const isOwner = space.ownerId === session.user.id;
+    const isSuperAdmin = session.user.isSuperAdmin === true;
+    if (space.accessType !== "PUBLIC" && !isMember && !isOwner && !isSuperAdmin) {
+      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    }
+
     return NextResponse.json({
-      ...space,
+      id: space.id,
+      name: space.name,
+      description: space.description,
+      accessType: space.accessType,
+      maxUsers: space.maxUsers,
+      status: space.status,
+      logoUrl: space.logoUrl,
+      primaryColor: space.primaryColor,
+      loadingMessage: space.loadingMessage,
+      createdAt: space.createdAt,
+      template: space.template,
+      owner: space.owner,
+      _count: space._count,
       myRole: space.members[0]?.role || null,
-      members: undefined,
     });
   } catch (error) {
     return NextResponse.json(

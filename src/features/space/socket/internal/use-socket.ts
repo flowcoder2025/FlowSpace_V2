@@ -300,6 +300,12 @@ export function useSocket({
           setSocketError("서버 연결에 실패했습니다. 페이지를 새로고침해주세요.");
         });
 
+        // 입장 인가 거부 (비멤버/차단/비활성 공간)
+        sock.on("space:error", (data) => {
+          console.error("[Socket] space:error:", data.code, data.message);
+          setSocketError(data.message);
+        });
+
         // ── 플레이어 이벤트 ──
         sock.on("players:list", ({ players: list }) => {
           playersMapRef.current.clear();
