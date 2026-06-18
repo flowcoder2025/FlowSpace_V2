@@ -1,0 +1,10 @@
+WI=WI-002-fix
+commit=8e3358f
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-002-fix.codex.json
+evaluator=.flowset/eval-results/WI-002-fix.eval.json
+merged=.flowset/eval-results/WI-002-fix.merged.json
+gates=tsc,lint,vitest,build
+codexVerdict=PASS
+evaluatorVerdict=WARNING(9.6,P3-defer)
+createdAt=2026-06-19T05:19:04Z
