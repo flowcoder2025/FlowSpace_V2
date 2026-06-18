@@ -1,13 +1,13 @@
 # HANDOFF
 
 ## Active WI
-(없음) — WI-002-fix 검증 완료(VERIFY), branch `fix/WI-002-fix-phaser-shutdown-leak`. **다음 작업: push → develop PR → 머지.**
+(없음) — WI-002-fix develop 머지 완료. 다음 세션은 **WI-003-refactor**부터.
 
 ## Ground Truth
-- Integration branch: `develop` @ `9dddba8` (origin/develop 동기화됨)
-- WI 브랜치 `fix/WI-002-fix-phaser-shutdown-leak` @ `8e3358f` (3 커밋, develop에서 분기) — **로컬만, 미푸시**
-- main: `11b04ac` **동결**
-- 현재 체크아웃: `fix/WI-002-fix-phaser-shutdown-leak`
+- Integration branch: `develop` @ `256ae57` (PR#2 머지 커밋) — origin/develop 동기화됨
+- WI 브랜치 `fix/WI-002-fix-phaser-shutdown-leak`: 머지 후 **로컬+원격 삭제됨**
+- main: `11b04ac` **동결** (develop 미반영)
+- 현재 체크아웃: `develop`
 
 ## Done (이번 세션)
 - **WI-002-fix 구현 + 검증 완료** (커밋 `8e3358f`): 안정성/리소스 누수 2건
@@ -17,9 +17,11 @@
   - 기계 게이트 4/4 PASS · `.pass`/`.merged.json` 생성
 
 ## Next (다음 세션 시작점)
-1. **WI-002-fix push + PR**: `git push -u origin fix/WI-002-fix-phaser-shutdown-leak` → `gh pr create --base develop` → CI 통과 → 머지 → 브랜치 삭제
-2. 머지 후 `current.json` IDLE, `fix_plan.md` WI-002 Done 확정
-3. **WI-003-refactor** 착수: 타 모듈 `internal/*` 직접 import 위반 정리
+1. `git checkout develop && git pull` 확인 (이미 develop @ 256ae57)
+2. **WI-003-refactor** 착수: develop에서 `refactor/WI-003-refactor-...` 분기
+   - 타 모듈 `internal/*` 직접 import 위반 정리 (editor↔game, server→socket/chat 경계)
+   - `current.json` activeWI=WI-003-refactor / status=ACTIVE, `fix_plan.md` Active WI 블록 채우기
+3. 경계 변경이면 구현 전 Codex 협의(`.claude/process/02`) → 구현 → 기계게이트 → 듀얼검증 → `.pass` → develop PR (WI-002와 동일 플로우)
 
 ## Open Issues (Queue)
 - **WI-003-refactor** (READY): 경계 위반 `internal/*` 직접 import 정리 — 다음 우선
@@ -27,7 +29,7 @@
 - **WI-005-fix** (READY): 접속 중 소켓 ban/kick 실시간 추방 (크로스프로세스 설계)
 - **WI-006-fix** (READY, 신규): `useScreenRecorder.onerror` 경로 pending resolve 미종결(P3, 무해). WI-002 evaluator 발산 발견
 
-## Verification (WI-002-fix = 검증 완료, 머지 대기)
+## Verification (WI-002-fix = 머지 완료)
 | Gate | Result | Evidence |
 |---|---|---|
 | tsc / lint / vitest / build | PASS / PASS(0 err) / PASS(52/52) / PASS | 세션 실측 (r3 코드 기준) |
@@ -35,7 +37,8 @@
 | evaluator | WARNING (9.6, P3 1건 defer→WI-006) | `.flowset/eval-results/WI-002-fix.eval.json` |
 | merged | gateDecision=PASS (P0/P1·fixNow 없음) | `.flowset/eval-results/WI-002-fix.merged.json` |
 | pass | 생성됨 | `.flowset/eval-results/WI-002-fix.pass` (commit 8e3358f) |
-| merge | 대기 | push → develop PR 필요 |
+| CI (flowset-semantic-gate, Vercel) | PASS | PR#2 checks |
+| merge | DONE | PR#2 → develop `256ae57` |
 
 ## 듀얼검증 라운드 이력 (WI-002)
 - r1: onstop `await saveFile` 중 unmount → setState-after-unmount (codex P2 fixNow / evaluator P3). → mountedRef 가드 + cleanup 무조건 detach (16488e2)
