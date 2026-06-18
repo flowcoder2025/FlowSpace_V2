@@ -1,12 +1,12 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-002-fix",
   "lastWI": "WI-001-fix",
-  "type": null,
-  "status": "IDLE",
+  "type": "fix",
+  "status": "ACTIVE",
   "integrationBranch": "develop",
-  "branch": "develop",
-  "startedAt": null,
+  "branch": "fix/WI-002-fix-phaser-shutdown-leak",
+  "startedAt": "2026-06-19",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": "f8e7ba2",
-  "note": "WI-001-fix develop 머지 완료(PR#1, merge f8e7ba2). 다음 세션: WI-002-fix를 develop에서 분기해 ACTIVE 설정."
+  "note": "WI-002-fix 착수: Phaser MainScene 생명주기 cleanup 미연결(SHUTDOWN/DESTROY) → eventBridge 싱글톤 리스너 누수 + useScreenRecorder unmount cleanup. develop에서 분기. 구현 전 Codex 설계 협의(Phaser 생명주기=consult 필수)."
 }
