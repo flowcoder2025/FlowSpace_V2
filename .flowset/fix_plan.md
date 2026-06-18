@@ -7,7 +7,7 @@
 ## Active WI
 - **ID**: WI-001-fix
 - **Type**: fix (보안)
-- **Status**: ACTIVE
+- **Status**: VERIFY (구현·기계게이트·듀얼검증 완료, `.pass` 생성됨 → develop 머지 대기)
 - **Branch**: `fix/WI-001-fix-auth-authz` (develop에서 분기)
 - **Goal**: 인증/인가 우회 및 데이터 노출 결함 차단
 - **Scope**:
@@ -32,6 +32,7 @@
 | WI-002-fix | fix | READY | Phaser `MainScene.shutdown()` SHUTDOWN 이벤트 미연결 → eventBridge 리스너 누수 + `useScreenRecorder` unmount cleanup | 보안 다음 |
 | WI-003-refactor | refactor | READY | 타 모듈 `internal/*` 직접 import 위반 정리 (editor↔game, server→socket/chat) | 경계 위반 |
 | WI-004-fix | fix | READY | `api/assets/[id]` DELETE unlink 시 `public` 경로 격리(`../` 차단) | P2 |
+| WI-005-fix | fix | READY | 접속 중 소켓 ban/kick 실시간 추방 (dashboard 제재 시 현재 연결 즉시 종료/room 제거). Next HTTP↔socket.io 크로스프로세스 채널(Redis pub-sub/내부훅/액션별 DB재조회 택1) 설계 필요 | WI-001 듀얼검증서 codex 신규 P2 분리. reconnect는 WI-001 join 게이트가 이미 차단 |
 
 ## Done
-- (없음)
+- **WI-001-fix** (보안) — 인증/인가 우회·데이터 노출 8건 차단. 기계게이트 4/4 PASS + 듀얼검증(codex PASS·evaluator PASS 9.375) + `.pass` 생성. 구현: join 동기인가, members IDOR, GET select allowlist, 멤버 PII 게이트, guest PASSWORD, middleware exact, AUTH_SECRET fail-closed, 역할계층 canActOn. (develop 머지 대기)

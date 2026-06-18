@@ -2,40 +2,40 @@
   "reviewer": "evaluator",
   "schemaVersion": 1,
   "scores": {
-    "completeness": 4,
-    "consistency": 5,
-    "specificity": 6,
-    "actionability": 7
+    "completeness": 9.5,
+    "consistency": 9.5,
+    "specificity": 9.5,
+    "actionability": 9
   },
-  "weightedTotal": 5.1,
-  "verdict": "FAIL",
+  "weightedTotal": 9.375,
+  "verdict": "PASS",
   "issues": [
     {
-      "severity": "P0",
-      "location": "server/handlers/room.ts:23",
-      "description": "join:space 핸들러가 socket.data.userId만 확인하고 멤버십/접근권을 검증하지 않은 채 socket.join 수행. loadMemberInfo는 비멤버를 거부하지 않음(role만 설정) → 비멤버가 임의 space 입장.",
-      "recommendation": "join 전 멤버십/restriction/access 동기 검증, 실패 시 join 차단.",
-      "defer": false,
-      "deferRationale": null,
-      "fixNow": true
+      "severity": "P3",
+      "location": "src/app/api/spaces/[id]/admin/members/route.ts:34,40",
+      "description": "admin members GET still selects user.email and returns the raw `members` objects (restrictedBy/restrictedReason/userId 등 내부 식별자 포함). 수용 기준 #4가 지목한 비-admin members/route.ts GET은 email을 제거하고 id/name/image allowlist를 적용해 해결됨(검증: members/route.ts:41). admin GET은 OWNER/STAFF/superAdmin 게이트(route.ts:24-29) 뒤에 있어 PII 무인가 노출은 아니나, GET space allowlist 패턴과 비교하면 응답 정형화가 빠져 있다.",
+      "recommendation": "admin GET도 select/매핑 allowlist로 정형화해 email 노출 범위를 최소화하고 restrictedBy/restrictedReason 등 내부 필드를 명시적으로 통제하라. 이 WI 수용 기준 밖이므로 후속 하드닝 항목으로 분리 가능.",
+      "defer": true,
+      "deferRationale": "수용 기준 #4의 대상 라우트(members/route.ts GET)는 충족됨. admin GET은 OWNER/STAFF/superAdmin 게이트 뒤라 무인가 PII 유출이 아니며 P0~P2 차단 대상 아님.",
+      "fixNow": false
     },
     {
-      "severity": "P1",
-      "location": "server/middleware/auth.ts:12",
-      "description": "AUTH_SECRET 미설정 시 fail-open — 'undefined' 바이트가 서명 키가 되어 토큰 위조 위험. 시작 시 어서션 없음.",
-      "recommendation": "AUTH_SECRET 누락/단문 시 fail-closed.",
-      "defer": false,
-      "deferRationale": null,
-      "fixNow": true
+      "severity": "P3",
+      "location": "src/app/api/guest/route.ts:50",
+      "description": "PASSWORD 검증이 평문 비교(accessSecret !== space.accessSecret)이고 비상수시간 비교다. members POST(members/route.ts:94)와 동일 정책이라 일관되며 이 WI가 신규 도입한 결함이 아니라 기존 코드베이스 전반의 설계(평문 accessSecret 저장)에 정합한다. 타이밍 사이드채널 위험은 본 컨텍스트에서 낮음.",
+      "recommendation": "accessSecret을 해시 저장 + crypto.timingSafeEqual 비교로 전환(코드베이스 전역 일괄). 별도 WI로 분리 권장.",
+      "defer": true,
+      "deferRationale": "기존 코드베이스 전역 패턴이며 본 WI는 'guest가 PASSWORD 검증을 거치도록' 하는 것이 수용 기준 #5. 해당 게이트는 충족됨. 평문/타이밍 이슈는 전역 리팩토링 범위.",
+      "fixNow": false
     },
     {
-      "severity": "P1",
-      "location": "src/app/api/spaces/[id]/members/route.ts:167",
-      "description": "PATCH restriction 분기가 OWNER/STAFF 공통 가드만 거침 → STAFF가 OWNER를 ban/mute 가능. body.role도 enum 검증 없이 raw write. '호출자 역할 ≤ 대상 역할'(rules/app.md #6) 위반.",
-      "recommendation": "역할 rank 공통 가드 + role enum allowlist + target-OWNER 보호.",
-      "defer": false,
-      "deferRationale": null,
-      "fixNow": true
+      "severity": "P3",
+      "location": "src/middleware.ts:21",
+      "description": "정적 에셋 판정의 favicon 분기가 startsWith(\"/favicon\")이라 /favicon-evil 같은 경로도 정적 자산으로 통과시킬 수 있다. 보안 경계가 아닌 정적 서빙 분기이며 기존 코드에서 유지된 패턴. 수용 기준 #6(루트 exact 매칭 + startsWith('/') no-op 제거)은 완전히 충족됨(middleware.ts:15-19 검증).",
+      "recommendation": "favicon 분기도 pathname === \"/favicon.ico\" 형태로 좁히면 일관성 향상. 영향 낮아 선택적.",
+      "defer": true,
+      "deferRationale": "보안 경계(인증 우회) 아님 — /_next, /favicon은 정적 자산 패스스루일 뿐이고 인증 우회로 이어지지 않는다. 수용 기준 #6의 핵심(루트 no-op 제거)은 충족.",
+      "fixNow": false
     }
   ]
 }

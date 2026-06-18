@@ -245,6 +245,7 @@ export interface ServerToClientEvents {
   }) => void;
 
   // Error events (세분화)
+  "space:error": (data: { code: string; message: string }) => void;
   "chat:error": (data: { code: string; message: string }) => void;
   "whisper:error": (data: { code: string; message: string }) => void;
   "party:error": (data: { code: string; message: string }) => void;

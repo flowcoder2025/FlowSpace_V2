@@ -5,9 +5,10 @@ import { prisma } from "@/lib/prisma";
 /** POST /api/guest - 게스트 세션 생성 */
 export async function POST(request: Request) {
   try {
-    const { spaceId, nickname } = (await request.json()) as {
+    const { spaceId, nickname, accessSecret } = (await request.json()) as {
       spaceId?: string;
       nickname?: string;
+      accessSecret?: string;
     };
 
     if (!spaceId || !nickname) {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     // 공간 존재 + 활성 확인
     const space = await prisma.space.findUnique({
       where: { id: spaceId },
-      select: { id: true, status: true, accessType: true },
+      select: { id: true, status: true, accessType: true, accessSecret: true },
     });
 
     if (!space || space.status !== "ACTIVE") {
@@ -42,6 +43,16 @@ export async function POST(request: Request) {
         { error: "Guest access not allowed for private spaces" },
         { status: 403 }
       );
+    }
+
+    // PASSWORD 공간은 게스트도 accessSecret 검증 (members POST와 동일 정책)
+    if (space.accessType === "PASSWORD") {
+      if (!accessSecret || accessSecret !== space.accessSecret) {
+        return NextResponse.json(
+          { error: "Invalid password" },
+          { status: 403 }
+        );
+      }
     }
 
     const guest = await createGuestSession(spaceId, nickname);
