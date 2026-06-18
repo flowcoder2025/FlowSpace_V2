@@ -9,7 +9,7 @@
  * - File System Access API / 다운로드 폴백
  */
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 // ============================================
 // Types
@@ -156,6 +156,39 @@ export function useScreenRecorder({
     typeof setTimeout
   > | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+
+  // 언마운트 정리 — 진행 중 녹화/타이머/오디오 자원 회수 (abort/discard 성격).
+  // 훅이 소유하지 않은 원본 트랙(screenTrack, audioTracks)은 stop하지 않는다 (화면공유 유지).
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (notificationTimerRef.current) {
+        clearTimeout(notificationTimerRef.current);
+        notificationTimerRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        // 핸들러 제거 → 언마운트 후 setState/저장 다이얼로그 방지
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        recorder.onerror = null;
+        try {
+          recorder.stop();
+        } catch {
+          // 이미 중단됨
+        }
+      }
+      mediaRecorderRef.current = null;
+      chunksRef.current = [];
+    };
+  }, []);
 
   const showNotification = useCallback(
     (type: NotificationType, message: string) => {
