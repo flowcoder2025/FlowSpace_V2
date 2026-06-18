@@ -1,41 +1,39 @@
 # HANDOFF
 
 ## Active WI
-WI-001-fix — 인증/인가 우회 및 데이터 노출 결함 차단 (status: ACTIVE, **구현 미착수**)
+WI-001-fix — 인증/인가 우회 및 데이터 노출 결함 차단 (status: **VERIFY** — 구현·검증 완료, develop 머지 대기)
 
 ## Ground Truth
 - Integration branch: `develop` @ `705d033` (main 동결, develop이 작업 메인)
-- WI branch: `fix/WI-001-fix-auth-authz` (develop에서 분기, 구현 대기)
+- WI branch: `fix/WI-001-fix-auth-authz` @ `80a3adb` (**WI-001 구현 커밋 완료**)
 - main: `11b04ac` **동결** (origin/main과 동일)
-- **푸시 안 됨 — 전부 로컬.** push + PR 시 CI(pr-checks 비강제) 활성화
-- Changed files (이 WI): 없음 — 프로세스 스캐폴딩 단계, 소스 미변경
+- **푸시 안 됨 — 전부 로컬.** push + PR(→develop) 시 CI(pr-checks 비강제) 활성화
+- Changed files (WI-001): 12 소스(.ts) + 5 원장(.flowset). 신규 헬퍼 2개: `src/lib/auth-secret.ts`, `src/lib/space-role.ts`
 
 ## Done (이번 세션)
-- 듀얼 블라인드 검증(codex CLI + Claude) → 보안 결함 13건 확정 (P0 2 / P1 6 / P2 5)
-- 게이트 그라운드 트루스 실측: tsc PASS · lint PASS · vitest 52/52 · build PASS
-- 프로세스 스캐폴딩: `.flowset` 원장 + `.claude/process/00~07` + `review.schema.json` + `evaluator-agent`
-- 경량 Stop 게이트 교체: prompt 훅 2개 제거 → `flowset_stop_gate.ps1` (deterministic)
-- CI 의미게이트 추가: `pr-checks.yml` (.pass 검사, 초기 비강제)
-- 브랜치 모델 확립: main 동결 / develop 통합 / wi/* 작업 / 승격
-- 메모리 저장: codex-cli-verification · powershell-ps1-utf8 · flowspace-dev-process
+- WI-001 보안 8건 구현 (P0 2 / P1 6) — codex와 설계 협의 후 구현, 보완점 6건 반영
+  - join 동기인가 / members IDOR / GET select allowlist / 멤버 PII 게이트 / guest PASSWORD / middleware exact / AUTH_SECRET fail-closed / 역할계층 canActOn
+- 기계 게이트 실측: tsc PASS · lint PASS(warning 1 기존) · vitest 52/52 · build PASS
+- 듀얼 블라인드 재검증: codex PASS(8건 CLOSED) · evaluator PASS(9.375) → `.pass` 생성
+- 커밋: `80a3adb` (`fix: WI-001 ...`)
 
 ## Next (다음 세션 시작점)
-1. `git checkout fix/WI-001-fix-auth-authz`
-2. 이 파일 + `.flowset/fix_plan.md` + `.flowset/eval-results/WI-001-fix.merged.json` 읽기
-3. 보안 수용 기준 8항목 구현 — **P0 2건**(socket `join:space` 무인가, members PATCH cross-space IDOR) → **P1 6건**(GET accessSecret/email 노출, guest PASSWORD 우회, middleware `startsWith("/")` no-op, AUTH_SECRET fail-open, 역할 계층) 순
-4. 기계게이트 + 듀얼검증(codex+evaluator) → `.merged.json`에 P0/P1·fixNow 없음 → `.pass` 생성 (`-EmitFingerprint`로 sourceFingerprint 포함)
-5. `develop`로 PR 머지 → WI-002-fix(Phaser shutdown 누수) 진행
+1. **push + PR**: `git push -u origin fix/WI-001-fix-auth-authz` → `gh pr create --base develop` (PR 제목 `fix: WI-001 ...`)
+2. CI(pr-checks) 통과 확인 → develop 머지 → 브랜치 삭제
+3. 머지 후 `current.json`/`fix_plan.md`에서 WI-001 status VERIFY→DONE 확정, 다음 ACTIVE 승격
+4. **WI-002-fix** 착수: Phaser `MainScene.shutdown()` SHUTDOWN 이벤트 미연결(eventBridge 리스너 누수) + `useScreenRecorder` unmount cleanup
+   - 시작 전 `.flowset/fix_plan.md` Queue 확인. 새 WI 브랜치는 develop에서 분기
 
 ## Open Issues
-- WI-001-fix 구현 미착수 (수용 기준 8항목 — `fix_plan.md`)
+- WI-005-fix (READY, 신규): 접속 중 소켓 ban/kick 실시간 추방. codex가 WI-001 검증서 적출한 P2 — Next HTTP(3000)↔socket.io(3001) 메모리 비공유라 단순패치 불가. Redis pub-sub / 내부훅 / 액션별 DB재조회 중 설계 선택 필요. reconnect는 WI-001 join 게이트가 이미 차단
 
-## Verification (WI-001-fix 현재 = 구현 전 결함 상태)
+## Verification (WI-001-fix = 구현·검증 완료)
 | Gate | Result | Evidence |
 |---|---|---|
-| tsc | PASS | 세션 실측 (fresh .next 후 exit 0) |
-| lint | PASS | 세션 실측 (warning 1) |
+| tsc | PASS | 세션 실측 (exit 0) |
+| lint | PASS | 세션 실측 (warning 1, 기존 LiveKitMediaContext) |
 | vitest | PASS 52/52 | 세션 실측 |
 | build | PASS | 세션 실측 (exit 0) |
-| codex | DONE (FAIL verdict, 8건) | `.flowset/eval-results/WI-001-fix.codex.json` |
-| evaluator | DONE (FAIL verdict, 3건) | `.flowset/eval-results/WI-001-fix.eval.json` |
-| pass | BLOCKED | P0/P1 미해결 → `.pass` 생성 금지 (구현 후 재검증 필요) |
+| codex | PASS (8건 CLOSED) | thread 019edc1e / `.flowset/eval-results/WI-001-fix.codex.json` |
+| evaluator | PASS (9.375) | `.flowset/eval-results/WI-001-fix.eval.json` |
+| pass | **생성됨** | `.flowset/eval-results/WI-001-fix.pass` (sourceFingerprint 포함, P0/P1 0건) |

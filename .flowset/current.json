@@ -7,5 +7,5 @@
   "branch": "fix/WI-001-fix-auth-authz",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "gatesPassed": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": null
+  "lastVerifiedCommit": "80a3adb"
 }
