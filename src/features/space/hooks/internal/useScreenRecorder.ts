@@ -156,11 +156,15 @@ export function useScreenRecorder({
     typeof setTimeout
   > | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  /** 마운트 상태 — 언마운트 후 진행 중인 onstop의 setState/저장 흐름 차단 */
+  const mountedRef = useRef(true);
 
   // 언마운트 정리 — 진행 중 녹화/타이머/오디오 자원 회수 (abort/discard 성격).
   // 훅이 소유하지 않은 원본 트랙(screenTrack, audioTracks)은 stop하지 않는다 (화면공유 유지).
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -174,15 +178,18 @@ export function useScreenRecorder({
         audioContextRef.current = null;
       }
       const recorder = mediaRecorderRef.current;
-      if (recorder && recorder.state !== "inactive") {
-        // 핸들러 제거 → 언마운트 후 setState/저장 다이얼로그 방지
+      if (recorder) {
+        // 핸들러는 state와 무관하게 제거 — 이미 stop()되어 inactive지만 onstop이
+        // dispatch 전이거나 await 중일 수 있음. 진행 중 onstop은 mountedRef 가드로 차단.
         recorder.ondataavailable = null;
         recorder.onstop = null;
         recorder.onerror = null;
-        try {
-          recorder.stop();
-        } catch {
-          // 이미 중단됨
+        if (recorder.state !== "inactive") {
+          try {
+            recorder.stop();
+          } catch {
+            // 이미 중단됨
+          }
         }
       }
       mediaRecorderRef.current = null;
@@ -331,6 +338,13 @@ export function useScreenRecorder({
         const result = await saveFile(blob, fileName);
 
         chunksRef.current = [];
+
+        // await(저장 다이얼로그) 동안 언마운트되었으면 state 갱신/알림 중단
+        if (!mountedRef.current) {
+          resolve();
+          return;
+        }
+
         setRecordingState("idle");
         setRecordingTime(0);
 
