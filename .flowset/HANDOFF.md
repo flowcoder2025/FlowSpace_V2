@@ -17,11 +17,14 @@ WI-001-fix — 인증/인가 우회 및 데이터 노출 결함 차단 (status: 
 - 듀얼 블라인드 재검증: codex PASS(8건 CLOSED) · evaluator PASS(9.375) → `.pass` 생성
 - 커밋: `80a3adb` (`fix: WI-001 ...`)
 
+## PR (오픈됨)
+- **#1**: https://github.com/flowcoder2025/FlowSpace_V2/pull/1 — `fix/WI-001-fix-auth-authz` → `develop`
+- CI: flowset-semantic-gate ✅ PASS / Vercel preview 배포. develop·WI 브랜치 둘 다 origin에 푸시됨(develop은 이번에 신규 생성)
+
 ## Next (다음 세션 시작점)
-1. **push + PR**: `git push -u origin fix/WI-001-fix-auth-authz` → `gh pr create --base develop` (PR 제목 `fix: WI-001 ...`)
-2. CI(pr-checks) 통과 확인 → develop 머지 → 브랜치 삭제
-3. 머지 후 `current.json`/`fix_plan.md`에서 WI-001 status VERIFY→DONE 확정, 다음 ACTIVE 승격
-4. **WI-002-fix** 착수: Phaser `MainScene.shutdown()` SHUTDOWN 이벤트 미연결(eventBridge 리스너 누수) + `useScreenRecorder` unmount cleanup
+1. **PR #1 머지 결정** (사용자 검토 후): develop 머지 → 브랜치 삭제
+2. 머지 후 `current.json`/`fix_plan.md`에서 WI-001 status VERIFY→DONE 확정, 다음 ACTIVE 승격
+3. **WI-002-fix** 착수: Phaser `MainScene.shutdown()` SHUTDOWN 이벤트 미연결(eventBridge 리스너 누수) + `useScreenRecorder` unmount cleanup
    - 시작 전 `.flowset/fix_plan.md` Queue 확인. 새 WI 브랜치는 develop에서 분기
 
 ## Open Issues
