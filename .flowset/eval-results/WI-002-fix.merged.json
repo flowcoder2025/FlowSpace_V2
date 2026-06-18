@@ -1,0 +1,29 @@
+{
+  "wi": "WI-002-fix",
+  "schemaVersion": 1,
+  "commit": "8e3358f",
+  "rounds": 3,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0 },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.6, "scores": { "completeness": 9.5, "consistency": 9.5, "specificity": 10, "actionability": 9.5 }, "issueCount": 1 }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "최종 라운드: codex PASS(issues=[]) · evaluator WARNING(9.6, P3 1건 defer). P0/P1 없음, fixNow=true 없음, 기계 게이트 4/4 PASS → .pass 생성 가능.",
+  "convergence": [
+    { "round": 1, "issue": "useScreenRecorder onstop await 중 unmount → setState-after-unmount", "codex": "P2 fixNow", "evaluator": "P3 defer", "status": "RESOLVED (16488e2: mountedRef 가드 + cleanup 무조건 detach)" },
+    { "round": 2, "issue": "stop() 후 stop 이벤트 dispatch 전 unmount → onstop 제거로 stopRecording Promise 영구 pending", "codex": "P2 fixNow", "evaluator": "P3 defer", "status": "RESOLVED (8e3358f: pendingStopResolveRef → cleanup에서 settle)" }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/features/space/hooks/internal/useScreenRecorder.ts (recorder.onerror 경로)",
+      "description": "recorder.stop() 후 'stop' 대신 'error' 이벤트가 dispatch되면 onerror가 resolve/pendingStopResolveRef를 종결하지 않아, 마운트 유지 상태에서 stopRecording Promise가 영구 pending. WI 명시 3경로(설계 목표)와 별개의 경계 케이스.",
+      "assessment": "SUSPECTED·발생 확률 낮음(error는 통상 stop 동반). 실자원 누수 없음(timer/state/audioContext/recorder/chunks 별경로 회수), 호출부가 await 결과 미소비 → 기능 무영향.",
+      "defer": true,
+      "deferRationale": "P3 무해 경계. WI-002 핵심 목표(생명주기 누수 + unmount 정리) 범위 밖. 후속 KI로 분리(WI-006-fix 후보).",
+      "fixNow": false
+    }
+  ]
+}
