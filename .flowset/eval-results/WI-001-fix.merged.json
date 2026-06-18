@@ -1,0 +1,30 @@
+{
+  "wi": "WI-001-fix",
+  "generatedAt": "2026-06-19",
+  "sources": {
+    "codex": ".flowset/eval-results/WI-001-fix.codex.json",
+    "evaluator": ".flowset/eval-results/WI-001-fix.eval.json"
+  },
+  "convergence": {
+    "both": 3,
+    "codexOnly": 5,
+    "evaluatorOnly": 0,
+    "note": "codex가 보안·라우팅 축에서 evaluator(Claude)보다 5건 더 적출 — cross-space IDOR(P0)·accessSecret 노출·PII 유출·guest 우회·middleware no-op. 듀얼 검증의 보완성 입증."
+  },
+  "issues": [
+    { "severity": "P0", "location": "server/handlers/room.ts:23", "title": "socket join:space 무인가", "sources": ["codex", "evaluator"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
+    { "severity": "P0", "location": "src/app/api/spaces/[id]/members/route.ts:173", "title": "members PATCH cross-space IDOR", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
+    { "severity": "P1", "location": "src/app/api/spaces/[id]/route.ts:36", "title": "GET accessSecret/inviteCode 노출", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
+    { "severity": "P1", "location": "src/app/api/spaces/[id]/members/route.ts:19", "title": "GET 멤버 PII(email/memberId) 유출", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
+    { "severity": "P1", "location": "src/app/api/guest/route.ts:40", "title": "guest PASSWORD 우회", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
+    { "severity": "P1", "location": "src/middleware.ts:12", "title": "middleware startsWith('/') no-op", "sources": ["codex"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
+    { "severity": "P1", "location": "server/middleware/auth.ts:12", "title": "AUTH_SECRET fail-open", "sources": ["codex", "evaluator"], "adjudication": "CONFIRMED", "status": "MUST-FIX" },
+    { "severity": "P1", "location": "src/app/api/spaces/[id]/admin/members/route.ts:87 + members/route.ts:167", "title": "역할 계층 미적용 (STAFF가 상위/동급 제재)", "sources": ["codex", "evaluator"], "adjudication": "CONFIRMED", "status": "MUST-FIX" }
+  ],
+  "gateDecision": {
+    "passEligible": false,
+    "reason": "P0 2건 + P1 6건 미해결 (fixNow:true). .pass 생성 금지.",
+    "blockingCount": { "P0": 2, "P1": 6 },
+    "machineGates": { "tsc": "PASS", "lint": "PASS", "vitest": "PASS(52/52)", "build": "PASS" }
+  }
+}
