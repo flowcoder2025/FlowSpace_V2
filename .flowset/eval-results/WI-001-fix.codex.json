@@ -1,0 +1,81 @@
+{
+  "reviewer": "codex",
+  "schemaVersion": 1,
+  "scores": null,
+  "weightedTotal": null,
+  "verdict": "FAIL",
+  "issues": [
+    {
+      "severity": "P0",
+      "location": "server/handlers/room.ts:23",
+      "description": "join:space가 인증 여부만 보고 멤버십/접근권(PRIVATE·PASSWORD·BANNED) 검증 전에 socket.join(spaceId)을 즉시 수행. loadMemberInfo는 fire-and-forget이고 멤버 없으면 기본 PARTICIPANT 유지 → 비멤버가 임의 spaceId로 presence/chat 송수신·DB 저장 가능.",
+      "recommendation": "join 전 DB에서 space/membership/restriction/access를 동기 검증, 실패 시 join 금지 + reject/disconnect. role/restriction은 검증 후에만 설정.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    },
+    {
+      "severity": "P0",
+      "location": "src/app/api/spaces/[id]/members/route.ts:173",
+      "description": "PATCH가 body.memberId의 spaceId 소속을 검증하지 않고 update({where:{id:body.memberId}}) 실행. A 공간 OWNER/STAFF가 B 공간 memberId를 넣어 타 공간 멤버 ban/역할변경 가능 (cross-space IDOR).",
+      "recommendation": "target member 조회로 target.spaceId === id 강제, 모든 mutation where에 spaceId 포함. role/restriction enum allowlist 검증.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    },
+    {
+      "severity": "P1",
+      "location": "src/app/api/spaces/[id]/route.ts:36",
+      "description": "GET이 select 없이 {...space}를 반환 → accessSecret(PASSWORD 비번)·inviteCode·ownerId 등 노출. 멤버십 체크 없이 로그인만 하면 임의 space 비밀번호 조회 가능.",
+      "recommendation": "select allowlist로 응답 구성, accessSecret 절대 미반환. 비공개 space는 owner/member/superAdmin만 허용.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    },
+    {
+      "severity": "P1",
+      "location": "src/app/api/spaces/[id]/members/route.ts:19",
+      "description": "GET이 멤버십 체크 없이 전 멤버의 email·avatarConfig·memberId·role·restriction 반환 → PII 유출 + cross-space IDOR(위)의 memberId 제공.",
+      "recommendation": "멤버 목록 조회를 해당 space member/admin으로 제한. 공개 space도 email/memberId 등 관리 식별자 미노출.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    },
+    {
+      "severity": "P1",
+      "location": "src/app/api/guest/route.ts:40",
+      "description": "guest 세션 생성이 PRIVATE만 차단하고 PASSWORD는 accessSecret 없이 통과. members POST(:74)는 비번을 검증하는데 guest 경로만 누락 → 비번 없이 PASSWORD space 접근.",
+      "recommendation": "PASSWORD space의 guest 생성에도 accessSecret 요구·서버 비교. restriction/maxUsers 정책도 동일 적용.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    },
+    {
+      "severity": "P1",
+      "location": "src/middleware.ts:12",
+      "description": "PUBLIC_PATHS에 \"/\" 포함 + pathname.startsWith(p) → 모든 경로가 isPublic=true. 인증 리다이렉트 분기(:20) 도달 불가, 비공개 경로 전부 통과.",
+      "recommendation": "루트는 pathname === \"/\" exact 매칭, prefix public은 의도 경로만. 서버측 가드도 유지.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    },
+    {
+      "severity": "P1",
+      "location": "server/middleware/auth.ts:12",
+      "description": "AUTH_SECRET 미설정 시 TextEncoder().encode(undefined)='undefined' 바이트를 서명/검증 키로 사용 → 알려진 키로 socket JWT 위조(임의 userId) 가능. api/socket/token도 동일 키.",
+      "recommendation": "서버 시작/route 진입 시 AUTH_SECRET 존재·길이 검증, 누락 시 fail-closed(500/503).",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    },
+    {
+      "severity": "P1",
+      "location": "src/app/api/spaces/[id]/admin/members/route.ts:87",
+      "description": "admin member action이 target.role===OWNER만 보호하고 ban/kick에 호출자 역할 ≤ 대상 역할 불변식 없음 → STAFF가 다른 STAFF/PARTICIPANT를 ban/kick/mute 가능.",
+      "recommendation": "OWNER>STAFF>PARTICIPANT rank 도입해 changeRole/mute/ban/kick/unmute 전체에 공통 적용. self/owner 보호 명시.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    }
+  ]
+}

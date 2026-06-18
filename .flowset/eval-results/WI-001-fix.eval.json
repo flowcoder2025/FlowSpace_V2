@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 4,
+    "consistency": 5,
+    "specificity": 6,
+    "actionability": 7
+  },
+  "weightedTotal": 5.1,
+  "verdict": "FAIL",
+  "issues": [
+    {
+      "severity": "P0",
+      "location": "server/handlers/room.ts:23",
+      "description": "join:space 핸들러가 socket.data.userId만 확인하고 멤버십/접근권을 검증하지 않은 채 socket.join 수행. loadMemberInfo는 비멤버를 거부하지 않음(role만 설정) → 비멤버가 임의 space 입장.",
+      "recommendation": "join 전 멤버십/restriction/access 동기 검증, 실패 시 join 차단.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    },
+    {
+      "severity": "P1",
+      "location": "server/middleware/auth.ts:12",
+      "description": "AUTH_SECRET 미설정 시 fail-open — 'undefined' 바이트가 서명 키가 되어 토큰 위조 위험. 시작 시 어서션 없음.",
+      "recommendation": "AUTH_SECRET 누락/단문 시 fail-closed.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    },
+    {
+      "severity": "P1",
+      "location": "src/app/api/spaces/[id]/members/route.ts:167",
+      "description": "PATCH restriction 분기가 OWNER/STAFF 공통 가드만 거침 → STAFF가 OWNER를 ban/mute 가능. body.role도 enum 검증 없이 raw write. '호출자 역할 ≤ 대상 역할'(rules/app.md #6) 위반.",
+      "recommendation": "역할 rank 공통 가드 + role enum allowlist + target-OWNER 보호.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true
+    }
+  ]
+}
