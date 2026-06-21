@@ -5,7 +5,13 @@
 > 초기 시드 = 2026-06-19 듀얼 블라인드 검증(codex CLI + Claude) 확정 결함.
 
 ## Active WI
-- (없음) — WI-002-fix develop 머지 완료(PR#2). 다음 세션에서 WI-003-refactor를 develop에서 분기해 ACTIVE 설정.
+- **WI-007-feat** (ACTIVE) — 스페이스 생성 슈퍼어드민 전용 제한 + 슈퍼어드민 부트스트랩. **타깃 base = `main`** (사용자 지시, develop 통합 플로우 예외). 수용 기준:
+  1. `POST /api/spaces`는 `isSuperAdmin !== true` 면 403 (`prisma.space.create` 유일 경로 차단).
+  2. `/spaces/new` 페이지는 비-슈퍼어드민을 `/my-spaces`로 redirect (서버 가드).
+  3. `my-spaces`의 '새 스페이스' 생성 진입점(toolbar + empty-state 버튼)은 슈퍼어드민에게만 노출.
+  4. 슈퍼어드민 부트스트랩 `scripts/set-super-admin.mjs` — 멱등, 미존재 사용자 시 명확 실패(생성 안 함), `--list` 지원.
+  5. **자기완결성**: 변경이 `main`(WI-001/002 미반영) 베이스에서 tsc/lint/vitest/build 통과 — develop 전용 코드(canActOn 등)에 의존하지 않음.
+  6. 기존 권한 부여(슈퍼어드민 역할 위임: `members`/`admin/members` PATCH) 회귀 없음.
 
 ## Queue
 | WI | Type | Status | Goal | Notes |

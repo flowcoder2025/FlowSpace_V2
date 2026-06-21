@@ -1,12 +1,13 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-007-feat",
   "lastWI": "WI-002-fix",
-  "type": null,
-  "status": "IDLE",
+  "type": "feat",
+  "status": "ACTIVE",
   "integrationBranch": "develop",
-  "branch": "develop",
-  "startedAt": null,
+  "branch": "feat/WI-007-feat-superadmin-space-creation",
+  "targetBase": "main",
+  "startedAt": "2026-06-21",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": "256ae57",
-  "note": "WI-002-fix develop 머지 완료(PR#2, merge 256ae57). 다음 세션: WI-003-refactor를 develop에서 분기해 ACTIVE 설정. (WI-004/005/006도 큐 대기)"
+  "note": "WI-007-feat: 스페이스 생성 슈퍼어드민 전용 제한 + 슈퍼어드민 부트스트랩 스크립트. 사용자 지시로 main에서 분기·머지(별도 작업, 표준 develop 통합 플로우 예외). main에 WI-001/002 미반영 → 변경 자기완결성(main 베이스 컴파일/빌드) 검증이 핵심."
 }
