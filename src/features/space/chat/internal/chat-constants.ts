@@ -16,14 +16,8 @@ export const STORAGE_PREFIX = "flowspace-chat-";
 // ── 닉네임 ──
 export const DEFAULT_NICKNAME = "Unknown";
 
-// ── 소켓 재연결 ──
-export const RECONNECTION_ATTEMPTS = 30;
-export const RECONNECTION_DELAY = 500;
-export const RECONNECTION_DELAY_MAX = 5000;
-export const RECONNECTION_TIMEOUT = 20000;
-
-// ── 이동 쓰로틀 ──
-export const MOVE_THROTTLE_MS = 100;
+// 소켓 transport 상수(RECONNECTION_*/MOVE_THROTTLE_MS)는 protocol 모듈로 이동(WI-012-1).
+// → src/features/space/protocol/internal/socket-constants.ts
 
 // ── 폰트 크기 ──
 export type ChatFontSize = "small" | "medium" | "large";

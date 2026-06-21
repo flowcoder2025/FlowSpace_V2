@@ -15,7 +15,7 @@ import { handleInternalHttp } from "./handlers/enforce";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
-} from "../src/features/space/socket/internal/types";
+} from "../src/features/space/protocol/internal/socket-events";
 
 const PORT = parseInt(process.env.SOCKET_PORT || "3001", 10);
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || process.env.AUTH_URL || "http://localhost:3000")

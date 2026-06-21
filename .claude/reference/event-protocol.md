@@ -76,7 +76,7 @@
 
 ## 2. Socket.io (Client ↔ Server)
 
-> 소스: `src/features/space/socket/internal/types.ts`
+> 소스: `src/features/space/protocol/internal/socket-events.ts` (protocol 모듈 SSOT)
 
 ### 공통 타입
 - `PlayerData { userId, nickname, avatar, position: { x, y } }`

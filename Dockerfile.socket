@@ -17,7 +17,8 @@ COPY prisma/ ./prisma/
 RUN npx prisma generate
 
 COPY server/ ./server/
-COPY src/features/space/socket/internal/types.ts ./src/features/space/socket/internal/types.ts
+# 서버 번들이 직접 import하는 순수 계약 파일만 COPY (배럴 import 금지 — React 끌림 방지)
+COPY src/features/space/protocol/internal/socket-events.ts ./src/features/space/protocol/internal/socket-events.ts
 COPY src/features/space/chat/internal/chat-constants.ts ./src/features/space/chat/internal/chat-constants.ts
 COPY src/features/space/enforce/internal/contract.ts ./src/features/space/enforce/internal/contract.ts
 COPY tsconfig.json ./
