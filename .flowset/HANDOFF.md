@@ -1,15 +1,18 @@
 # HANDOFF
 
 ## Active WI
-(없음) — WI-008-fix **듀얼검증 PASS·`.pass` 생성 완료**(commit `e19d8be`, feature/WI-008-fix-superadmin-p3-cleanup). **develop PR 머지만 남음**. 다음 세션 우선은 **WI-003-refactor(경계 위반)** → WI-004-fix(assets DELETE 경로격리).
+(없음) — WI-003-refactor **듀얼검증 PASS·`.pass` 생성 완료**(commit `58c9025`, refactor/WI-003-refactor-internal-import-cleanup). **develop PR 생성/머지만 남음**. 다음 세션 우선은 **WI-004-fix(assets DELETE 경로격리, P2)** → WI-005-fix(소켓 ban/kick 실시간, P2).
 
-## ⚠️ 다음 세션 우선 — WI-003-refactor (경계 위반 정리)
-- READY. 타 모듈 `internal/*` 직접 import 위반 정리: editor↔game, server→socket/chat. 영향 분석 절차(grep 확장자 필터 없이 + 동의어 2차 검색) 필수. 모듈 구조: `module/index.ts`(Public) + `module/internal/`(Private), index.ts만 외부 노출.
-- 그다음: WI-004-fix(`api/assets/[id]` DELETE 경로격리 `../` 차단, P2) → WI-005-fix(소켓 ban/kick 실시간 크로스프로세스, P2) → WI-006/010/011(P3 부채).
+> ⚠️ **이전 HANDOFF stale 정정**: WI-008-fix는 이미 **PR#5 머지 완료**(`1de51a5`)였음(원장만 미갱신이었던 것). 메모리(MEMORY.md)가 최신이었음.
+
+## ⚠️ 다음 세션 우선 — WI-004-fix (assets DELETE 경로격리)
+- READY, P2. `api/assets/[id]` DELETE unlink 시 `public` 경로 격리(`../` 차단 — path traversal 방지). 영향 분석 절차(grep 확장자 필터 없이 + 동의어 2차 검색) 필수.
+- 그다음: WI-005-fix(소켓 ban/kick 실시간 크로스프로세스, P2) → WI-006/010/011/012(P3 부채).
 - **진행 방식(사용자 확정 2026-06-21)**: 모든 WI는 develop 정상 플로우 — `feature/WI-NNN` 분기 → 기계게이트(tsc/lint/vitest/build) → 듀얼검증(codex CLI + evaluator-agent) → `.pass` → **develop PR 머지**(프로세스 07상 사용자 승인 불요). 라이브 반영이 필요하면 그때 develop→main **승격**(process 07; 승인 필요 + main 푸시 작성자 = 인가 계정 `flowcoder25@gmail.com`).
 
-## Done 추가 (이번 세션, 2026-06-21)
-- **WI-008-fix**: WI-007 듀얼검증 defer P3×2 해소. (1) `set-super-admin.mjs` 회수 인자 화이트리스트화(`flagArg` 'true'/'false'만 인정, 오타·잉여인자 usage+exit1, `--list`/무인자 분기 최우선 유지, 기본 부여 계약 보존). (2) `POST /api/spaces` 403에 `code:"SUPER_ADMIN_REQUIRED"` 병기(invariant #4). 기계게이트 4/4 PASS + 듀얼검증(codex PASS·evaluator 9.875, P3×3 전부 defer) + `.pass`(fingerprint 6a288939). 설계 codex consult 1R. commit `e19d8be`. **develop PR 머지 대기**.
+## Done 추가 (이번 세션, 2026-06-22)
+- **WI-003-refactor**: 타 모듈 `internal/*` 직접 import 위반 정리(경계 캡슐화). 인앱 cross-module internal import **7건**을 배럴 routing으로 해소 — editor↔game(game 배럴 `TILE_INDEX`/`extractDefaultMapData`/`TilemapResult`, editor 배럴 `EditorSystem`; MainScene `await import` lazy 로드라 정적 순환 없음), socket→chat(chat 배럴 `MOVE_THROTTLE_MS`/`RECONNECTION_*`), stores/editor-store→editor 배럴. **재발 방지 이중 방어**: ESLint `no-restricted-imports`(`@/**/internal[/**]` alias 정밀·오탐0) + `src/__tests__/module-boundaries.test.ts`(import 경로 실해석으로 alias+상대경로 cross-module internal 정밀 차단, vitest 게이트 강제). 서버(별도 esbuild 번들 — 배럴 import 시 React 끌려와 빌드깨짐)·scripts dev툴의 순수 계약/internal import는 범위 밖 → **WI-012-refactor**(protocol 계약 모듈 분리)로 등록. 기계게이트 **5/5** PASS(tsc/lint/vitest 53·53/build/서버 esbuild 번들) + 듀얼검증(codex **4R 최종 PASS**·evaluator WARNING 9.5, P3×4 전부 defer) + `.pass`(fingerprint fc768c9d). 설계 codex consult 1R + 검증 codex 4R 수렴. 스펙: `.claude/specs/architecture/2026-06-22-module-boundary-encapsulation.md`. commit `58c9025`. **develop PR 대기**.
+- **WI-008-fix**(직전, 2026-06-21): WI-007 P3×2 해소. **PR#5 머지 완료**(`1de51a5`). (이전 HANDOFF가 '머지만 남음'으로 stale했음.)
 
 ## main↔develop 정합 + 배포 상태 (2026-06-21)
 - develop = WI-001 + WI-002 + WI-007 + **WI-009**(PR#4 `08fc2b9`) + 원장. develop ⊇ main.

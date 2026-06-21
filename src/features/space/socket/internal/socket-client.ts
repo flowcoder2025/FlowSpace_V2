@@ -5,7 +5,7 @@ import {
   RECONNECTION_DELAY,
   RECONNECTION_DELAY_MAX,
   RECONNECTION_TIMEOUT,
-} from "@/features/space/chat/internal/chat-constants";
+} from "@/features/space/chat";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 

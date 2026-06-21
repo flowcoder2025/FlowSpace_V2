@@ -1,0 +1,11 @@
+WI=WI-003-refactor
+commit=58c9025
+sourceFingerprint=fc768c9d57e189f55b554b8403c35b8e8de0331dac9a58bce85e8715f448f5b9
+codex=.flowset/eval-results/WI-003-refactor.codex.json
+evaluator=.flowset/eval-results/WI-003-refactor.eval.json
+merged=.flowset/eval-results/WI-003-refactor.merged.json
+gates=tsc,lint,vitest,build
+codexVerdict=PASS
+evaluatorVerdict=WARNING(9.5,P3x4-defer)
+target=develop (PR)
+createdAt=2026-06-21T15:57:59Z

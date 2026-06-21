@@ -5,7 +5,7 @@ import type {
   EditorTool,
   EditorLayerName,
   EditorMapObject,
-} from "@/features/space/editor/internal/types";
+} from "@/features/space/editor";
 
 interface EditorStore {
   // State

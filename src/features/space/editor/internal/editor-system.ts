@@ -14,7 +14,7 @@ import type {
   EditorLayerVisibilityPayload,
   EditorTilePaintRequestPayload,
 } from "@/features/space/game/events";
-import type { TilemapResult } from "@/features/space/game/internal/tilemap/tilemap-system";
+import type { TilemapResult } from "@/features/space/game";
 import { GridOverlay } from "./grid-overlay";
 import { EditorCursor } from "./editor-cursor";
 

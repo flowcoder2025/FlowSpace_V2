@@ -1,0 +1,37 @@
+너는 FlowSpace(Next.js 15 + Phaser 3 메타버스) 리팩토링 설계 협의자다. WI-003-refactor: "타 모듈 internal/* 직접 import 위반 정리". 아키텍처 규칙: 각 모듈은 `module/index.ts`(Public API) + `module/internal/`(Private). 외부는 index.ts(배럴)만 import, 타 모듈의 internal/* 직접 import 금지. 산문으로 답하라.
+
+## 확정된 위반 인벤토리 (grep 전수, 확장자 필터 없이)
+
+### A. 인앱 위반 (둘 다 src 트리, 같은 빌드)
+1. src/stores/editor-store.ts → `editor/internal/types` (타입 3개). editor/index.ts가 이미 동일 타입 export 중.
+2. src/features/space/editor/internal/use-editor.ts → `game/internal/tilemap/map-data`의 `extractDefaultMapData`(런타임 fn).
+3. src/features/space/editor/internal/tile-palette-data.ts → `game/internal/tilemap/tileset-generator`의 `TILE_INDEX`(런타임 const).
+4. src/features/space/editor/internal/editor-system.ts → `game/internal/tilemap/tilemap-system`의 `TilemapResult`(타입).
+5. src/features/space/game/internal/scenes/main-scene.ts → `editor/internal/editor-system`의 `EditorSystem`(런타임 class).
+6. src/features/space/socket/internal/use-socket.ts → `chat/internal/chat-constants`의 `MOVE_THROTTLE_MS, DEFAULT_NICKNAME`.
+7. src/features/space/socket/internal/socket-client.ts → `chat/internal/chat-constants`의 `RECONNECTION_ATTEMPTS/DELAY/DELAY_MAX/TIMEOUT`.
+
+### B. 서버(별도 프로세스) 위반
+8. server/index.ts + server/handlers/{room,party,movement,media,chat,editor,avatar}.ts → `socket/internal/types`(순수 타입) + `chat/internal/chat-constants`(순수 const, party.ts·chat.ts). 상대경로 import.
+   - Dockerfile.socket가 위 internal 파일 2개를 명시 COPY. .github/workflows/deploy-socket.yml이 socket/internal/types.ts 경로변경 트리거.
+
+### C. 제외 후보
+9. scripts/debug-*.ts, quick-chibi-test.ts → `assets/internal/*` (dev 디버그 툴, 테스트 커버리지 없음).
+10. scripts/migrate-design-system.py → 파이썬 문자열 리터럴(경로 목록), import 아님.
+
+## 핵심 제약 (검증 완료)
+- 서버는 esbuild로 server/index.ts 단일 번들. `socket/index.ts`/`chat/index.ts` 배럴은 useSocket/useChat 등 React 훅을 함께 export → 서버가 배럴 import하면 React+클라 트리 전체가 번들에 끌려와 빌드 깨짐. 그래서 Dockerfile이 순수 계약 파일 2개만 COPY. **즉 서버 케이스는 배럴 routing으로 해결 불가.**
+- socket/internal/types.ts = import 0개 순수 타입. chat/internal/chat-constants.ts = "서버/클라 공통, React 의존성 없음" 명시된 순수 const.
+- game-manager.ts가 MainScene을 `await import()` lazy 로드 → game/index.ts는 editor/index.ts를 정적으로 끌지 않음. 따라서 editor→game 배럴 routing 시 editor/index↔game/index 정적 순환은 발생하지 않음(main-scene→editor는 런타임 lazy라 양 배럴 초기화 후 실행).
+- RECONNECTION_*/MOVE_THROTTLE_MS는 소켓 상수인데 물리적으로 chat-constants.ts에 위치(오배치 냄새). chat/index.ts는 이들을 현재 export 안 함(DEFAULT_NICKNAME만 export).
+
+## 내 제안
+- A(인앱): 배럴 routing으로 해소. game/index.ts에 `TILE_INDEX, extractDefaultMapData, type TilemapResult` 추가 export, editor/index.ts에 `EditorSystem` 추가 export, chat/index.ts에 `MOVE_THROTTLE_MS, RECONNECTION_*` 추가 export. 7개 import 사이트를 배럴로 교체. 정적 순환 없음(위 검증).
+- B(서버): 두 순수 계약 파일을 communication 도메인 공유 계약 모듈로 승격하는 게 정석이나(예: `src/features/space/protocol/index.ts` 순수, server가 이 배럴 상대경로 import, Dockerfile/워크플로우 경로 갱신), 신규 모듈+파일 이동+server 8파일+Docker+CI 변경이라 범위/배포 리스크 큼. 대안: 서버는 별도 빌드/프로세스이므로 "순수 계약 파일에 한해 cross-process import 허용"을 명시 예외로 문서화하고 인앱(A)만 정리.
+- C(scripts): 이번 WI 제외, 문서화.
+
+## 질문
+1. B(서버)는 정석 추출(protocol 모듈 신규) vs 명시 예외 문서화 중 무엇을 권하나? 이 리팩토링 WI의 적정 범위와 배포 리스크를 함께 고려해서.
+2. A에서 chat-constants의 소켓 상수(RECONNECTION_*/MOVE_THROTTLE_MS)를 chat 배럴로 노출하는 게 맞나, 아니면 socket 모듈로 물리 이동이 맞나? B의 결론과 일관되게.
+3. 내가 놓치고 있는 위험 1가지를 반드시 지적하라.
+간결하게, 실행 가능한 결론 위주로.

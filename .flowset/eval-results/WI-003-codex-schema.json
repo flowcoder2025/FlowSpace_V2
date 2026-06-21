@@ -1,0 +1,29 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reviewer", "schemaVersion", "scores", "weightedTotal", "verdict", "issues"],
+  "properties": {
+    "reviewer": { "type": "string", "enum": ["codex", "evaluator"] },
+    "schemaVersion": { "type": "integer", "enum": [1] },
+    "scores": { "type": "null" },
+    "weightedTotal": { "type": "null" },
+    "verdict": { "type": "string", "enum": ["PASS", "WARNING", "FAIL"] },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "location", "description", "recommendation", "defer", "deferRationale", "fixNow"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
+          "location": { "type": "string" },
+          "description": { "type": "string" },
+          "recommendation": { "type": "string" },
+          "defer": { "type": "boolean" },
+          "deferRationale": { "type": ["string", "null"] },
+          "fixNow": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}
