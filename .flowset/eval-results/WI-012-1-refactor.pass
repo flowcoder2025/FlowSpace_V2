@@ -1,0 +1,14 @@
+WI=WI-012-1-refactor
+commit=806d07b
+sourceFingerprint=2fc1cc676a2eb54492ff5cad25c2d41e81182861ba0e4eea48bd11f35f9291d4
+fingerprintScope=changeset(17 .ts files vs develop: protocol/{index,internal/socket-events,internal/socket-constants}, socket/{index,internal/socket-client,internal/use-socket}, chat/{index,internal/chat-constants}, server/index + handlers/{room,movement,editor,avatar,media,chat,party,enforce}). socket/internal/types.ts 삭제는 ACMRTUX 필터 제외. 커밋 후 워킹트리 clean이라 Stop 게이트는 changed=0으로 통과(이 값은 검증된 changeset 감사 기록). 비-소스(Dockerfile.socket/deploy-socket.yml/문서/원장)는 fingerprint 범위 외.
+codex=.flowset/eval-results/WI-012-1-refactor.codex.r3.json
+evaluator=.flowset/eval-results/WI-012-1-refactor.eval.json
+merged=.flowset/eval-results/WI-012-1-refactor.merged.json
+gates=tsc,lint,vitest,build,esbuild-server
+gatesEvidence=tsc 0 / lint 0(기존 LiveKit 경고 1) / vitest 128·128 / next build 0 / 서버 esbuild 번들 0 + metafile COPY 완전성 실증(런타임 src 입력 3개 전수)
+codexVerdict=PASS(r3, 0 issues; 3R 수렴 r1 P3-doc->r2 P1-authsecretCOPY+P3-원장->r3 PASS)
+evaluatorVerdict=WARNING(10.0, run1 PASS 10.0->run2 최종HEAD WARNING 10.0 P3x1 스펙표[806d07b 해소])
+gateDecision=PASS
+target=develop (PR 예정)
+createdAt=2026-06-22T05:22:09+09:00

@@ -1,0 +1,23 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 10,
+    "consistency": 10,
+    "specificity": 10,
+    "actionability": 10
+  },
+  "weightedTotal": 10,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": ".claude/specs/architecture/2026-06-22-protocol-contract-module.md:38-48 (변경 표면 표)",
+      "description": "최종 HEAD(d028764, r2) 기준 독립 재채점. 핵심 검증 결과: (1) Dockerfile COPY 완전성 — Dockerfile.socket의 정확한 esbuild 플래그(--external:bufferutil/utf-8-validate/@prisma/client/.prisma/client)를 로컬에서 재현+metafile 추출, src/ 런타임 입력은 정확히 3개(chat/internal/chat-constants.ts, enforce/internal/contract.ts, lib/auth-secret.ts)이며 전부 Dockerfile COPY 목록에 존재. 3개 모두 transitive src/ import 0(chat-constants 무, enforce contract는 node:crypto만, auth-secret 무) → COPY 집합 폐쇄. socket-events.ts는 import type-only라 esbuild elide(번들 미포함) 확인 — Dockerfile 주석과 일치. (2) auth-secret COPY 추가는 실재 선재 P1 해소 실증 — develop의 server/middleware/auth.ts는 runtime `import { getAuthSecret } from '../../src/lib/auth-secret'`인데 develop Dockerfile.socket COPY에 없었음 → Docker 빌드 시 esbuild 'Could not resolve' 로 깨졌을 결함. (3) deploy-socket.yml paths가 4개 src(socket-events+3런타임)+Dockerfile+compose 정확 반영. (4) protocol 모듈 분리 정합: git rename R096(types.ts→socket-events.ts), 소스 내 구 경로 참조 0(잔존은 신규 파일 provenance 주석뿐), 인앱 소비자 전부 @/features/space/protocol 배럴 경유(module-boundaries.test 통과), 서버 9개소는 순수 import-path swap만(로직 변경 0, 계약 보존). (5) 보안: API/lib 행위 변경 0(auth-secret.ts 내용 무변경), protocol 모듈은 순수 타입+transport 상수(secret/env/io 0). 기계게이트 전수 독립 재실행: tsc 0 / lint 0(기존 LiveKit 경고 1) / vitest 128·128 / next build 0 / esbuild server 번들 0(743.6kb). 단 결함: 이 protocol-contract 스펙의 '변경 표면' 표가 r2에서 추가된 src/lib/auth-secret.ts COPY/CI-paths 행을 누락(설계 시점 r1 표를 미갱신).",
+      "recommendation": "스펙 §변경 표면 표의 '배포' 행에 src/lib/auth-secret.ts(WI-001 도입 헬퍼)의 Dockerfile COPY + deploy-socket.yml paths 추가를 1행 보강. WI-012-2 또는 머지 정리 시 흡수 가능.",
+      "defer": true,
+      "deferRationale": "순수 문서 완전성 부채로 기능·빌드·추적성에 영향 없음. auth-secret COPY의 실제 메커니즘과 근거는 이미 load-bearing 3곳에 정확히 문서화됨 — Dockerfile.socket 인라인 주석(line 20-22, metafile 검증 근거 명시), 경계 스펙 §B(현재 COPY 3파일 정확 열거), current.json 원장 note(선재 P1 해소 명시). 게이트 차단 사유 아님(P0/P1 없음). KI 등록 후 WI-012-2 흡수.",
+      "fixNow": false
+    }
+  ]
+}
