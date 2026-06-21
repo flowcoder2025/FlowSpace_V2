@@ -45,8 +45,10 @@ src/features/space/protocol/
 | import | `socket/internal/{socket-client,use-socket}.ts` | 타입·소켓상수를 protocol 배럴에서 소비(`DEFAULT_NICKNAME`만 chat 유지) |
 | 정리 | `chat/internal/chat-constants.ts`, `chat/index.ts` | 소켓상수 정의·임시 re-export 제거 |
 | 서버 | `server/index.ts` + `handlers/{room,movement,editor,avatar,media,chat,party,enforce}.ts` (9) | 타입 import 경로를 protocol/internal/socket-events로 |
-| 배포 | `Dockerfile.socket`, `.github/workflows/deploy-socket.yml` | COPY/paths를 socket-events.ts로 갱신(소켓상수는 서버 미사용 → COPY 불필요) |
+| 배포 | `Dockerfile.socket`, `.github/workflows/deploy-socket.yml` | COPY/paths를 socket-events.ts로 갱신(소켓상수는 서버 미사용 → COPY 불필요). **+ 선재 P1 해소**: 서버 런타임 의존 `src/lib/auth-secret.ts`(WI-001 도입, Dockerfile COPY 누락이던 것) 추가 — esbuild metafile로 src 런타임 입력 3개(chat-constants·enforce contract·auth-secret) 전수 COPY 실증 |
 | 문서 | `communication.md`, `event-protocol.md`, `module-boundary-encapsulation.md` | SSOT 포인터 갱신 |
+
+> **선재 P1(Dockerfile COPY 누락) 해소**: develop 상태에서 `server/middleware/auth.ts`가 런타임 import하는 `src/lib/auth-secret.ts`(WI-001 `80a3adb` 도입)가 `Dockerfile.socket` COPY·`deploy-socket.yml` paths에 빠져 있었다. `import type`가 아닌 런타임 import라 Docker 빌드 컨텍스트에서 esbuild가 resolve 실패 → 향후 main 승격 시 OCI 소켓 빌드가 깨질 결함. 본 WI가 COPY/paths를 다루므로 함께 닫음. `socket-events.ts`는 `import type`-only라 esbuild가 elide(번들 미포함)하지만 계약 추적용으로 COPY 유지.
 
 ## 위험과 방어
 
