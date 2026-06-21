@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.5,
+    "consistency": 9.5,
+    "specificity": 9.5,
+    "actionability": 9.5
+  },
+  "weightedTotal": 9.5,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/features/space/hooks/internal/useScreenRecorder.test.ts:83-209",
+      "description": "신규 4개 테스트는 onerror settle / onstop=null / 즉시 resolve / 정상 onstop 회귀를 커버하나, WI-006이 함께 의존하게 된 unmount cleanup의 pendingStopResolveRef settle 경로(useScreenRecorder.ts:200-203, useEffect return)는 테스트가 없다. 즉 stopRecording() pending 중 컴포넌트 언마운트 시 Promise가 settle되는지가 미검증. 증거: 테스트 파일에 unmount({result})/rerender 후 stopPromise settle 단언이 없음. onerror/onstop/unmount 3경로 중 2경로만 회귀망 보유.",
+      "recommendation": "renderHook의 unmount()를 stopRecording() pending 직후 호출하고 반환 Promise가 resolve되는지 단언하는 5번째 테스트 추가(WI-002 도입·WI-006 공유 계약 동시 보호).",
+      "defer": true,
+      "deferRationale": "해당 cleanup settle 경로는 WI-002에서 이미 구현·머지된 코드로 WI-006 변경분이 아니며, 회귀 위험은 낮음(P3 테스트 부채). WI-011-test(테스트 하니스 정비)로 묶어 처리 가능.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/hooks/internal/useScreenRecorder.ts:307-308",
+      "description": "onerror 핸들러가 setRecordingState('idle')/handleError를 mountedRef 가드 없이 호출한다. onstop은 async라 await saveFile 후 재개 시 unmount-after-state 위험이 있어 mountedRef 가드(line 376)를 두지만, onerror는 동기이고 unmount cleanup이 recorder.onerror=null(line 188)로 떼어내므로 언마운트 후 동일 recorder에서 onerror가 발화되는 경로가 구조적으로 차단된다. 따라서 stale setState(React act/unmounted-update 경고)는 현 생명주기에서 도달 불가. SUSPECTED 아님 — 비대칭은 의도적이며 무해.",
+      "recommendation": "현 상태 유지로 충분. 방어적 일관성을 원하면 onerror 진입부에 'if (!mountedRef.current) { ...settle만; return; }' 추가 가능하나 동작 변화 없음(현재도 unmount 시 핸들러가 떼어짐).",
+      "defer": true,
+      "deferRationale": "언마운트 후 onerror 발화 경로가 cleanup의 onerror=null로 차단되어 실제 결함이 아님. 코드 가독성/일관성 차원의 선택사항.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/hooks/internal/useScreenRecorder.ts:357",
+      "description": "stopRecording 내 audioContextRef.current.close()는 .catch()가 없어 onerror(line 312)·unmount(line 179) 경로와 비대칭이다. AudioContext.close()가 reject하면 stopRecording이 unhandled rejection을 낼 수 있다. 단 이는 WI-006 변경분이 아닌 선재 코드이며, 같은 컨텍스트를 직전에 정상 생성한 상태에서 close가 reject할 가능성은 사실상 없음.",
+      "recommendation": "선재 부채. WI-006 범위 밖이므로 별도 정리 WI에서 .catch(() => {}) 추가로 3경로 close 정책 통일 권장.",
+      "defer": true,
+      "deferRationale": "WI-006이 도입한 코드가 아니며(pre-existing), 실패 가능성 무시할 수준. 범위 밖.",
+      "fixNow": false
+    }
+  ]
+}
