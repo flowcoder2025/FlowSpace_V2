@@ -5,7 +5,7 @@
 > 초기 시드 = 2026-06-19 듀얼 블라인드 검증(codex CLI + Claude) 확정 결함.
 
 ## Active WI
-- (없음) — WI-010-perf **develop 머지 완료**(PR#10, merge `47022a6`, impl `ed73930`). 다음 우선: WI-011-test / WI-012-refactor / WI-013-perf (전부 P3).
+- **WI-011-test** (ACTIVE) — `GET /api/spaces` filter 분기 회귀 + API 라우트 테스트 하니스(auth/prisma mock) 신규 도입 + `useScreenRecorder` unmount-during-stopping settle 경로 테스트(WI-006 흡수). 브랜치 `test/WI-011-test-route-harness-recorder-settle`.
 
 ## Queue
 | WI | Type | Status | Goal | Notes |
