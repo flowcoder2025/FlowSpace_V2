@@ -149,7 +149,7 @@ chibi-pipeline Phase 12 — 인프라 마이그레이션 + 디자인 시스템 �
 - Game Manager: `src/features/space/game/internal/game-manager.ts`
 - MainScene: `src/features/space/game/internal/scenes/main-scene.ts`
 - Input Controller: `src/features/space/game/internal/player/input-controller.ts`
-- Socket types: `src/features/space/socket/internal/types.ts`
+- Socket types·transport 상수: `src/features/space/protocol/` (SSOT — `internal/socket-events.ts` 타입 + `internal/socket-constants.ts` 상수, WI-012-1)
 - Socket Client: `src/features/space/socket/internal/socket-client.ts`
 - Socket Bridge: `src/features/space/bridge/internal/use-socket-bridge.ts`
 - Chat Panel: `src/components/space/chat-panel.tsx` (드래그/리사이즈/Enter 활성화)
