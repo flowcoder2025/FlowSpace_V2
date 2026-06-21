@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-006-fix",
-  "lastWI": "WI-005-fix",
+  "activeWI": null,
+  "lastWI": "WI-006-fix",
   "type": "fix",
-  "status": "PASS",
+  "status": "MERGED",
   "integrationBranch": "develop",
-  "branch": "fix/WI-006-fix-screen-recorder-onerror",
+  "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "5c9fa16",
-  "note": "WI-006-fix(useScreenRecorder onerror dangling Promise, P3) 게이트 PASS — develop PR 대기. 기계게이트 4/4(tsc 0/lint 0/vitest 92·92/build 0) + 듀얼검증(codex r1 PASS 0 issues·evaluator WARNING 9.5, P3×3 defer) + .pass(fingerprint 19ecaf43, impl 5c9fa16). recorder.onerror가 pendingStopResolveRef를 settle하지 않아 'error' 시 onstop 미발화면 stopRecording() Promise 영구 pending이던 버그. onerror를 정상 abort로 강화(onstop=null+audioContext close+chunks 폐기+ref null+pendingStopResolveRef settle). resolve 시맨틱은 기존 onstop error 경로와 일관(Promise<void> 유지). 설계 codex consult 1R. evaluator P3×3 흡수: unmount settle 테스트부재→WI-011 / onerror mountedRef가드→실결함 아님 / stopRecording close .catch→WI-012 선재. 클라이언트 훅만 변경(서버 esbuild 무관). 다음: PR 머지 후 MERGED 전환 → WI-010/011/012(P3)."
+  "lastVerifiedCommit": "2644b3c",
+  "note": "WI-006-fix(useScreenRecorder onerror dangling Promise, P3) develop 머지 완료 — PR#9, merge 2644b3c(impl 5c9fa16). recorder.onerror가 pendingStopResolveRef를 settle하지 않아 'error' 시 onstop 미발화면 stopRecording() Promise 영구 pending이던 버그. onerror를 정상 abort로 강화(onstop=null+audioContext close+chunks 폐기+mediaRecorderRef===recorder시 null+pendingStopResolveRef settle). resolve 시맨틱은 기존 onstop error 경로와 일관(Promise<void> 유지). 기계게이트 4/4(tsc 0/lint 0/vitest 92·92/build 0) + 듀얼검증(codex r1 PASS 0 issues·evaluator WARNING 9.5, P3×3 defer) + .pass(fingerprint 19ecaf43). 설계 codex consult 1R. evaluator 뮤테이션 테스트 실증. 클라이언트 훅만 변경(서버 esbuild 무관). 다음 큐(전부 P3): WI-010-perf(전역 목록 페이지네이션) / WI-011-test(라우트 테스트 하니스 + useScreenRecorder unmount settle 테스트) / WI-012-refactor(protocol 모듈 분리 + stopRecording close .catch 통일). 승격 미실행 부채: WI-001/002/003/004/005/006/008/009는 develop만, main(라이브) 미반영."
 }

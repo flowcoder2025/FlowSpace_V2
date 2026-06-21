@@ -1,11 +1,10 @@
 # HANDOFF
 
 ## Active WI
-(없음) — WI-006-fix **게이트 PASS · develop PR 대기**(impl `5c9fa16`, `.pass` fingerprint `19ecaf43`). 직전 WI-005-fix develop 머지 완료(PR#8, merge `a3de864`). 다음 우선은 **WI-010-perf / WI-011-test / WI-012-refactor (전부 P3)**.
+(없음) — WI-006-fix **develop 머지 완료**(PR#9, merge `2644b3c`, impl `5c9fa16`). 다음 우선은 **WI-010-perf / WI-011-test / WI-012-refactor (전부 P3)**.
 
-## ⚠️ 다음 세션 우선 — 남은 P3 부채 (WI-006 게이트 통과)
-- **WI-006-fix 상태**: 구현·기계게이트·듀얼검증·`.pass`까지 완료. **남은 단계는 develop PR 생성·머지뿐**(아래 PR 절차). 머지 후 `current.json`/원장 MERGED 전환 + 브랜치 정리.
-- 그다음 큐(READY, 전부 P3): WI-010-perf(슈퍼어드민 전역 목록 페이지네이션 — `GET /api/spaces` scope={} take/cursor/상한) / WI-011-test(api·socket 라우트 테스트 하니스 + filter 분기 회귀 + **useScreenRecorder unmount settle 경로 테스트**(WI-006 evaluator P3 흡수)) / WI-012-refactor(protocol 순수계약 모듈 분리 + 소켓상수 물리이동 + enforce·assets write-side 중앙화 + **useScreenRecorder stopRecording close `.catch` 비대칭 통일**(WI-006 evaluator P3 선재 흡수)).
+## ⚠️ 다음 세션 우선 — 남은 P3 부채
+- 큐(READY, 전부 P3): WI-010-perf(슈퍼어드민 전역 목록 페이지네이션 — `GET /api/spaces` scope={} take/cursor/상한) / WI-011-test(api·socket 라우트 테스트 하니스 + filter 분기 회귀 + **useScreenRecorder unmount settle 경로 테스트**(WI-006 evaluator P3 흡수)) / WI-012-refactor(protocol 순수계약 모듈 분리 + 소켓상수 물리이동 + enforce·assets write-side 중앙화 + **useScreenRecorder stopRecording close `.catch` 비대칭 통일**(WI-006 evaluator P3 선재 흡수)).
 - **진행 방식(사용자 확정 2026-06-21)**: 모든 WI는 develop 정상 플로우 — `feature/WI-NNN` 분기 → 기계게이트(tsc/lint/vitest/build) → 듀얼검증(codex CLI + evaluator-agent) → `.pass` → **develop PR 머지**(프로세스 07상 사용자 승인 불요). 경계 변경 WI는 구현 전 codex consult 필수(process 02). 라이브 반영이 필요하면 그때 develop→main **승격**(process 07; 승인 필요 + main 푸시 작성자 = 인가 계정 `flowcoder25@gmail.com`).
 
 ## Done 추가 (이번 세션, 2026-06-22)
