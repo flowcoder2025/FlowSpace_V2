@@ -19,6 +19,7 @@ RUN npx prisma generate
 COPY server/ ./server/
 COPY src/features/space/socket/internal/types.ts ./src/features/space/socket/internal/types.ts
 COPY src/features/space/chat/internal/chat-constants.ts ./src/features/space/chat/internal/chat-constants.ts
+COPY src/features/space/enforce/internal/contract.ts ./src/features/space/enforce/internal/contract.ts
 COPY tsconfig.json ./
 
 RUN npx esbuild server/index.ts \
