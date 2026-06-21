@@ -14,7 +14,7 @@ import { TileCollisionChecker } from "../player/tile-collision-checker";
 import { RemotePlayerManager } from "../remote/remote-player-manager";
 import { CameraController } from "../camera/camera-controller";
 import { ObjectManager } from "../objects/object-manager";
-import { EditorSystem } from "@/features/space/editor/internal/editor-system";
+import { EditorSystem } from "@/features/space/editor";
 import { createLoadableAssets, loadAssetsInScene } from "../asset-loader";
 import { COLLISION_LAYER_NAMES } from "../tilemap/map-data";
 import type { AssetGeneratedPayload } from "../../events";

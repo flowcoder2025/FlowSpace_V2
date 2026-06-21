@@ -1,6 +1,6 @@
 /** 타일 팔레트 데이터 - TILE_INDEX 기반 카테고리별 타일 목록 */
 
-import { TILE_INDEX } from "@/features/space/game/internal/tilemap/tileset-generator";
+import { TILE_INDEX } from "@/features/space/game";
 import type { TilePaletteItem } from "./types";
 
 export const TILE_PALETTE: TilePaletteItem[] = [
