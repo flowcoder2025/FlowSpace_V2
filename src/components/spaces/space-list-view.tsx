@@ -13,8 +13,16 @@ const FILTERS = [
 
 export function SpaceListView({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const router = useRouter();
-  const { spaces, isLoading, filter, setFilter, fetchSpaces } =
-    useSpaceStore();
+  const {
+    spaces,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    filter,
+    setFilter,
+    fetchSpaces,
+    loadMore,
+  } = useSpaceStore();
 
   useEffect(() => {
     fetchSpaces();
@@ -77,11 +85,25 @@ export function SpaceListView({ isSuperAdmin = false }: { isSuperAdmin?: boolean
           )}
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {spaces.map((space) => (
-            <SpaceCard key={space.id} space={space} isSuperAdmin={isSuperAdmin} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {spaces.map((space) => (
+              <SpaceCard key={space.id} space={space} isSuperAdmin={isSuperAdmin} />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={() => loadMore()}
+                disabled={isLoadingMore}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-line bg-cream px-6 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream-deep disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoadingMore ? "불러오는 중…" : "더 보기"}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

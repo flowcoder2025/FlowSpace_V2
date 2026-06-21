@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
 
-/** GET /api/spaces - 내 공간 목록 (슈퍼어드민의 "전체"는 모든 ACTIVE 스페이스) */
+/**
+ * GET /api/spaces - 내 공간 목록 (슈퍼어드민의 "전체"는 모든 ACTIVE 스페이스).
+ * cursor 페이지네이션: `?limit=`(기본 50·최대 100) + `?cursor=`(직전 페이지 마지막 id).
+ * 응답: `{ spaces, nextCursor, hasMore }` (기존 `spaces` 필드 유지 = 하위호환).
+ */
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -34,7 +39,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const spaces = await prisma.space.findMany({
+    const limit = parsePageLimit(request.nextUrl.searchParams.get("limit"));
+    const cursor = request.nextUrl.searchParams.get("cursor");
+
+    const rows = await prisma.space.findMany({
       where: { ...scope, status: "ACTIVE" },
       include: {
         template: { select: { key: true, name: true } },
@@ -45,10 +53,15 @@ export async function GET(request: NextRequest) {
           take: 1,
         },
       },
-      orderBy: { updatedAt: "desc" },
+      // updatedAt은 가변·비유니크 → id 타이브레이커로 동일 시각 내 결정적 순서 보장
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    const result = spaces.map((s) => ({
+    const { items, nextCursor, hasMore } = buildCursorPage(rows, limit);
+
+    const result = items.map((s) => ({
       id: s.id,
       name: s.name,
       description: s.description,
@@ -62,7 +75,7 @@ export async function GET(request: NextRequest) {
       createdAt: s.createdAt,
     }));
 
-    return NextResponse.json({ spaces: result });
+    return NextResponse.json({ spaces: result, nextCursor, hasMore });
   } catch (error) {
     return NextResponse.json(
       {
