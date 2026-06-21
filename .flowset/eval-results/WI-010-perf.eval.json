@@ -1,0 +1,50 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 9.6,
+    "specificity": 9.8,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.7,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "prisma/schema.prisma (model Space, @@index) + src/app/api/spaces/route.ts:57",
+      "description": "정렬 인덱스 부재(스케일 부채 잔존). 전역 슈퍼어드민 경로(scope={}, where={status:'ACTIVE'})에서 orderBy [updatedAt desc, id desc] + cursor seek로 페이지를 넘기지만, Space 모델에는 @@index([status])만 있고 (status, updatedAt, id) 복합 인덱스가 없다. 따라서 ACTIVE 스페이스가 대량일 때 각 페이지마다 전체 ACTIVE 집합을 정렬해야 하며, cursor 페이지네이션의 본래 이점(인덱스 기반 seek로 깊은 페이지도 O(limit))을 얻지 못한다. 다만 이번 WI의 1차 부채(무제한 take → 전체 로드/네트워크 폭주)는 take:limit+1 상한으로 해소되었고, 본 항목은 깊은 페이지 정렬 비용에 한정된 2차 부채.",
+      "recommendation": "prisma/schema.prisma Space에 @@index([status, updatedAt, id]) 추가 후 마이그레이션. (updatedAt desc, id desc 정렬을 status 필터와 함께 인덱스로 커버해 cursor seek 효율화.)",
+      "defer": true,
+      "deferRationale": "P3. WI-010의 명시 목표(무페이지네이션 전체 로드 → cursor 상한)는 완전 충족했고, 인덱스는 스키마/마이그레이션 변경이라 별도 작업 단위가 적절. 현재 데이터 규모에서 기능·정확성 영향 없음(정렬 비용만). 인덱스 추가는 코드 변경 없는 독립 핫픽스/후속 perf WI로 흡수 가능.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/route.ts:59 (cursor: { id: cursor }, skip: 1)",
+      "description": "SUSPECTED(낮은 위험·미악용): cursor 입력값에 대한 형식/소속 검증이 없다. 클라가 임의 문자열을 cursor로 보내면 Prisma는 해당 id 행을 기준점으로 seek하려 한다. 보안상으로는 안전 — where:{...scope,status:'ACTIVE'}가 cursor/skip과 독립적으로 항상 적용되므로 scope 밖 행이 노출될 수 없다(scope가 cursor보다 우선). 권한 밖 데이터 누출 경로 없음을 코드로 확인. 다만 (a) 다른 scope/삭제된 id를 cursor로 재사용하면 페이지 경계가 부정확해질 수 있고(자기 scope 내 항목 누락/중복), (b) 존재하지 않는 cursor id는 Prisma가 런타임 예외를 던질 수 있어 500(catch→Failed to fetch)으로 떨어질 수 있다. 코드베이스 선례(messages/route.ts:58)도 동일하게 cursor 미검증이라 일관적.",
+      "recommendation": "현행 보안상 무해이므로 필수 아님. 견고화하려면 cursor 미존재/타scope 시 graceful 처리(첫 페이지 폴백 또는 400 INVALID_CURSOR)로 500 회피. 코드베이스 전반(messages 포함) 일괄 적용이 일관적.",
+      "defer": true,
+      "deferRationale": "P3. 데이터 노출·인가 우회 없음(scope 우선 적용 실증). 잘못된 cursor는 정상 사용 흐름(nextCursor 그대로 재전송)에서 발생하지 않으며, 발생 시 영향은 부정확 경계/500에 그쳐 자가복구(재진입) 가능. 기존 messages 라우트와 동일 컨벤션이라 단독 수정 시 비일관 — WI-012/공통 정리에서 일괄이 적절.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/pagination.ts (신규) vs src/app/api/spaces/[id]/messages/route.ts:33,71-73",
+      "description": "DRY 미완결(선재 중복 잔존). 신규 buildCursorPage/parsePageLimit가 messages 라우트의 기존 인라인 cursor 절단(hasMore=length>limit / slice(0,limit) / nextCursor=results.at(-1).id)과 limit 파싱(Math.min(parseInt(...||'50'),100), 상수 50/100 하드코딩)을 사실상 동일 캡슐화했고 pagination.ts 주석도 messages 라우트를 선례로 명시하나, messages 라우트는 여전히 헬퍼를 재사용하지 않고 인라인 중복을 유지한다. 동일 패턴 2회 출현(CLAUDE.md '같은 로직 2회 이상 → 분리' 취지). 본 WI 신규 코드 자체는 올바르게 헬퍼화되어 회귀 위험 없음.",
+      "recommendation": "messages 라우트의 cursor 절단/limit 파싱을 buildCursorPage/parsePageLimit으로 치환해 단일 출처화(응답 키가 messages이므로 items만 매핑).",
+      "defer": true,
+      "deferRationale": "P3. messages 라우트는 이번 WI 범위 밖 선재 코드로 동작상 정상·동일. 공통 모듈 중복 제거는 WI-012-refactor 성격에 부합 → 그쪽 흡수. 본 WI의 신규 코드는 이미 헬퍼화 완료.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/pagination.ts:19-23 (parsePageLimit) + src/stores/space-store.ts:41-47 (buildQuery)",
+      "description": "관찰(결함 아님): parsePageLimit/MAX_PAGE_LIMIT의 cap·검증은 견고(NaN/0/음수→기본, >MAX→cap, parseInt 소수절삭 명시 테스트 커버)하나, 클라(buildQuery)는 limit 파라미터를 전송하지 않아 항상 서버 기본 50으로만 동작한다. 즉 limit 검증/캡 로직의 현재 실효 표면은 서버 직접 호출·향후 호출자뿐이며 UI 경로에서는 미노출(테스트로만 커버). limit 상한은 전역 목록 폭주 방지용 서버측 방어선이므로 클라 비노출이 오히려 안전(클라가 100 강제해도 cap). specificity 관점 기록.",
+      "recommendation": "현행 유지 권장(서버 상한 방어로 충분). 향후 클라 페이지 크기 노출 필요 시 buildQuery에 limit 추가.",
+      "defer": true,
+      "deferRationale": "P3이자 결함 아님. 스케일 부채 해소 목적에 부합하며 변경 불필요. 기록 목적의 관찰.",
+      "fixNow": false
+    }
+  ]
+}

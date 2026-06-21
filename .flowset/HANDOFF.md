@@ -1,11 +1,14 @@
 # HANDOFF
 
 ## Active WI
-(없음) — WI-006-fix **develop 머지 완료**(PR#9, merge `2644b3c`, impl `5c9fa16`). 다음 우선은 **WI-010-perf / WI-011-test / WI-012-refactor (전부 P3)**.
+(없음) — WI-010-perf **develop PR 대기**(impl `ed73930`, 3커밋). 다음 우선은 **WI-011-test / WI-012-refactor / WI-013-perf (전부 P3)**.
 
 ## ⚠️ 다음 세션 우선 — 남은 P3 부채
-- 큐(READY, 전부 P3): WI-010-perf(슈퍼어드민 전역 목록 페이지네이션 — `GET /api/spaces` scope={} take/cursor/상한) / WI-011-test(api·socket 라우트 테스트 하니스 + filter 분기 회귀 + **useScreenRecorder unmount settle 경로 테스트**(WI-006 evaluator P3 흡수)) / WI-012-refactor(protocol 순수계약 모듈 분리 + 소켓상수 물리이동 + enforce·assets write-side 중앙화 + **useScreenRecorder stopRecording close `.catch` 비대칭 통일**(WI-006 evaluator P3 선재 흡수)).
+- 큐(READY, 전부 P3): WI-011-test(api·socket 라우트 테스트 하니스 + filter 분기 회귀 + **useScreenRecorder unmount settle 경로 테스트**(WI-006 evaluator P3 흡수)) / WI-012-refactor(protocol 순수계약 모듈 분리 + 소켓상수 물리이동 + enforce·assets write-side 중앙화 + **messages 라우트 cursor 로직을 WI-010 신규 `src/lib/pagination.ts` 공용 헬퍼로 통일**(WI-010 evaluator P3 흡수) + **useScreenRecorder stopRecording close `.catch` 비대칭 통일**(WI-006 evaluator P3 선재 흡수)) / **WI-013-perf**(`GET /api/spaces` 핫 쿼리용 Space 복합 인덱스 `status`+`updatedAt desc`+`id desc` 마이그레이션 — WI-010 듀얼검증 codex r3+evaluator 공통 defer, DB 마이그레이션 승인+프로덕션 EXPLAIN 검증 필요).
 - **진행 방식(사용자 확정 2026-06-21)**: 모든 WI는 develop 정상 플로우 — `feature/WI-NNN` 분기 → 기계게이트(tsc/lint/vitest/build) → 듀얼검증(codex CLI + evaluator-agent) → `.pass` → **develop PR 머지**(프로세스 07상 사용자 승인 불요). 경계 변경 WI는 구현 전 codex consult 필수(process 02). 라이브 반영이 필요하면 그때 develop→main **승격**(process 07; 승인 필요 + main 푸시 작성자 = 인가 계정 `flowcoder25@gmail.com`).
+
+## Done 추가 (이번 세션, 2026-06-22)
+- **WI-010-perf**: `GET /api/spaces`가 페이지네이션 없이 전체 ACTIVE 스페이스를 로드하던 스케일 부채(P3, WI-009 슈퍼어드민 전역 `scope={}`) 해소. cursor 페이지네이션(`parsePageLimit` 기본 50·최대 100 + `cursor`, `take:limit+1` → `buildCursorPage` → `{spaces,nextCursor,hasMore}`, 기존 spaces 유지=하위호환) + `orderBy [updatedAt desc, id desc]`(id 타이브레이커) + 모든 스코프 일관. 클라: `space-store` `loadMore`+`_reqId` 토큰(stale 응답 무시) + `space-list-view` "더 보기"(전역 가시성 회귀 방지). 신규 순수 헬퍼 `src/lib/pagination.ts`(+테스트). vitest 92→108. 기계게이트 4/4. **듀얼검증 codex 3R 수렴**(r1 FAIL P2/fixNow `isLoadingMore` 고착 → 수정 `529108e` / r2 WARNING P3 역방향 누수 → 선제 해소 `ed73930` / r3 WARNING P3×1 defer) · evaluator WARNING 9.7(최종 HEAD 재검증, P3×4 defer, 변이검증 5종 검출, 보안 sound) + `.pass`(`2ef1dd0b`). 설계 codex consult 1R(경쟁상태 위험 E 지목). **두 검증자 r1 동일 실결함 독립 발견**. 남은 P3→WI-013-perf(인덱스)/WI-012(cursor검증·messages DRY). **develop PR 대기**(impl `ed73930`).
 
 ## Done 추가 (이번 세션, 2026-06-22)
 - **WI-006-fix**: `useScreenRecorder`의 `recorder.onerror`가 handleError+idle+stopTimer만 하고 `stopRecording()`이 보관한 `pendingStopResolveRef`를 settle하지 않아, 'error' 이벤트 후 `onstop` 미발화 시 `stopRecording()` Promise가 영구 pending이던 P3 결함 해소. `onerror`를 정상 abort로 강화: `onstop=null`(중복 저장 차단)+`audioContext close`+`chunks 폐기`+`mediaRecorderRef===recorder`시 null+`pendingStopResolveRef` settle. resolve 시맨틱은 기존 onstop의 `result.status==="error"` 경로와 일관(오류는 error 상태/onError로 전달, `Promise<void>` 계약 유지). 신규 vitest 4(88→92). 기계게이트 4/4 PASS. 듀얼검증 codex **r1 PASS 0 issues**·evaluator WARNING 9.5(P3×3 defer) + `.pass`(`19ecaf43`). 설계 codex consult 1R(settle-in-onerror가 안전망 타임아웃보다 우수 — saveFile 진행 중 premature resolve 회피). evaluator 뮤테이션 테스트로 결함 검출 실증(pre-fix 복원 시 test1·3 5초 타임아웃 FAIL). **develop PR 대기**(commit `5c9fa16`).
