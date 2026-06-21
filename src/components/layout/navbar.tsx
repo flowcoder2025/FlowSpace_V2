@@ -80,13 +80,15 @@ export function Navbar() {
               >
                 로그아웃
               </button>
-              <Link
-                href={ROUTES.SPACES_NEW}
-                className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-brand-deep"
-              >
-                새 스페이스
-                <span aria-hidden="true">+</span>
-              </Link>
+              {session.user.isSuperAdmin && (
+                <Link
+                  href={ROUTES.SPACES_NEW}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-brand-deep"
+                >
+                  새 스페이스
+                  <span aria-hidden="true">+</span>
+                </Link>
+              )}
             </>
           ) : (
             <>
@@ -183,13 +185,15 @@ export function Navbar() {
                   >
                     로그아웃
                   </button>
-                  <Link
-                    href={ROUTES.SPACES_NEW}
-                    onClick={() => setMobileOpen(false)}
-                    className="block rounded-md bg-brand px-3 py-2.5 text-center text-sm font-medium text-cream transition-colors hover:bg-brand-deep"
-                  >
-                    새 스페이스 +
-                  </Link>
+                  {session.user.isSuperAdmin && (
+                    <Link
+                      href={ROUTES.SPACES_NEW}
+                      onClick={() => setMobileOpen(false)}
+                      className="block rounded-md bg-brand px-3 py-2.5 text-center text-sm font-medium text-cream transition-colors hover:bg-brand-deep"
+                    >
+                      새 스페이스 +
+                    </Link>
+                  )}
                 </>
               ) : (
                 <>
