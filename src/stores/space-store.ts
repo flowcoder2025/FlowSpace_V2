@@ -87,8 +87,11 @@ export const useSpaceStore = create<SpaceStore>((set, get) => ({
   },
 
   loadMore: async () => {
-    const { hasMore, nextCursor, isLoadingMore, filter } = get();
-    if (!hasMore || !nextCursor || isLoadingMore) return;
+    const { hasMore, nextCursor, isLoadingMore, isLoading, filter } = get();
+    // isLoading 가드: 전체 리로드 중에는 페이지네이션하지 않는다(리로드가 진행 중
+    // loadMore를 대체). 가드 없이 리로드 중 loadMore가 호출되면 공유 _reqId를
+    // 증가시켜 리로드를 무효화하고 isLoading을 고착시키는 역방향 누수가 생김.
+    if (isLoading || !hasMore || !nextCursor || isLoadingMore) return;
     const reqId = get()._reqId + 1;
     set({ isLoadingMore: true, _reqId: reqId });
     try {
