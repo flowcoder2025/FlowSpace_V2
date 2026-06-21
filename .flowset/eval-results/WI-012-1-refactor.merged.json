@@ -1,0 +1,57 @@
+{
+  "wi": "WI-012-1-refactor",
+  "schemaVersion": 1,
+  "commit": "806d07b",
+  "target": "develop (PR 예정)",
+  "rounds": 3,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0, "rounds": 3, "convergence": "r1 WARNING(P3 doc stale 포인터) -> r2 FAIL(P1 auth-secret COPY 누락 + P3 원장 불일치) -> r3 PASS(0 issues). 라운드별 더 깊이 파고들며 선재 P1 적출 후 수렴." },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 10.0, "scores": { "completeness": 10.0, "consistency": 10.0, "specificity": 10.0, "actionability": 10.0 }, "issueCount": 1, "runs": 2, "note": "run1(3dac762) PASS 10.0 0 issues. run2(최종 d028764) WARNING 10.0 P3x1(protocol 스펙 변경표면표 auth-secret 행 미반영, defer). run2가 metafile로 COPY 완전성 독립 실증(런타임 src 입력 3개 전수 COPY, socket-events type-only elide 확인)." }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "순수 리팩토링 WI(런타임 동작 변경 0 — 통신 순수계약을 protocol 모듈로 승격). 듀얼검증 3R 수렴: codex r1 P3(doc)->r2 P1(auth-secret COPY)+P3(원장)->r3 PASS 0 issues; evaluator run1 PASS 10.0(3dac762)->run2 WARNING 10.0 P3x1(최종 d028764, 스펙표 nit). codex r2가 적출한 선재 P1(server/middleware/auth.ts 런타임 의존 src/lib/auth-secret.ts가 Dockerfile.socket COPY 누락 — WI-001 80a3adb 도입분, Docker 빌드 컨텍스트 esbuild resolve 실패로 향후 main 승격 시 OCI 빌드 깨질 결함)을 본 WI가 COPY/paths를 다루므로 함께 해소. esbuild metafile로 서버 번들 런타임 src 입력 전수(chat-constants·enforce contract·auth-secret 3개) COPY 완전성을 codex(권고)·evaluator(독립 실행) 양측 실증. evaluator run2 유일 P3(스펙표 미반영)는 806d07b에서 doc 보강 해소. 최종 잔여 P0/P1/P2/fixNow 0. 기계게이트 5/5(tsc 0/lint 0(기존 LiveKit 경고 1)/vitest 128·128/next build 0/서버 esbuild 번들 0) + esbuild metafile COPY 완전성 -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "경계 스펙 module-boundary-encapsulation.md §B 본문(L42)이 삭제된 socket/internal/types.ts를 여전히 server import로 기술(stale SSOT 포인터). L47 후속 항목은 갱신됐으나 L42 본문 미갱신.",
+      "codex": "WARNING (P3, fixNow:true)",
+      "evaluator": "(미지적 — codex 단독)",
+      "status": "RESOLVED(43667fb) — L42를 현재 server 순수계약 import 집합(protocol/socket-events·chat-constants·enforce contract)으로 갱신 + COPY 파일 수 2->3 정정."
+    },
+    {
+      "round": 2,
+      "issue": "선재 P1: server/middleware/auth.ts가 런타임 import하는 src/lib/auth-secret.ts(WI-001 도입)가 Dockerfile.socket COPY·deploy-socket.yml paths에서 누락 → Docker 빌드 컨텍스트 esbuild resolve 실패(향후 main 승격 시 OCI 빌드 깨짐).",
+      "codex": "FAIL (P1, fixNow:true)",
+      "evaluator": "(run1 미검출 — COPY 완전성 10.0 줬으나 auth-secret 갭 놓침; run2에서 독립 실증 확인)",
+      "status": "RESOLVED(d028764) — Dockerfile.socket COPY + deploy-socket.yml paths에 src/lib/auth-secret.ts 추가. esbuild metafile로 서버 번들 런타임 src 입력 전수(3개) COPY 완전성 실증. WI-001 80a3adb 도입 이래의 선재 결함을 본 WI가 닫음."
+    },
+    {
+      "round": 2,
+      "issue": ".flowset/current.json activeWI가 WI-012-refactor/develop(분할 전 상태)로 검증 대상 WI-012-1-refactor/피처브랜치와 불일치.",
+      "codex": "FAIL set의 P3 (fixNow:true)",
+      "evaluator": "(미지적 — codex 단독)",
+      "status": "RESOLVED(d028764) — activeWI=WI-012-1-refactor, branch=피처브랜치, status=VERIFY로 정합."
+    },
+    {
+      "round": 3,
+      "issue": "r2 P1/P3 재확인 + 잔여 점검.",
+      "codex": "PASS (0 issues)",
+      "evaluator": "WARNING 10.0 (run2: 스펙표 P3x1 defer)",
+      "status": "CONVERGED — codex 0 issues. evaluator 유일 P3(protocol 스펙 변경표면표 auth-secret 행 미반영)는 806d07b doc 보강으로 해소. P0/P1/P2·fixNow 0."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator(run2)"],
+      "divergent": true,
+      "location": ".claude/specs/architecture/2026-06-22-protocol-contract-module.md (변경표면표)",
+      "description": "r2에서 추가된 src/lib/auth-secret.ts COPY/CI-paths 행이 protocol 스펙 변경표면표에 미반영(r1 설계 시점 표 미갱신).",
+      "assessment": "기능/빌드/추적성 영향 없음 — 메커니즘은 Dockerfile.socket 인라인 주석·경계 스펙 §B·current.json 원장에 정확히 문서화돼 있었음. 그러나 본 WI가 생성한 스펙의 완전성 nit이라 즉시 보강.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": false,
+      "status": "RESOLVED(806d07b) — 변경표면표 배포 행에 auth-secret COPY/실증 명시 + 선재 P1 해소 근거 단락 추가."
+    }
+  ]
+}

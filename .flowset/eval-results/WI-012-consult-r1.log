@@ -1,0 +1,192 @@
+OpenAI Codex v0.141.0
+--------
+workdir: C:\Team-jane\FlowSpace
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019eebb2-b6f3-7072-809b-8a9549f9f924
+--------
+user
+# 설계 협의 — WI-012-refactor (통신 순수계약 정리 + P3 흡수)
+
+당신은 FlowSpace(Next.js 15 + Phaser 3, TypeScript, Windows) 리포의 **설계 협의 파트너**다. 메인 구현자는 Claude. 이 협의는 구현 착수 전 경계 변경 설계를 합의하기 위한 것이다. **코드를 바꾸지 말고**, 산문으로 답하라. 모든 판단은 아래 사실(실제 코드 read-only 확인 완료)에 근거한다.
+
+## 컨텍스트
+- 개발 프로세스: `feature/WI` 분기 → 기계게이트(tsc/lint/vitest/build + **서버 esbuild 번들**) → 듀얼 블라인드 검증(codex CLI + evaluator) → `.pass` → develop PR 머지. 라이브(main) 반영은 별도 승격(승인 필요).
+- 경계 규칙: 모듈 = `index.ts`(Public 배럴) + `internal/`(private). 타 모듈은 배럴만 import(ESLint `no-restricted-imports @/**/internal` + `module-boundaries.test.ts` 경로해석 게이트, **src/ 한정** — server/scripts 예외).
+- **WI-003에서 확인된 1급 함정**: `server/`는 Next 앱과 **별도 esbuild 단일번들**(`Dockerfile.socket`이 `npx esbuild server/index.ts --bundle`). socket/chat 배럴(index.ts)을 서버가 import하면 React 훅이 번들에 끌려와 빌드가 깨진다 → 서버는 **순수 계약 파일만 상대경로 직접 import + Dockerfile COPY**.
+- **배포 트리거**: `.github/workflows/deploy-socket.yml`은 **`main` push에만** 발동(현재 작업은 develop → 자동 배포 없음). 단 `Dockerfile.socket` COPY 경로가 틀리면 향후 승격 시 OCI 빌드 실패. 과거 chat-constants COPY 누락으로 빌드 실패 선례 있음.
+
+## WI-012 범위 (6 서브스코프, 전부 P3 부채)
+
+### S1. 통신 순수계약 protocol 모듈 분리 (핵심·고위험)
+현행 통신 순수계약 3파일 분산:
+- `src/features/space/socket/internal/types.ts` — **import 0건 순수 타입**(Socket.io 이벤트/페이로드, ClientToServerEvents/ServerToClientEvents 20+). 서버 9개소가 상대경로 import(`server/index.ts` + handlers room/movement/editor/avatar/media/chat/party/enforce). `Dockerfile.socket` COPY + `deploy-socket.yml` paths + 도메인규칙 `communication.md`("이벤트 타입은 socket/internal/types.ts 참조")가 이 경로를 SSOT로 가리킴.
+- `src/features/space/chat/internal/chat-constants.ts` — **chat 도메인 상수**(MAX_MESSAGES/MAX_CONTENT_LENGTH/RATE_LIMIT_MS/ADMIN_COMMAND_ALIASES/FONT_*/DEFAULT_NICKNAME 등) + **오배치된 소켓 상수**(RECONNECTION_ATTEMPTS/DELAY/DELAY_MAX/TIMEOUT, MOVE_THROTTLE_MS)가 한 파일에 혼재. 서버(chat/party 핸들러)는 chat 상수(MAX_CONTENT_LENGTH/RATE_LIMIT_MS/DEFAULT_NICKNAME)만 import하고 **소켓 상수는 import 안 함**.
+- `src/features/space/enforce/internal/contract.ts` — Node crypto만 쓰는 순수 제재 계약(WI-005). 이미 enforce 모듈로 잘 분리 + Dockerfile/CI 등록 완료.
+
+WI 원안 목표 문구: "통신 순수계약을 공유 계약 모듈(예: `protocol/index.ts` 순수, React 무의존)로 승격 → server·Dockerfile.socket·deploy-socket.yml 경로 갱신".
+
+### S2. chat 오배치 소켓 상수 물리 이동 (S1과 결합)
+- 소켓 상수 5종이 chat-constants.ts에 정의 + chat/index.ts 배럴에 **"안정 API 아님, 후속 WI에서 통신 공유 계약 위치로 이동 예정" 주석과 함께 임시 re-export**(WI-003가 cross-module internal 위반을 임시 해소한 흔적).
+- 소비처는 **socket 모듈 내부 2파일뿐**: `socket/internal/socket-client.ts`(RECONNECTION_* 4종, 현재 `@/features/space/chat` 배럴 경유), `socket/internal/use-socket.ts`(MOVE_THROTTLE_MS + DEFAULT_NICKNAME, 배럴 경유). 전수 grep 확인 — 테스트/server/scripts 어디서도 소켓 상수 미참조.
+- communication.md invariant #1(100ms throttle)·#2(500ms→5s, 30회)가 이 상수들이 통신 도메인 소속임을 규칙으로 못박음.
+
+### S3. EventBridge 공개계약 game/events 단일 진입점 (독립·중위험)
+- 공개 진입점 **이중**: 최상위 `game/index.ts` 배럴은 eventBridge+GameEvents+**payload 타입 4/28개만** 재노출; `game/events/index.ts` 서브배럴은 28개 전부 노출.
+- `game/events/`는 `game/internal/` **밖**이라 ESLint·boundary test가 cross-module 직접 import를 못 잡음. 그 결과 editor 2파일(editor-system.ts/use-editor.ts, `@/features/space/game/events` alias)·avatar 1파일(sprite-generator.ts, 상대경로 `../../game/events`)이 **최상위 배럴이 안 주는 Editor payload 타입 때문에 서브배럴을 직접 import**. 나머지 cross-module 소비자 4파일은 최상위 배럴 사용. game/internal/** 8파일은 동일모듈 상대경로(정상).
+- 최상위 game 배럴은 game-manager(Phaser/React 의존)도 re-export하나, game events 소비자는 전부 클라이언트(server는 game events 미사용 → esbuild 무관).
+
+### S4. useScreenRecorder `audioContext.close()` `.catch` 비대칭 (WI-006 P3, 저위험)
+- `src/features/space/hooks/internal/useScreenRecorder.ts`의 close() 4곳: unmount(L179, `.catch` 有)/onerror(L312, `.catch` 有)/startRecording 진입(L263, **`.catch` 無**)/stopRecording(L357, **`.catch` 無**). WI-006 evaluator는 L357만 지목("3경로 통일"=179/312/357, 263 누락 집계).
+- close()는 await 안 됨 → reject가 반환 `Promise<void>`에 전파 안 되나 unhandled rejection 가능. 현 테스트는 audioTracks 미전달이라 4 close 경로 전부 미커버(변이검증 불가).
+
+### S5. messages 라우트 cursor 로직 → `src/lib/pagination.ts` 통일 (WI-010 P3, 저위험)
+- **라우트 2개**가 cursor/limit/hasMore/nextCursor 인라인 중복: `src/app/api/spaces/[id]/messages/route.ts`(비-admin), `src/app/api/spaces/[id]/admin/messages/route.ts`(admin). 둘 다 `take:limit+1` + `cursor:{id},skip:1` + 손수 절단. `spaces/route.ts`는 이미 `parsePageLimit`/`buildCursorPage` 사용(레퍼런스).
+- 응답 계약 차이: 비-admin=`{messages: 변환매핑, nextCursor, hasMore}`, admin=`{messages: raw items, nextCursor}`(hasMore 없음, 클라가 `!!nextCursor`로 파생). 헬퍼는 무확장 치환 가능.
+
+### S6. POST /api/spaces 전체 커버리지 + 미사용 하니스 경로 (WI-011 P3, 저위험·테스트전용)
+- POST는 5경로(401/403 SUPER_ADMIN_REQUIRED/400 name·templateKey/404 template/201 + 500 catch). route.test.ts는 **403만 커버**. mockPrisma.space.create/template.findUnique는 배선됐으나 미소비. WI-011 계약 = **소스 .ts 무수정, 테스트만**.
+
+## 핵심 결정점 (당신의 판단을 구함)
+
+**D1 (가장 중요) — S1 protocol 모듈 범위**: 다음 중 권고는?
+- (A) **풀 protocol 모듈**: 신규 `protocol/` 모듈에 socket types + 소켓상수(+enforce contract?) 승격. server 9개소 + Dockerfile.socket COPY + deploy-socket.yml paths + communication.md 갱신. WI 원안 충실, 통신계약 SSOT 단일화. **단 types.ts 이동은 활성 위반을 고치지 않음**(server는 경계 예외, 이미 정상 동작) — 순전히 배포인프라 리스크를 감수한 개념적 정리.
+- (B) **socket 모듈 내부 정합**: types.ts는 현 위치 유지(이미 문서상 SSOT, server 정상 import). **오배치 소켓상수만** `socket/internal/socket-constants.ts`로 이동, chat 배럴 임시 re-export 제거, socket-client/use-socket를 동일모듈 상대 import로 교체. **server/Dockerfile/CI 무변경**(server는 소켓상수 미import). 활성 부채(오배치 상수 + 임시 배럴) 완전 해소 + 배포 리스크 0.
+- (C) 하이브리드.
+
+배포 트리거가 main 전용이라 develop 단계에선 자동 배포 없음 + 로컬 esbuild 번들 게이트로 빌드 선검증 가능함을 감안해 판단해줘.
+
+**D2 — DEFAULT_NICKNAME 소속**: chat 도메인 값(chat-constants)인데 server chat/party + socket use-socket이 공유. protocol/socket으로 이동 vs chat 잔류? (WI-003 eval은 "chat 도메인 값이라 chat 유지 타당"으로 판단했음.)
+
+**D3 — S3 단일화 방향**: (가) 최상위 game 배럴이 28개 payload 전부 재노출(`export *` vs 명시 나열) + editor/avatar를 최상위 배럴로 통일, events 서브배럴은 game 내부 전용으로 한정. (나) events를 `game/internal/`로 물리 이동(8개 내부 상대경로도 갱신). ESLint에 events 서브배럴 cross-module 차단 하드닝을 이번 스코프에 넣을지?
+
+**D4 — S4 .catch 범위**: L357만(서브스코프 충실) vs L263+L357(4경로 완전 통일). `.catch(()=>{})` no-op vs console.error 로깅? 변이검증 가능한 테스트(AudioContext 스텁 + audioTracks 전달)를 신규 추가할지(WI-006 교훈: "테스트 결함은 즉시 강화")?
+
+**D5 — S5 admin 응답**: admin messages 응답에 hasMore를 추가(additive·하위호환, 클라 단순화)할지 vs 무변경(nextCursor만)?
+
+**D6 (메타) — WI 분할/순서**: 6 서브스코프를 **단일 PR**로 갈지, 아니면 위험 프로파일에 따라 **분할**(예: 배포인프라 건드리는 S1+S2를 별 PR, 나머지 S3~S6를 cleanup PR; 또는 sub-numbering WI-012-1/-2)할지? 리뷰 안전성 vs WI 단위 일관성 트레이드오프 관점에서.
+
+## 요청
+- D1~D6 각각에 명확한 권고 + 근거 1줄.
+- **내가 놓치고 있는 위험 1가지**(코드/빌드/배포/회귀 어디든).
+- 구현 순서 제안(원자적 변경이 필요한 지점 — 중간 상태에서 빌드 깨지는 구간 명시).
+
+codex
+권고는 **C: 슬림 protocol 하이브리드**입니다.
+
+**D1 — S1 protocol 범위**  
+`src/features/space/protocol` 같은 순수 계약 모듈을 만들고 **socket event types + 소켓 transport 상수만** 승격하는 쪽을 권합니다.  
+근거: 서버가 `socket/internal/types.ts`를 직접 보는 상태는 동작상 문제는 없지만 “private를 서버 예외로 읽는 계약”이라 장기 SSOT로 약합니다. 다만 `enforce/internal/contract.ts`는 이미 WI-005에서 독립 계약으로 안정화됐으니 protocol에 흡수하지 않는 게 낫습니다.
+
+**D2 — DEFAULT_NICKNAME**  
+`DEFAULT_NICKNAME`은 **chat에 잔류**가 맞습니다.  
+근거: transport 동작 상수가 아니라 채팅 도메인의 사용자 표시 기본값이고, 서버 chat/party도 그 의미로 씁니다. socket `use-socket`만 chat 공개 배럴에서 가져오면 됩니다.
+
+**D3 — EventBridge 단일화**  
+최상위 `game/index.ts`가 payload 타입 28개를 전부 공개하고, editor/avatar는 모두 최상위 배럴로 통일하는 방향을 권합니다. `export *`보다는 **명시 나열**이 더 안전합니다.  
+근거: `game/events`를 물리적으로 `internal/`로 옮기면 game 내부 8파일까지 흔드는 반면, 실제 문제는 cross-module 소비자가 서브배럴로 우회하는 공개면 불일치입니다. 이번에는 ESLint 하드닝까지 넣어 `@/features/space/game/events`와 상대 `../../game/events`의 외부 사용을 막는 게 좋습니다.
+
+**D4 — audioContext.close() .catch**  
+`L263 + L357` 둘 다 처리해서 4경로 완전 통일을 권합니다. `.catch(() => {})`보다 `console.error` 또는 기존 프로젝트 로깅 관례가 있으면 그 관례를 따르는 쪽이 낫습니다.  
+근거: evaluator가 L357만 찍었어도 같은 결함군이고, unhandled rejection 방지가 목적이면 4개 경로의 동작을 맞춰야 합니다. AudioContext 스텁 + `audioTracks` 전달 테스트도 추가하는 게 WI-006 교훈과 맞습니다.
+
+**D5 — admin messages 응답**  
+admin 응답 계약은 **무변경**, `nextCursor`만 유지하는 쪽을 권합니다.  
+근거: additive라도 API 계약 변경이고 현재 클라는 `!!nextCursor`로 파생 중입니다. 이번 범위는 pagination helper 통일이지 응답 표면 확장이 아닙니다.
+
+**D6 — WI 분할/순서**  
+단일 PR보다는 **2개 PR 분할**을 권합니다.  
+근거: S1/S2는 서버 번들, Dockerfile, workflow path, 문서까지 닿는 경계 변경이고, S3~S6은 클라이언트/테스트/저위험 cleanup입니다. 리뷰어가 배포 리스크와 일반 cleanup을 분리해서 볼 수 있어 안전합니다.
+
+권장 분할:
+
+1. `WI-012-1`: S1 + S2  
+   protocol 신설, socket types/transport constants 이동, server imports, Dockerfile COPY, deploy paths, communication.md 갱신, esbuild 번들 검증.
+
+2. `WI-012-2`: S3~S6  
+   game public barrel 정리, recorder catch/test, pagination helper 적용, POST route 테스트 보강.
+
+**놓친 위험 1가지**  
+`protocol/index.ts`가 “편의상” 다른 feature 배럴이나 runtime 값을 import하게 되면 서버 esbuild 번들에 다시 React/Next 클라이언트 코드가 끌려올 수 있습니다. `protocol`은 타입/상수만 두고, 서버가 import하는 경로도 반드시 순수 파일 또는 순수 배럴이어야 합니다.
+
+**구현 순서 제안**
+
+1. protocol 순수 파일 먼저 생성  
+   중간 상태 빌드 영향 없음.
+
+2. socket event types를 protocol로 옮기고 기존 `socket/internal/types.ts`는 즉시 제거하지 말고 임시 re-export 또는 한 커밋 내 전체 import 갱신  
+   깨지는 구간: server 9개소 중 일부만 갱신하면 TypeScript/server esbuild가 깨질 수 있습니다.
+
+3. 서버 9개소, Dockerfile.socket COPY, deploy-socket.yml paths, communication.md를 같은 원자 변경으로 갱신  
+   깨지는 구간: 코드 import는 바꿨는데 Dockerfile COPY가 누락되면 로컬 tsc는 통과해도 OCI 빌드가 실패합니다.
+
+4. 소켓 상수 5종을 protocol 또는 socket transport constants로 이동하고 `chat/index.ts` 임시 re-export 제거  
+   깨지는 구간: `socket-client.ts`/`use-socket.ts` 갱신 전 re-export를 제거하면 클라이언트 빌드가 깨집니다.
+
+5. S3에서 먼저 `game/index.ts` 공개 타입을 확장한 뒤 editor/avatar imports를 최상위 배럴로 바꾸고, 마지막에 lint/boundary 차단 추가  
+   깨지는 구간: 차단 규칙을 먼저 넣으면 기존 직접 import 때문에 lint가 즉시 실패합니다.
+
+6. S4~S6은 독립 적용 가능  
+   recorder는 catch 추가 후 테스트, pagination은 응답 스냅/계약 확인, POST는 테스트만 추가하면 됩니다.
+tokens used
+5,098
+권고는 **C: 슬림 protocol 하이브리드**입니다.
+
+**D1 — S1 protocol 범위**  
+`src/features/space/protocol` 같은 순수 계약 모듈을 만들고 **socket event types + 소켓 transport 상수만** 승격하는 쪽을 권합니다.  
+근거: 서버가 `socket/internal/types.ts`를 직접 보는 상태는 동작상 문제는 없지만 “private를 서버 예외로 읽는 계약”이라 장기 SSOT로 약합니다. 다만 `enforce/internal/contract.ts`는 이미 WI-005에서 독립 계약으로 안정화됐으니 protocol에 흡수하지 않는 게 낫습니다.
+
+**D2 — DEFAULT_NICKNAME**  
+`DEFAULT_NICKNAME`은 **chat에 잔류**가 맞습니다.  
+근거: transport 동작 상수가 아니라 채팅 도메인의 사용자 표시 기본값이고, 서버 chat/party도 그 의미로 씁니다. socket `use-socket`만 chat 공개 배럴에서 가져오면 됩니다.
+
+**D3 — EventBridge 단일화**  
+최상위 `game/index.ts`가 payload 타입 28개를 전부 공개하고, editor/avatar는 모두 최상위 배럴로 통일하는 방향을 권합니다. `export *`보다는 **명시 나열**이 더 안전합니다.  
+근거: `game/events`를 물리적으로 `internal/`로 옮기면 game 내부 8파일까지 흔드는 반면, 실제 문제는 cross-module 소비자가 서브배럴로 우회하는 공개면 불일치입니다. 이번에는 ESLint 하드닝까지 넣어 `@/features/space/game/events`와 상대 `../../game/events`의 외부 사용을 막는 게 좋습니다.
+
+**D4 — audioContext.close() .catch**  
+`L263 + L357` 둘 다 처리해서 4경로 완전 통일을 권합니다. `.catch(() => {})`보다 `console.error` 또는 기존 프로젝트 로깅 관례가 있으면 그 관례를 따르는 쪽이 낫습니다.  
+근거: evaluator가 L357만 찍었어도 같은 결함군이고, unhandled rejection 방지가 목적이면 4개 경로의 동작을 맞춰야 합니다. AudioContext 스텁 + `audioTracks` 전달 테스트도 추가하는 게 WI-006 교훈과 맞습니다.
+
+**D5 — admin messages 응답**  
+admin 응답 계약은 **무변경**, `nextCursor`만 유지하는 쪽을 권합니다.  
+근거: additive라도 API 계약 변경이고 현재 클라는 `!!nextCursor`로 파생 중입니다. 이번 범위는 pagination helper 통일이지 응답 표면 확장이 아닙니다.
+
+**D6 — WI 분할/순서**  
+단일 PR보다는 **2개 PR 분할**을 권합니다.  
+근거: S1/S2는 서버 번들, Dockerfile, workflow path, 문서까지 닿는 경계 변경이고, S3~S6은 클라이언트/테스트/저위험 cleanup입니다. 리뷰어가 배포 리스크와 일반 cleanup을 분리해서 볼 수 있어 안전합니다.
+
+권장 분할:
+
+1. `WI-012-1`: S1 + S2  
+   protocol 신설, socket types/transport constants 이동, server imports, Dockerfile COPY, deploy paths, communication.md 갱신, esbuild 번들 검증.
+
+2. `WI-012-2`: S3~S6  
+   game public barrel 정리, recorder catch/test, pagination helper 적용, POST route 테스트 보강.
+
+**놓친 위험 1가지**  
+`protocol/index.ts`가 “편의상” 다른 feature 배럴이나 runtime 값을 import하게 되면 서버 esbuild 번들에 다시 React/Next 클라이언트 코드가 끌려올 수 있습니다. `protocol`은 타입/상수만 두고, 서버가 import하는 경로도 반드시 순수 파일 또는 순수 배럴이어야 합니다.
+
+**구현 순서 제안**
+
+1. protocol 순수 파일 먼저 생성  
+   중간 상태 빌드 영향 없음.
+
+2. socket event types를 protocol로 옮기고 기존 `socket/internal/types.ts`는 즉시 제거하지 말고 임시 re-export 또는 한 커밋 내 전체 import 갱신  
+   깨지는 구간: server 9개소 중 일부만 갱신하면 TypeScript/server esbuild가 깨질 수 있습니다.
+
+3. 서버 9개소, Dockerfile.socket COPY, deploy-socket.yml paths, communication.md를 같은 원자 변경으로 갱신  
+   깨지는 구간: 코드 import는 바꿨는데 Dockerfile COPY가 누락되면 로컬 tsc는 통과해도 OCI 빌드가 실패합니다.
+
+4. 소켓 상수 5종을 protocol 또는 socket transport constants로 이동하고 `chat/index.ts` 임시 re-export 제거  
+   깨지는 구간: `socket-client.ts`/`use-socket.ts` 갱신 전 re-export를 제거하면 클라이언트 빌드가 깨집니다.
+
+5. S3에서 먼저 `game/index.ts` 공개 타입을 확장한 뒤 editor/avatar imports를 최상위 배럴로 바꾸고, 마지막에 lint/boundary 차단 추가  
+   깨지는 구간: 차단 규칙을 먼저 넣으면 기존 직접 import 때문에 lint가 즉시 실패합니다.
+
+6. S4~S6은 독립 적용 가능  
+   recorder는 catch 추가 후 테스트, pagination은 응답 스냅/계약 확인, POST는 테스트만 추가하면 됩니다.
