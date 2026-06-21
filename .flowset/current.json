@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-004-fix",
-  "lastWI": "WI-003-refactor",
-  "type": "fix",
-  "status": "ACTIVE",
+  "activeWI": null,
+  "lastWI": "WI-004-fix",
+  "type": null,
+  "status": "IDLE",
   "integrationBranch": "develop",
-  "branch": "fix/WI-004-fix-assets-delete-path-isolation",
-  "startedAt": "2026-06-22",
+  "branch": "develop",
+  "startedAt": null,
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "edd2918",
-  "note": "WI-003-refactor(타 모듈 internal/* 직접 import 위반 정리) develop 머지 완료 — PR#6, merge edd2918 (feat 58c9025 + 검증산출물 3e44d8b). 인앱 cross-module internal 7건 배럴 routing 해소 + ESLint(alias 정밀)·module-boundaries vitest 테스트 이중 방어. 기계게이트 5/5(tsc/lint/vitest 53·53/build/서버 esbuild). 듀얼검증 codex 4R 최종 PASS·evaluator 9.5(P3x4 defer). 설계 codex consult 1R. server/scripts 순수계약·EventBridge 단일화는 WI-012-refactor로 분리. 스펙 .claude/specs/architecture/2026-06-22-module-boundary-encapsulation.md. 다음: WI-004-fix(assets DELETE 경로격리 P2). WI-001/002/009는 develop만 — main 미반영(승격 대상)."
+  "lastVerifiedCommit": "67531b4",
+  "note": "WI-004-fix(DELETE /api/assets/[id] path traversal 차단, CWE-22 P2) develop 머지 완료 — PR#7, merge 67531b4 (impl bc334a7 + 검증산출물 c732516). resolveGeneratedAssetPath()로 public/assets/generated 경계 격리(백슬래시/null byte 거부 + POSIX URL 정규화 + prefix 검사 + path.relative 이중검사). 경계 밖 unlink 스킵+warn, DB row 삭제는 진행. vitest 18케이스(53→71). 기계게이트 4/4 PASS. 듀얼검증 codex PASS 0 issues·evaluator 9.62(P3x3 defer). 설계 codex consult 1R(컨테인먼트 루트 public→public/assets/generated 타이트화). write-side 중앙화는 WI-012 후속. 다음: WI-005-fix(소켓 ban/kick 실시간 크로스프로세스 P2, 경계변경→codex consult 필수). WI-001/002/003/008/009/004는 develop만 — main 미반영(승격 대상)."
 }
