@@ -1,0 +1,27 @@
+{
+  "wi": "WI-008-fix",
+  "schemaVersion": 1,
+  "commit": "e19d8be",
+  "target": "develop (PR)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0 },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.875, "scores": { "completeness": 10, "consistency": 9.5, "specificity": 10, "actionability": 10 }, "issueCount": 3 }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "codex PASS(issues=[]) · evaluator WARNING(9.875). evaluator 3건 전부 P3·defer: 2건은 해소 완료 항목의 검증 기록(결함 아님), 1건은 WI-008 범위 밖 선재 비현실 엣지(SUSPECTED). P0/P1/P2 없음, fixNow=true 없음, 기계 게이트 4/4 PASS(tsc/lint/vitest 52·52/build) → .pass 생성. 설계 codex consult 1R 반영(--list 분기 최우선 유지, alias 미추가, code명 SUPER_ADMIN_REQUIRED, 스코프 403 1건 한정).",
+  "convergence": [],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "scripts/set-super-admin.mjs:42",
+      "description": "SUSPECTED·선재·범위외: 이메일이 문자 그대로 '--list'인 사용자에게는 인자 파싱 모호로 슈퍼어드민 부여 불가. WI-008 변경분 아닌 선재 동작이며 운영상 비현실적(이메일='--list' 불가).",
+      "assessment": "WI-008 두 수용 기준과 무관, 회귀 유발 없음. codex는 미발견(PASS). 비치명 선재 엣지.",
+      "defer": true,
+      "deferRationale": "범위 밖 선재 동작 + 비현실 엣지. 본 WI 수용 기준 무관. 필요 시 별도 정리 WI에서 --list를 옵션 플래그로 분리 고려.",
+      "fixNow": false
+    }
+  ]
+}

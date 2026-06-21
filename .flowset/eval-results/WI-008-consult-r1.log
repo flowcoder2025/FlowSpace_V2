@@ -1,0 +1,86 @@
+OpenAI Codex v0.141.0
+--------
+workdir: C:\Team-jane\FlowSpace
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019eeaa7-086b-7c93-bb52-89aa954d4fbf
+--------
+user
+# 설계 협의 (consult) — WI-008-fix: WI-007 듀얼검증 P3×2 해소
+
+당신은 시니어 리뷰어다. 아래 WI-008-fix 구현 계획을 검토하고, **내가 놓친 위험 1가지 이상**을 반드시 지적하라. 산문으로 간결히 답하라.
+
+## 배경
+FlowSpace = Next.js 15 풀스택 + Phaser. WI-007(스페이스 생성 슈퍼어드민 전용 제한)의 evaluator 듀얼검증에서 defer된 P3 2건을 해소하는 정리 WI다. 기능 결함이 아닌 방어적 UX/일관성 부채.
+
+프로젝트 규칙 app.md invariant #4: API 에러 응답은 `{ error: string, code?: string }` 형식 통일.
+
+## 결함 1: `scripts/set-super-admin.mjs:36` 회수 인자 파싱
+현재:
+```js
+const next = process.argv[3] !== "false"; // 기본 true, 'false' 명시 시에만 회수
+```
+문제: 정확히 문자열 `"false"`만 회수로 인정. 오타(`flse`, `False`, `0`)는 조용히 부여(true)로 처리됨.
+
+용법(파일 헤더): `node scripts/set-super-admin.mjs <email> [true|false]` (기본 부여, false 명시 시 회수) + `--list`.
+
+### 내 계획
+3번째 인자를 명시적으로 검증:
+- 인자 없음 → 기본 `true`(부여) 유지 (용법 문서와 일치)
+- `"true"` → 부여, `"false"` → 회수
+- 그 외 임의 문자열 → usage 출력 후 `process.exitCode = 1`, DB 조작 없이 즉시 반환
+- (alias `grant`/`revoke` 추가 허용은 과한가? true/false만으로 충분한가?)
+
+## 결함 2: `src/app/api/spaces/route.ts:86-91` POST 403 `code` 필드 누락
+현재:
+```ts
+if (session.user.isSuperAdmin !== true) {
+  return NextResponse.json(
+    { error: "Only superAdmin can create spaces" },
+    { status: 403 }
+  );
+}
+```
+문제: app.md invariant #4의 `code` 필드 없음. 같은 파일 GET의 400은 이미 `code: "INVALID_FILTER"` 병기.
+
+### 내 계획
+```ts
+return NextResponse.json(
+  { error: "Only superAdmin can create spaces", code: "FORBIDDEN_NOT_SUPERADMIN" },
+  { status: 403 }
+);
+```
+- 클라이언트 `create-space-form.tsx:49`는 `data.error`를 그대로 표시. 이 폼은 `/spaces/new` 페이지가 비-슈퍼어드민을 서버 redirect로 차단하므로 정상 흐름에서 도달 불가(403은 직접 POST/race에서만 발생).
+- 질문: 클라이언트를 `code` 분기로 바꿔야 하나, 아니면 서버 `code` 병기만으로 충분한가? (P3 정리이므로 스코프 최소가 원칙)
+
+## 스코프 질문
+같은 route.ts에 `code` 없는 다른 4xx가 다수 존재(401 Unauthorized, POST 400 name/templateKey, POST 404 Template not found). invariant #4는 `code?` (선택)이라 강제 아님. WI-008 스코프를 **403 1건으로 한정**하고 나머지는 별도 WI로 두는 게 맞는가, 아니면 이 기회에 일괄 정합하는 게 맞는가?
+
+## 코드명 컨벤션
+기존 코드는 `INVALID_FILTER` (SCREAMING_SNAKE). 403 코드명으로 `FORBIDDEN_NOT_SUPERADMIN` 적절한가, 더 나은 컨벤션이 있는가?
+
+codex
+계획은 대체로 맞지만, 놓친 위험이 하나 있다면 `set-super-admin.mjs`의 `--list` 처리 순서다. 3번째 인자 검증을 공통으로 먼저 넣으면 `node scripts/set-super-admin.mjs --list` 같은 기존 경로를 깨거나, 향후 `--list` 뒤에 뭔가 붙은 경우를 엉뚱하게 boolean 인자 오류로 처리할 수 있다. `--list`는 최우선 분기하고, `<email> [true|false]` 경로에서만 3번째 인자를 검증하는 게 안전하다. 가능하면 4번째 이후 잉여 인자도 usage 오류로 막아야 “오타를 조용히 허용하지 않는다”는 취지와 일관된다.
+
+alias `grant/revoke`는 지금은 추가하지 않는 게 낫다. 헤더 용법이 `[true|false]`라면 WI-008-fix는 그 계약을 엄격히 만드는 작업으로 끝내는 게 좋다. alias는 편의 기능이라 테스트 케이스와 문서 표면만 늘린다.
+
+403 응답은 서버에 `code`를 병기하는 것만으로 충분해 보인다. 클라이언트가 현재 `data.error`를 표시하고, 정상 라우팅에서는 비슈퍼어드민이 폼에 도달하지 못한다면 `code` 분기까지 넣는 건 스코프가 커진다. 다만 테스트가 JSON 전체 일치를 하고 있으면 `{ code }` 추가로 깨질 수 있으니 API 테스트나 스냅샷은 확인해야 한다.
+
+다른 401/400/404까지 이번에 일괄 정합하는 건 비추천이다. invariant가 `code?`라면 전체 누락이 즉시 위반은 아니고, WI-008-fix의 목적이 WI-007 듀얼검증 P3×2 해소라면 403 1건과 CLI 인자 검증으로 한정하는 게 리뷰하기 쉽다. 별도 WI로 “route.ts API error code 정합화”를 잡는 편이 낫다.
+
+코드명은 `FORBIDDEN_NOT_SUPERADMIN`도 이해 가능하지만, 기존 `INVALID_FILTER`처럼 원인 중심이면 `INSUFFICIENT_PRIVILEGES`나 `SUPER_ADMIN_REQUIRED`가 더 재사용성이 좋다. 이 케이스에 가장 명확한 건 `SUPER_ADMIN_REQUIRED`다.
+tokens used
+2,560
+계획은 대체로 맞지만, 놓친 위험이 하나 있다면 `set-super-admin.mjs`의 `--list` 처리 순서다. 3번째 인자 검증을 공통으로 먼저 넣으면 `node scripts/set-super-admin.mjs --list` 같은 기존 경로를 깨거나, 향후 `--list` 뒤에 뭔가 붙은 경우를 엉뚱하게 boolean 인자 오류로 처리할 수 있다. `--list`는 최우선 분기하고, `<email> [true|false]` 경로에서만 3번째 인자를 검증하는 게 안전하다. 가능하면 4번째 이후 잉여 인자도 usage 오류로 막아야 “오타를 조용히 허용하지 않는다”는 취지와 일관된다.
+
+alias `grant/revoke`는 지금은 추가하지 않는 게 낫다. 헤더 용법이 `[true|false]`라면 WI-008-fix는 그 계약을 엄격히 만드는 작업으로 끝내는 게 좋다. alias는 편의 기능이라 테스트 케이스와 문서 표면만 늘린다.
+
+403 응답은 서버에 `code`를 병기하는 것만으로 충분해 보인다. 클라이언트가 현재 `data.error`를 표시하고, 정상 라우팅에서는 비슈퍼어드민이 폼에 도달하지 못한다면 `code` 분기까지 넣는 건 스코프가 커진다. 다만 테스트가 JSON 전체 일치를 하고 있으면 `{ code }` 추가로 깨질 수 있으니 API 테스트나 스냅샷은 확인해야 한다.
+
+다른 401/400/404까지 이번에 일괄 정합하는 건 비추천이다. invariant가 `code?`라면 전체 누락이 즉시 위반은 아니고, WI-008-fix의 목적이 WI-007 듀얼검증 P3×2 해소라면 403 1건과 CLI 인자 검증으로 한정하는 게 리뷰하기 쉽다. 별도 WI로 “route.ts API error code 정합화”를 잡는 편이 낫다.
+
+코드명은 `FORBIDDEN_NOT_SUPERADMIN`도 이해 가능하지만, 기존 `INVALID_FILTER`처럼 원인 중심이면 `INSUFFICIENT_PRIVILEGES`나 `SUPER_ADMIN_REQUIRED`가 더 재사용성이 좋다. 이 케이스에 가장 명확한 건 `SUPER_ADMIN_REQUIRED`다.
