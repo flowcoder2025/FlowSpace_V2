@@ -1,13 +1,20 @@
 # HANDOFF
 
 ## Active WI
-(없음) — WI-002-fix develop 머지 완료. 다음 세션은 **WI-003-refactor**부터.
+(없음) — WI-007-feat **main 머지 완료**(별도 작업). 다음 세션은 develop 통합 큐 **WI-003-refactor**부터 + **WI-008-fix**(WI-007 P3×2).
+
+## ⚠️ main↔develop 분기 상태 (2026-06-21, 중요)
+- **WI-007-feat가 main에만 있고 develop엔 없음**. 사용자 지시로 슈퍼어드민 스페이스 생성 제한을 main에 직접 머지(별도 작업, 표준 develop 통합 플로우 예외).
+- main `2a6e2ed` = `11b04ac`(기존 동결) + WI-007(`49d272e`). **WI-001/002는 여전히 main 미반영.**
+- develop `<ledger>` = WI-001/002 + 원장만. **WI-007 코드 미반영.**
+- **back-sync 미결**: develop을 WI-007과 정합화하려면 `git merge origin/main`(main→develop) 권고. 미실행 시 develop엔 슈퍼어드민 제한 없음(향후 develop→main 승격 시 main의 WI-007은 보존됨 — 충돌/리버트 없음 확인).
 
 ## Ground Truth
-- Integration branch: `develop` @ `256ae57` (PR#2 머지 커밋) — origin/develop 동기화됨
-- WI 브랜치 `fix/WI-002-fix-phaser-shutdown-leak`: 머지 후 **로컬+원격 삭제됨**
-- main: `11b04ac` **동결** (develop 미반영)
+- Integration branch: `develop` (origin/develop 동기화 — 원장 커밋 포함)
+- main: `2a6e2ed` (PR#3로 WI-007 머지). 그 외 WI-001/002 미반영 동결 유지.
+- WI 브랜치 `feat/WI-007-feat-superadmin-space-creation`: 머지 후 **로컬+원격 삭제됨**
 - 현재 체크아웃: `develop`
+- WI-002 이전: develop @ `256ae57`(PR#2), main 동결 `11b04ac`
 
 ## Done (이번 세션)
 - **WI-002-fix 구현 + 검증 완료** (커밋 `8e3358f`): 안정성/리소스 누수 2건
