@@ -1,0 +1,12 @@
+WI=WI-009-feat
+commit=fb484d6
+sourceFingerprint=2dedbb42d82f0d895e1e10ae662ab770c4cfcbb1178d5578acc78b1632204302
+fingerprintScope=changeset(4 files: src/app/api/spaces/route.ts, src/components/spaces/space-card.tsx, src/components/spaces/space-list-view.tsx, src/stores/space-store.ts)
+codex=.flowset/eval-results/WI-009-feat.codex.json
+evaluator=.flowset/eval-results/WI-009-feat.eval.json
+merged=.flowset/eval-results/WI-009-feat.merged.json
+gates=tsc,lint,vitest,build
+codexVerdict=PASS
+evaluatorVerdict=WARNING(9.8,P3x2-defer)
+target=develop (PR 예정)
+createdAt=2026-06-21T14:40:00Z

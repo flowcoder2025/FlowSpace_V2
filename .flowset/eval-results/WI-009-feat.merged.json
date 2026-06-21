@@ -1,0 +1,46 @@
+{
+  "wi": "WI-009-feat",
+  "schemaVersion": 1,
+  "commit": "fb484d6",
+  "target": "develop (PR 예정)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0 },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.8, "scores": { "completeness": 10, "consistency": 10, "specificity": 10, "actionability": 9 }, "issueCount": 2 }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "r1: codex PASS(issues=[]) · evaluator WARNING(9.8, P3 2건 defer). P0/P1/P2 없음, fixNow=true 없음, 기계 게이트 4/4 PASS(tsc/lint/vitest 52-52/build, feature/WI-009 트리 실측) → .pass 생성. 코드 = feature/WI-009-feat-superadmin-global-spaces commit fb484d6. 두 검증자 모두 핵심 4기준(슈퍼어드민 전역 scope·일반사용자 동작 불변·세션 권위 기반 관리 버튼·inviteCode 누출 차단) 충족 확인, 권한상승/IDOR 없음.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "독립 검증 분기: codex는 결함 0 / evaluator는 P3 2건(페이지네이션 부재, 라우트 테스트 부재) 발견. 둘 다 defer 가능 부채로 정확성·보안 무영향.",
+      "codex": "PASS (미발견)",
+      "evaluator": "WARNING 9.8 (P3x2 defer)",
+      "status": "RESOLVED — 양측 모두 P0/P1/P2 없음 + fixNow 없음에 수렴. P3 2건은 후속 WI로 분리(2R 불요)."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/app/api/spaces/route.ts:24-40",
+      "description": "슈퍼어드민 '전체' scope({})가 모든 ACTIVE 스페이스를 제한·페이지네이션 없이 반환. 스케일 시 응답/쿼리 비용 선형 증가.",
+      "assessment": "기능·보안 결함 아님. 기존 GET /api/spaces도 무페이지네이션이라 본 WI가 회귀시키지 않음 — 슈퍼어드민 행 수만 확대.",
+      "defer": true,
+      "deferRationale": "성능/스케일 부채, 정확성·보안 무영향. 후속 WI(take/cursor 페이지네이션)로 분리.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/app/api/spaces/route.ts (vitest 커버리지)",
+      "description": "신규 filter 분기(전역 vs 멤버십, 화이트리스트, INVALID_FILTER 400)에 대한 자동 회귀 테스트 부재. vitest 52종은 chat 유틸 한정, API 라우트 미검증.",
+      "assessment": "테스트 부채. 분기 단순·명시적이고 tsc/lint/build + 듀얼검증으로 정확성 확인. 프로젝트에 API 라우트 테스트 하니스 부재(WI-007도 동일 처리).",
+      "defer": true,
+      "deferRationale": "P3 테스트 부채. API 테스트 하니스 신규 도입은 별도 범위. 후속 WI로 분리.",
+      "fixNow": false
+    }
+  ]
+}
