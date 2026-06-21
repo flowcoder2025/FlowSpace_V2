@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-011-test",
-  "lastWI": "WI-010-perf",
+  "activeWI": null,
+  "lastWI": "WI-011-test",
   "type": "test",
-  "status": "VERIFY",
+  "status": "MERGED",
   "integrationBranch": "develop",
-  "branch": "test/WI-011-test-route-harness-recorder-settle",
+  "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "baa2f0c",
-  "note": "WI-011-test(P3 테스트 부채) 듀얼검증 PASS, .pass 생성, develop PR 대기. 테스트 전용(소스 .ts 무수정 — 양 검증자 git diff HEAD -- src/ 빈결과 확인). (1) 신규 재사용 API 라우트 테스트 하니스 src/__tests__/helpers/api-route.ts(순수 빌더 buildGetRequest/buildJsonRequest/makeSession/makeSpaceRow/readJson — vi.mock 프리앰블은 파일로컬 호이스팅이라 중앙화 불가). (2) src/app/api/spaces/route.test.ts: GET filter→scope 분기 17케이스(owned/joined/null·all × 일반/슈퍼어드민, INVALID_FILTER 400, status:ACTIVE 상시 부착, 페이지네이션 take=limit+1/cursor:{id}/skip:1, cursor에도 scope 보존, 응답 allowlist exact-key-set[inviteCode/accessSecret/ownerId/templateId/updatedAt 미노출], POST superAdmin 가드 1건). (3) useScreenRecorder.test.ts: unmount 경로 3건(stopping 중 언마운트 settle[WI-006 P3 흡수, 변이검증됨] / 언마운트 후 stopRecording 즉시 resolve / saveFile await 중 언마운트 mountedRef 가드[고유 delay setTimeout 식별로 변이검증 가능하게 강화]). vitest 108→128(+20). 기계게이트 4/4(tsc 0/lint 0/vitest 128·128/build 0). 설계 codex consult 1R + 듀얼검증 2R(codex r1 WARNING P3x3→r2 PASS 0 issues · evaluator r1 9.3→r2 9.625, 수렴 P3 3건[가드 false-pass·superAdmin scope·allowlist] 선제 강화 후 양측 변이검증 실증) + .pass(fingerprint cfdd572c). 잔여 P3x3 전부 defer=WI-012(POST 커버리지·하니스 미사용경로·GET500 폴백). 큐 잔여: WI-012-refactor / WI-013-perf(전부 P3). 승격 미실행 부채: WI-001~010은 develop만, main(라이브) 미반영."
+  "lastVerifiedCommit": "2b91419",
+  "note": "WI-011-test(P3 테스트 부채) develop 머지 완료 — PR#11, merge 2b91419(impl a066359/r2 baa2f0c). 테스트 전용(소스 .ts 무수정 — 양 검증자 git diff HEAD -- src/ 빈결과 확인). (1) 신규 재사용 API 라우트 테스트 하니스 src/__tests__/helpers/api-route.ts(순수 빌더 buildGetRequest/buildJsonRequest/makeSession/makeSpaceRow/readJson — vi.mock 프리앰블은 파일로컬 호이스팅이라 중앙화 불가). (2) src/app/api/spaces/route.test.ts: GET filter→scope 분기 17케이스(owned/joined/null·all × 일반/슈퍼어드민, INVALID_FILTER 400, status:ACTIVE 상시 부착, 페이지네이션 take=limit+1/cursor:{id}/skip:1, cursor에도 scope 보존, 응답 allowlist exact-key-set[inviteCode/accessSecret/ownerId/templateId/updatedAt 미노출], POST superAdmin 가드 1건). (3) useScreenRecorder.test.ts: unmount 경로 3건(stopping 중 언마운트 settle[WI-006 P3 흡수, 변이검증됨] / 언마운트 후 stopRecording 즉시 resolve / saveFile await 중 언마운트 mountedRef 가드[고유 delay setTimeout 식별로 변이검증 가능하게 강화]). vitest 108→128(+20). 기계게이트 4/4(tsc 0/lint 0/vitest 128·128/build 0). 설계 codex consult 1R + 듀얼검증 2R(codex r1 WARNING P3x3→r2 PASS 0 issues · evaluator r1 9.3→r2 9.625, 수렴 P3 3건[가드 false-pass·superAdmin scope·allowlist] 선제 강화 후 양측 변이검증 실증) + .pass(fingerprint cfdd572c). 잔여 P3x3 전부 defer=WI-012(POST 커버리지·하니스 미사용경로·GET500 폴백). 큐 잔여: WI-012-refactor / WI-013-perf(전부 P3). 승격 미실행 부채: WI-001~010은 develop만, main(라이브) 미반영."
 }
