@@ -11,7 +11,7 @@ const FILTERS = [
   { key: "joined", label: "참여 중" },
 ] as const;
 
-export function SpaceListView() {
+export function SpaceListView({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const router = useRouter();
   const { spaces, isLoading, filter, setFilter, fetchSpaces } =
     useSpaceStore();
@@ -40,13 +40,15 @@ export function SpaceListView() {
           ))}
         </div>
 
-        <button
-          onClick={() => router.push("/spaces/new")}
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-brand px-5 py-2.5 text-sm font-medium text-cream transition-colors hover:bg-brand-deep"
-        >
-          새 스페이스
-          <span aria-hidden="true">+</span>
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => router.push("/spaces/new")}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-brand px-5 py-2.5 text-sm font-medium text-cream transition-colors hover:bg-brand-deep"
+          >
+            새 스페이스
+            <span aria-hidden="true">+</span>
+          </button>
+        )}
       </div>
 
       {/* List */}
@@ -60,15 +62,19 @@ export function SpaceListView() {
             아직 스페이스가 없습니다
           </h3>
           <p className="mt-2 max-w-sm text-sm text-ink-muted">
-            첫 스페이스를 만들거나, 초대 링크로 다른 공간에 입장하세요.
+            {isSuperAdmin
+              ? "첫 스페이스를 만들거나, 초대 링크로 다른 공간에 입장하세요."
+              : "초대 링크로 다른 공간에 입장하세요."}
           </p>
-          <button
-            onClick={() => router.push("/spaces/new")}
-            className="mt-6 inline-flex items-center justify-center gap-2 rounded-md bg-brand px-5 py-2.5 text-sm font-medium text-cream transition-colors hover:bg-brand-deep"
-          >
-            첫 스페이스 만들기
-            <span aria-hidden="true">→</span>
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => router.push("/spaces/new")}
+              className="mt-6 inline-flex items-center justify-center gap-2 rounded-md bg-brand px-5 py-2.5 text-sm font-medium text-cream transition-colors hover:bg-brand-deep"
+            >
+              첫 스페이스 만들기
+              <span aria-hidden="true">→</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
