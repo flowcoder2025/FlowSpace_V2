@@ -1,0 +1,78 @@
+{
+  "wi": "WI-011-test",
+  "schemaVersion": 1,
+  "commit": "baa2f0c",
+  "target": "develop (PR 예정)",
+  "rounds": 2,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0, "rounds": 2, "convergence": "r1 WARNING(P3x3 defer) -> r2 PASS(0 issues, r1 3건 전부 해소 확인)" },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.625, "scores": { "completeness": 9.5, "consistency": 9.8, "specificity": 9.7, "actionability": 9.5 }, "issueCount": 3, "runs": 2, "note": "r1 WARNING 9.3 P3x3(false-pass 가드 + fixture 수동동기화 + POST/GET500 미커버) -> r2 WARNING 9.625 P3x3(전부 WI-012 범위 defer). 3건 해소 변이검증 실증." }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "테스트 전용 WI(소스 무수정 — git diff HEAD -- src/ 빈 결과로 양 검증자 확인). r1에서 두 검증자가 수렴 발견한 'mountedRef 가드 smoke false-pass'(codex#1+eval#1) 포함 P3 3건을 선제 강화(r2, baa2f0c) 후 codex r2 PASS(0 issues)·evaluator r2 WARNING 9.625(잔여 P3x3 전부 defer=WI-012 범위). P0/P1/P2 없음, fixNow=true 없음, 기계게이트 4/4 PASS(tsc 0/lint 0(기존 LiveKit 경고 1건만)/vitest 128·128(108->+20)/next build 0) -> .pass 생성. 핵심 회귀 가드(권한격리 filter=all+일반사용자, 응답 allowlist, INVALID_FILTER 400, 페이지네이션 take/cursor/skip, recorder stopping-중-unmount settle, mountedRef 가드)는 모두 변이검증으로 검출 실증.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "mountedRef 가드 smoke 테스트(useScreenRecorder.test.ts 세 번째 unmount 케이스)가 false-pass — 가드를 무력화(if(false))해도 통과. 유일 assertion expect(onstopDone).toBeDefined()가 가드 무관 항상 참.",
+      "codex": "WARNING (P3, defer, fixNow:false)",
+      "evaluator": "WARNING 9.3 (동일 결함 P3 defer)",
+      "status": "RESOLVED — 두 검증자 독립 수렴 발견. React 19라 setState-after-unmount 관측 불가 → 가드가 차단하는 showNotification의 setTimeout(_, notificationDuration)을 고유 delay(123456)로 식별하도록 강화(baa2f0c). 가드 if(false) 변이 시 setTimeout 예약되어 FAIL — 메인·evaluator 양측 변이검증 실증."
+    },
+    {
+      "round": 1,
+      "issue": "filter 매트릭스 불완전 — superAdmin owned/joined 정확 scope 미검증(status만 확인). superAdmin owned/joined를 전역으로 처리하는 회귀가 통과할 수 있음.",
+      "codex": "WARNING (P3, defer, fixNow:false)",
+      "evaluator": "(미지적 — codex 단독)",
+      "status": "RESOLVED — filter=owned/joined + 슈퍼어드민 정확 scope 케이스 추가(baa2f0c). owned scope를 isSuperAdmin?{}:... 로 변이 시 FAIL 검출(evaluator 변이검증 실증)."
+    },
+    {
+      "round": 1,
+      "issue": "응답 allowlist 단언 부분적 — fixture에 templateId/updatedAt 포함되나 테스트는 선택 필드만 부재 확인. 그 필드를 응답에 추가해도 통과.",
+      "codex": "WARNING (P3, defer, fixNow:false)",
+      "evaluator": "(eval#2 fixture 수동동기화로 인접 지적)",
+      "status": "RESOLVED — Object.keys(space).sort() 정확 key 집합 단언으로 강화 + templateId/updatedAt 명시 부재 확인(baa2f0c). ownerId 누출 변이 시 FAIL 검출(evaluator 변이검증 실증)."
+    },
+    {
+      "round": 2,
+      "issue": "r1 3건 재확인 + 잔여 점검.",
+      "codex": "PASS (0 issues)",
+      "evaluator": "WARNING 9.625 (잔여 P3x3 전부 defer)",
+      "status": "CONVERGED — codex 0 issues, evaluator 잔여는 전부 후속 범위(POST happy/입력검증, 하니스 미사용 경로). P0/P1/P2·fixNow 없음."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/app/api/spaces/route.test.ts (POST 커버리지)",
+      "description": "POST happy-path(슈퍼어드민 성공 create + inviteCode 응답) 및 입력검증 분기(400 name/templateKey 누락, 404 template not found) 미커버. superAdmin 가드 403 1케이스만 존재.",
+      "assessment": "WI-011 명시 범위(GET filter 분기 회귀)가 아님. 설계 codex consult에서 POST는 범위 밖으로 합의(GET 집중 명료성). 하니스(buildJsonRequest)가 확장을 수용하도록 설계됨.",
+      "defer": true,
+      "deferRationale": "POST 전체 커버리지는 별도 범위 -> WI-012 또는 후속 test WI에서 하니스 재사용.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["codex(r1)", "evaluator"],
+      "divergent": false,
+      "location": "src/__tests__/helpers/api-route.ts (makeSpaceRow fixture)",
+      "description": "makeSpaceRow가 Prisma 스키마와 수동 동기화 — 미래 민감 컬럼 추가 시 자동 미반영. buildJsonRequest 본문 round-trip / makeSpaceRow.status 오버라이드가 단언으로 직접 검증되지 않음(미사용 경로, tsc 시그니처 보장).",
+      "assessment": "현 응답 매핑은 명시 allowlist라 fixture가 raw row를 정확 모사하면 충분(exact-key-set 단언으로 누출 검출 실증). 미사용 헬퍼 경로는 후속 POST/messages 테스트에서 자연 소비.",
+      "defer": true,
+      "deferRationale": "P3 하드닝. 하니스 확장 시점(WI-012 messages/POST)에서 자연 해소.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator(r1)"],
+      "divergent": true,
+      "location": "src/app/api/spaces/route.test.ts (GET 500 폴백)",
+      "description": "GET try/catch 500 폴백 분기 미커버.",
+      "assessment": "WI 명시 범위 밖. 방어적 폴백이라 보안/정확성 영향 없음.",
+      "defer": true,
+      "deferRationale": "P3 커버리지 폭 -> 후속.",
+      "fixNow": false
+    }
+  ]
+}

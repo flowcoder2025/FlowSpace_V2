@@ -1,0 +1,13 @@
+WI=WI-011-test
+commit=baa2f0c
+sourceFingerprint=cfdd572ce14a331f3d783a769f320c24985eb92ce19b99c3559f32484ba006c2
+fingerprintScope=changeset(3 files, committed: src/__tests__/helpers/api-route.ts, src/app/api/spaces/route.test.ts, src/features/space/hooks/internal/useScreenRecorder.test.ts) — 소스(.ts) 무수정, 테스트만 추가. 커밋 후 워킹트리 clean이라 Stop 게이트는 changed=0으로 통과(이 값은 검증된 changeset 감사 기록).
+codex=.flowset/eval-results/WI-011-test.codex.r2.json
+evaluator=.flowset/eval-results/WI-011-test.eval.json
+merged=.flowset/eval-results/WI-011-test.merged.json
+gates=tsc,lint,vitest,build
+codexVerdict=PASS(r2, 0 issues; r1 WARNING P3x3->전부 해소)
+evaluatorVerdict=WARNING(9.625, P3x3-defer=WI-012 범위, 3건 해소 변이검증 실증)
+gateDecision=PASS
+target=develop (PR 예정)
+createdAt=2026-06-22T04:10:00Z

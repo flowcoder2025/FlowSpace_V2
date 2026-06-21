@@ -1,0 +1,2087 @@
+OpenAI Codex v0.141.0
+--------
+workdir: C:\Team-jane\FlowSpace
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019eeb7c-a9fa-7b12-97bb-8f2ee18da65b
+--------
+user
+# 설계 협의 요청 — WI-011-test (FlowSpace, Next.js 15 + Vitest)
+
+당신은 독립 설계 파트너입니다. 메인 구현자는 Claude. read-only로 코드베이스를 확인하고 아래 설계 결정에 대해 의견과 "내가 놓칠 위험 1가지"를 산문으로 주세요. **코드를 바꾸지 마세요.**
+
+## 배경
+P3 테스트 부채 해소. 두 영역:
+1. `GET /api/spaces` filter 분기 회귀 테스트 + 재사용 가능한 **API 라우트 테스트 하니스**(auth/prisma mock) 신규 도입.
+2. `useScreenRecorder`의 unmount-during-stopping **settle 경로** 테스트(WI-006 evaluator P3 흡수 — 기존 테스트는 onerror 경로만 커버, 언마운트 cleanup이 `pendingStopResolveRef`를 settle하는 경로 미커버).
+
+대상 파일:
+- `src/app/api/spaces/route.ts` (GET 핸들러: `auth()` + `prisma.space.findMany`, filter→scope 분기, cursor 페이지네이션)
+- `src/features/space/hooks/internal/useScreenRecorder.ts` (cleanup effect line 166~205, stopRecording line 349~413)
+- 기존 테스트: `src/features/space/hooks/internal/useScreenRecorder.test.ts` (onerror 경로 4건), `src/lib/pagination.test.ts`, `src/stores/space-store.test.ts`, `src/__tests__/module-boundaries.test.ts`
+- vitest 설정: `vitest.config.ts` (environment jsdom, include `src/**/*.test.ts(x)`, alias `@`→src)
+
+## 검증된 PoC (이미 통과)
+`vi.hoisted`로 `mockAuth`/`mockPrisma` 생성 → `vi.mock("@/lib/auth")`/`vi.mock("@/lib/prisma")` → `import { GET } from "./route"` → `new NextRequest(new URL(...))`로 호출 → `res.status` / `await res.json()` 읽기 + `mockPrisma.space.findMany.mock.calls[0][0].where`로 scope 캡처. 401·슈퍼어드민 전역 scope `{status:"ACTIVE"}` 2케이스 통과 확인.
+
+## 결정 1 — 하니스 형태
+vitest의 `vi.mock`/`vi.hoisted`는 **파일 로컬 호이스팅**이라 mock wiring 자체는 테스트 파일마다 6줄 정도 반복이 불가피. 내 계획:
+- `src/__tests__/helpers/api-route.ts` (비-test 파일, vitest include 미수집)에 **순수 빌더만** 노출: `buildGetRequest(path, params)` → NextRequest, `makeSession(user|null)`, `makeSpaceRow(overrides)` (route의 include 형태 `{template, _count, members}` 맞춘 행), `readJson(res)`.
+- `vi.mock` 프리앰블은 테스트 파일에 그대로 두되 헬퍼 파일 상단 주석에 복붙용 패턴 명시.
+
+질문: (a) 이 분리가 맞나, 아니면 `__mocks__/` 디렉토리 자동목 또는 `setupFiles`로 auth/prisma mock을 중앙화하는 게 나은가? 후자는 모든 테스트에 전역 영향 → 과하다고 판단했는데 동의하는가? (b) 헬퍼를 `src/__tests__/helpers/`에 두는 게 `module-boundaries.test.ts`(cross-module internal import 차단) 게이트와 충돌 없나?
+
+## 결정 2 — filter 분기 커버리지
+회귀 가치 높은 순으로 커버 예정:
+1. 미인증 → 401
+2. `filter=owned` → `where.ownerId === userId`
+3. `filter=joined` → `where.members.some.userId === userId`
+4. `filter=null` + 일반 사용자 → 멤버십 scope
+5. `filter=null` + 슈퍼어드민 → 전역(`where`에 ownerId/members 없음, `status:"ACTIVE"`만)
+6. `filter=all` + 일반 사용자 → **멤버십 scope**(전역 아님 — 권한 격리 핵심)
+7. `filter=all` + 슈퍼어드민 → 전역
+8. 미허용 filter(`?filter=bogus`) → 400 `code:"INVALID_FILTER"`
+9. 페이지네이션: `?limit`/`?cursor` → `take===limit+1`, `cursor:{id}`+`skip:1` 전달, 응답 `{spaces,nextCursor,hasMore}` 형태(`limit+1`개 반환 시 hasMore=true·마지막 잘림)
+10. 보안: 위조 cursor가 scope를 우회하지 못함(`where:{...scope,status}`가 cursor와 독립 — findMany 인자에 scope 항상 존재)
+11. 응답 매핑에 `inviteCode` 미포함(WI-009 죽은 필드 제거 회귀)
+
+질문: 6·10·11이 과한가, 아니면 빠진 핵심 케이스가 있나? POST(슈퍼어드민 가드 403)도 같은 하니스로 넣을 가치가 있나, 아니면 WI-011 범위(GET filter)에서 제외가 맞나?
+
+## 결정 3 — useScreenRecorder unmount-settle 테스트
+MockMediaRecorder.stop()은 onstop을 자동 발화 안 함(기존 테스트 패턴). 시나리오:
+- (A) **settle**: start → stopRecording() 호출(state "stopping", `pendingStopResolveRef` 보관, onstop 미발화) → `unmount()` → cleanup이 onstop 제거 + `pendingStopResolveRef()` 호출 → stopRecording Promise resolve. unmount 전엔 pending, 후엔 settled 단언.
+- (B) **mountedRef 가드**: start → stopRecording() → onstop 발화시키되 saveFile을 `window.showSaveFilePicker` deferred로 hang → unmount(mountedRef=false) → picker resolve → onstop이 `!mountedRef.current`로 setState 스킵하고 resolve. "언마운트 후 setState 없음" 검증.
+
+질문: (B)가 결정적으로 재현 가능한가(act/microtask 타이밍), 아니면 (A)만으로 WI-006 P3 흡수에 충분한가? (B)를 넣되 불안정하면 (A) 우선?
+
+## 공통
+- 추측 금지, 실제 코드 확인 후 답변.
+- 마지막에 **"내가 놓칠 위험 1가지"** 명시.
+
+codex
+코드 변경 없이 read-only로 확인하겠습니다. 먼저 라우트, 훅, 기존 테스트와 boundary 테스트가 실제로 어떤 전제를 갖는지 좁혀서 보겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'src/__tests__/module-boundaries.test.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'src/app/api/spaces/route.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'src/features/space/hooks/internal/useScreenRecorder.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'src/features/space/hooks/internal/useScreenRecorder.test.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'vitest.config.ts'" in C:\Team-jane\FlowSpace
+ succeeded in 290ms:
+import { defineConfig } from "vitest/config";
+import path from "path";
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: "jsdom",
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
+});
+
+ succeeded in 296ms:
+/**
+ * ëª¨ë“ˆ ê²½ê³„ ìº¡ìŠ??ê°•ì œ ?ŒìŠ¤??(WI-003)
+ *
+ * ?„í‚¤?ì²˜ ê·œì¹™: ê°?ëª¨ë“ˆ?€ `module/index.ts`(Public API) + `module/internal/`(Private).
+ * ?€ ëª¨ë“ˆ??`internal/*`ë¥?ì§ì ‘ import ?˜ëŠ” ê²ƒì„ ê¸ˆì??œë‹¤.
+ *
+ * ESLint `no-restricted-imports`??alias(@/) ê²½ë¡œë§??•ë? ì°¨ë‹¨ ê°€?¥í•˜?? ?ë?ê²½ë¡œ
+ * cross-module internal ì¹¨ë²”?€ glob?¼ë¡œ ?™ì¼ëª¨ë“ˆ ?í–¥(`../../internal/*`)ê³?êµ¬ë¶„?? * ë¶ˆê??¥í•˜ë¯€ë¡? import ê²½ë¡œë¥??¤ì œ ?´ì„??ëª¨ë“ˆ ?Œìœ ê¶Œì„ ?ì •?˜ëŠ” ë³??ŒìŠ¤?¸ë¡œ ë³´ê°•?œë‹¤.
+ * (server/**Â·scripts/** ??ë³„ë„ ë¹Œë“œ/?´ì´ë©??œìˆ˜ ê³„ì•½ ?ˆì™¸ ??src/ ë§?ê²€?¬í•œ??)
+ */
+
+import { describe, it, expect } from "vitest";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+
+const SRC_ROOT = path.resolve(process.cwd(), "src");
+
+/** src ?˜ìœ„ ëª¨ë“  .ts/.tsx ?Œì¼ ?ˆë?ê²½ë¡œ ?˜ì§‘ */
+function collectSourceFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      out.push(...collectSourceFiles(full));
+    } else if (/\.tsx?$/.test(entry)) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+/** ?Œì¼?ì„œ import/export-from/dynamic-import ??ëª¨ë“ˆ ?¤íŽ™ifier ì¶”ì¶œ */
+function extractSpecifiers(content: string): string[] {
+  const specs: string[] = [];
+  const patterns = [
+    /\bfrom\s+["']([^"']+)["']/g, // import/export ... from "X"
+    /\bimport\s+["']([^"']+)["']/g, // import "X" (side-effect)
+    /\bimport\s*\(\s*["']([^"']+)["']/g, // dynamic import("X")
+  ];
+  for (const re of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(content)) !== null) {
+      specs.push(m[1]);
+    }
+  }
+  return specs;
+}
+
+/** specifierë¥??ˆë?ê²½ë¡œ(posix)ë¡??´ì„. ?¸ë? ?¨í‚¤ì§€(bare)??null */
+function resolveSpecifier(fileAbs: string, spec: string): string | null {
+  let abs: string;
+  if (spec.startsWith("@/")) {
+    abs = path.resolve(SRC_ROOT, spec.slice(2));
+  } else if (spec.startsWith(".")) {
+    abs = path.resolve(path.dirname(fileAbs), spec);
+  } else {
+    return null; // node_modules ??bare specifier
+  }
+  return abs.split(path.sep).join("/");
+}
+
+/**
+ * cross-module internal ì¹¨ë²”?´ë©´ ?Œìœ  ëª¨ë“ˆ ?”ë ‰? ë¦¬ë¥?ë°˜í™˜, ?„ë‹ˆë©?null.
+ * ê·œì¹™: ?´ì„??ê²½ë¡œ??`internal` ?¸ê·¸ë¨¼íŠ¸ê°€ ?ˆê³ , import ???Œì¼??ê·?internal?? * ?Œìœ ??ëª¨ë“ˆ(internal ?”ë ‰? ë¦¬??ë¶€ëª? ?˜ìœ„???ˆì? ?Šìœ¼ë©??„ë°˜.
+ */
+function violationModuleDir(fileAbs: string, resolved: string): string | null {
+  const segs = resolved.split("/");
+  const idx = segs.indexOf("internal");
+  if (idx < 1) return null; // internal ?¸ê·¸ë¨¼íŠ¸ ?†ìŒ
+  const moduleDir = segs.slice(0, idx).join("/");
+  const filePosix = fileAbs.split(path.sep).join("/");
+  // ê°™ì? ëª¨ë“ˆ(?Œìœ  ?”ë ‰? ë¦¬ ?˜ìœ„)?´ë©´ ?•ìƒ
+  if (filePosix === moduleDir || filePosix.startsWith(moduleDir + "/")) {
+    return null;
+  }
+  return moduleDir;
+}
+
+describe("module boundaries: ?€ ëª¨ë“ˆ internal/* ì§ì ‘ import ê¸ˆì?", () => {
+  it("src ??cross-module internal import ?„ë°˜??0ê±´ì´?´ì•¼ ?œë‹¤", () => {
+    const files = collectSourceFiles(SRC_ROOT);
+    const violations: string[] = [];
+
+    for (const file of files) {
+      const content = readFileSync(file, "utf-8");
+      for (const spec of extractSpecifiers(content)) {
+        const resolved = resolveSpecifier(file, spec);
+        if (!resolved) continue;
+        const owner = violationModuleDir(file, resolved);
+        if (owner) {
+          const rel = path.relative(SRC_ROOT, file).split(path.sep).join("/");
+          violations.push(`src/${rel}  ?? "${spec}"  (?Œìœ  ëª¨ë“ˆ: ${owner.split("/src/")[1] ?? owner})`);
+        }
+      }
+    }
+
+    expect(
+      violations,
+      `?€ ëª¨ë“ˆ internal/* ì§ì ‘ import ?„ë°˜:\n${violations.join("\n")}\n?´ë‹¹ ëª¨ë“ˆ??ë°°ëŸ´(index.ts)???µí•´ import?˜ì„¸??`,
+    ).toEqual([]);
+  });
+});
+
+ succeeded in 298ms:
+import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
+
+/**
+ * GET /api/spaces - ??ê³µê°„ ëª©ë¡ (?ˆí¼?´ë“œë¯¼ì˜ "?„ì²´"??ëª¨ë“  ACTIVE ?¤íŽ˜?´ìŠ¤).
+ * cursor ?˜ì´ì§€?¤ì´?? `?limit=`(ê¸°ë³¸ 50Â·ìµœë? 100) + `?cursor=`(ì§ì „ ?˜ì´ì§€ ë§ˆì?ë§?id).
+ * ?‘ë‹µ: `{ spaces, nextCursor, hasMore }` (ê¸°ì¡´ `spaces` ?„ë“œ ? ì? = ?˜ìœ„?¸í™˜).
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const isSuperAdmin = session.user.isSuperAdmin === true;
+    const filter = request.nextUrl.searchParams.get("filter"); // "owned" | "joined" | "all" | null
+
+    const memberScope: Prisma.SpaceWhereInput = {
+      members: { some: { userId } },
+    };
+
+    let scope: Prisma.SpaceWhereInput;
+    if (filter === "owned") {
+      scope = { ownerId: userId };
+    } else if (filter === "joined") {
+      scope = memberScope;
+    } else if (filter === null || filter === "all") {
+      // ?ˆí¼?´ë“œë¯¼ì˜ "?„ì²´"ë§??„ì—­(ëª¨ë“  ACTIVE), ?¼ë°˜ ?¬ìš©?ëŠ” ë³¸ì¸ ë©¤ë²„???¤íŽ˜?´ìŠ¤
+      scope = isSuperAdmin ? {} : memberScope;
+    } else {
+      return NextResponse.json(
+        { error: "Invalid filter", code: "INVALID_FILTER" },
+        { status: 400 }
+      );
+    }
+
+    const limit = parsePageLimit(request.nextUrl.searchParams.get("limit"));
+    const cursor = request.nextUrl.searchParams.get("cursor");
+
+    const rows = await prisma.space.findMany({
+      where: { ...scope, status: "ACTIVE" },
+      include: {
+        template: { select: { key: true, name: true } },
+        _count: { select: { members: true } },
+        members: {
+          where: { userId },
+          select: { role: true },
+          take: 1,
+        },
+      },
+      // updatedAt?€ ê°€ë³€Â·ë¹„ìœ ?ˆí¬ ??id ?€?´ë¸Œ?ˆì´ì»¤ë¡œ ?™ì¼ ?œê° ??ê²°ì •???œì„œ ë³´ìž¥
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+
+    const { items, nextCursor, hasMore } = buildCursorPage(rows, limit);
+
+    const result = items.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      accessType: s.accessType,
+      template: s.template,
+      maxUsers: s.maxUsers,
+      memberCount: s._count.members,
+      myRole: s.members[0]?.role || null,
+      logoUrl: s.logoUrl,
+      primaryColor: s.primaryColor,
+      createdAt: s.createdAt,
+    }));
+
+    return NextResponse.json({ spaces: result, nextCursor, hasMore });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to fetch spaces",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/** POST /api/spaces - ê³µê°„ ?ì„± */
+export async function POST(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // ê³µê°„ ?ì„±?€ ?ˆí¼?´ë“œë¯¼ë§Œ ?ˆìš© (?ì„±??ê³µê°„??OWNER ê¶Œí•œ?€ ?´í›„ ë©¤ë²„ PATCHë¡??„ìž„)
+    if (session.user.isSuperAdmin !== true) {
+      return NextResponse.json(
+        { error: "Only superAdmin can create spaces", code: "SUPER_ADMIN_REQUIRED" },
+        { status: 403 }
+      );
+    }
+
+    const body = (await request.json()) as {
+      name?: string;
+      description?: string;
+      templateKey?: string;
+      accessType?: string;
+      accessSecret?: string;
+      maxUsers?: number;
+    };
+
+    if (!body.name || !body.templateKey) {
+      return NextResponse.json(
+        { error: "name, templateKey are required" },
+        { status: 400 }
+      );
+    }
+
+    const template = await prisma.template.findUnique({
+      where: { key: body.templateKey as "OFFICE" | "CLASSROOM" | "LOUNGE" },
+    });
+
+    if (!template) {
+      return NextResponse.json(
+        { error: "Template not found" },
+        { status: 404 }
+      );
+    }
+
+    const space = await prisma.space.create({
+      data: {
+        name: body.name,
+        description: body.description || null,
+        ownerId: session.user.id,
+        templateId: template.id,
+        accessType: (body.accessType as "PUBLIC" | "PRIVATE" | "PASSWORD") || "PUBLIC",
+        accessSecret: body.accessSecret || null,
+        maxUsers: body.maxUsers || 50,
+        members: {
+          create: {
+            userId: session.user.id,
+            displayName: session.user.name,
+            role: "OWNER",
+          },
+        },
+      },
+      include: {
+        template: { select: { key: true, name: true } },
+      },
+    });
+
+    return NextResponse.json(
+      {
+        id: space.id,
+        name: space.name,
+        inviteCode: space.inviteCode,
+        template: space.template,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to create space",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+ succeeded in 301ms:
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+} from "vitest";
+import { renderHook, act, cleanup } from "@testing-library/react";
+import { useScreenRecorder } from "./useScreenRecorder";
+
+// ============================================
+// MediaRecorder / MediaStream ëª¨í‚¹
+// jsdom?€ MediaRecorder/MediaStream??êµ¬í˜„?˜ì? ?Šìœ¼ë¯€ë¡?ìµœì†Œ ?¤í…?¼ë¡œ ?€ì²?
+// stop()?€ onstop???ë™ ë°œí™”?˜ì? ?ŠëŠ”?????ŒìŠ¤?¸ê? onstop/onerrorë¥??˜ë™ ?¸ë¦¬ê±°í•´
+// 'error ??onstop ë¯¸ë°œ??(WI-006)ë¥?ê²°ì •?ìœ¼ë¡??¬í˜„?˜ê¸° ?„í•¨.
+// ============================================
+
+type Handler = (() => void) | null;
+
+class MockMediaRecorder {
+  static instances: MockMediaRecorder[] = [];
+  static isTypeSupported = (): boolean => true;
+
+  state: "inactive" | "recording" | "paused" = "inactive";
+  ondataavailable: Handler = null;
+  onstop: Handler = null;
+  onerror: Handler = null;
+
+  constructor(
+    public stream: unknown,
+    public options: unknown
+  ) {
+    MockMediaRecorder.instances.push(this);
+  }
+
+  start(): void {
+    this.state = "recording";
+  }
+  stop(): void {
+    this.state = "inactive";
+  }
+  pause(): void {
+    this.state = "paused";
+  }
+  resume(): void {
+    this.state = "recording";
+  }
+}
+
+class MockMediaStream {
+  constructor(public tracks?: unknown[]) {}
+  getAudioTracks(): unknown[] {
+    return [];
+  }
+}
+
+const fakeTrack = {} as unknown as MediaStreamTrack;
+
+function latestRecorder(): MockMediaRecorder {
+  const rec = MockMediaRecorder.instances.at(-1);
+  if (!rec) throw new Error("no MediaRecorder instance created");
+  return rec;
+}
+
+beforeEach(() => {
+  MockMediaRecorder.instances = [];
+  vi.stubGlobal("MediaRecorder", MockMediaRecorder);
+  vi.stubGlobal("MediaStream", MockMediaStream);
+  // saveFile()???¤ìš´ë¡œë“œ ?´ë°± ê²½ë¡œ??(?•ìƒ onstop ?Œê? ?ŒìŠ¤??
+  (URL as unknown as { createObjectURL: () => string }).createObjectURL =
+    vi.fn(() => "blob:mock");
+  (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL =
+    vi.fn();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("useScreenRecorder ??onerror ê²½ë¡œ (WI-006)", () => {
+  it("stopRecording ?€ê¸?ì¤?onerrorê°€ ë°œìƒ?˜ë©´ Promiseë¥?settle?œë‹¤ (?êµ¬ pending ì°¨ë‹¨)", async () => {
+    const onError = vi.fn();
+    const { result } = renderHook(() =>
+      useScreenRecorder({ spaceName: "?ŒìŠ¤??, onError })
+    );
+
+    await act(async () => {
+      await result.current.startRecording(fakeTrack);
+    });
+    expect(result.current.recordingState).toBe("recording");
+
+    const recorder = latestRecorder();
+
+    // stopRecording() ?¸ì¶œ ??onstop?€ ë°œí™”?œí‚¤ì§€ ?ŠëŠ”??(error ê²½ë¡œ ëª¨ì‚¬)
+    let settled = false;
+    let stopPromise: Promise<void> | undefined;
+    act(() => {
+      stopPromise = result.current.stopRecording().then(() => {
+        settled = true;
+      });
+    });
+
+    // onstop/onerror ëª¨ë‘ ë¯¸ë°œ?????„ì§ pending
+    expect(settled).toBe(false);
+    expect(result.current.recordingState).toBe("stopping");
+
+    // 'error' ?´ë²¤??ë°œí™”
+    act(() => {
+      recorder.onerror?.();
+    });
+
+    await act(async () => {
+      await stopPromise;
+    });
+
+    expect(settled).toBe(true);
+    expect(result.current.recordingState).toBe("idle");
+    expect(onError).toHaveBeenCalledWith("?¹í™” ì¤??¤ë¥˜ê°€ ë°œìƒ?ˆìŠµ?ˆë‹¤");
+    expect(result.current.error).toBe("?¹í™” ì¤??¤ë¥˜ê°€ ë°œìƒ?ˆìŠµ?ˆë‹¤");
+  });
+
+  it("?¹í™” ì¤?onerror??idleë¡??•ë¦¬?˜ê³ , ?´í›„ stopRecording?€ ì¦‰ì‹œ resolve?œë‹¤", async () => {
+    const onError = vi.fn();
+    const { result } = renderHook(() =>
+      useScreenRecorder({ spaceName: "s", onError })
+    );
+
+    await act(async () => {
+      await result.current.startRecording(fakeTrack);
+    });
+    const recorder = latestRecorder();
+
+    act(() => {
+      recorder.onerror?.();
+    });
+
+    expect(result.current.recordingState).toBe("idle");
+    expect(onError).toHaveBeenCalledTimes(1);
+
+    // recorder refê°€ ë¹„ì›Œ??stopRecording???‘ì—… ?†ì´ ì¦‰ì‹œ resolve (dangling ?†ìŒ)
+    let settled = false;
+    await act(async () => {
+      await result.current.stopRecording().then(() => {
+        settled = true;
+      });
+    });
+    expect(settled).toBe(true);
+    expect(result.current.recordingState).toBe("idle");
+  });
+
+  it("onerror ????²Œ ?„ì°©??onstop?€ ì¤‘ë³µ ì²˜ë¦¬?˜ì? ?ŠëŠ”??(onstop=null)", async () => {
+    const { result } = renderHook(() =>
+      useScreenRecorder({ spaceName: "s" })
+    );
+
+    await act(async () => {
+      await result.current.startRecording(fakeTrack);
+    });
+    const recorder = latestRecorder();
+
+    let stopPromise: Promise<void> | undefined;
+    act(() => {
+      stopPromise = result.current.stopRecording();
+    });
+    act(() => {
+      recorder.onerror?.();
+    });
+    await act(async () => {
+      await stopPromise;
+    });
+
+    // onstop ?¸ë“¤?¬ê? ?œê±°?˜ì–´ ?¬í›„ ?€???±ê³µ ?Œë¦¼??ë°œìƒ?˜ì? ?ŠìŒ
+    expect(recorder.onstop).toBeNull();
+    expect(result.current.notification).toBeNull();
+  });
+
+  it("?•ìƒ onstop ê²½ë¡œ???€????resolve?˜ê³  success ?Œë¦¼???„ìš´??(?Œê?)", async () => {
+    const { result } = renderHook(() =>
+      useScreenRecorder({ spaceName: "s" })
+    );
+
+    await act(async () => {
+      await result.current.startRecording(fakeTrack);
+    });
+    const recorder = latestRecorder();
+
+    let settled = false;
+    let stopPromise: Promise<void> | undefined;
+    act(() => {
+      stopPromise = result.current.stopRecording().then(() => {
+        settled = true;
+      });
+    });
+    expect(result.current.recordingState).toBe("stopping");
+
+    // ë¸Œë¼?°ì?ê°€ stop() ??ë°œí™”?˜ëŠ” onstop??ëª¨ì‚¬
+    await act(async () => {
+      recorder.onstop?.();
+      await stopPromise;
+    });
+
+    expect(settled).toBe(true);
+    expect(result.current.recordingState).toBe("idle");
+    expect(result.current.notification?.type).toBe("success");
+  });
+});
+
+ succeeded in 314ms:
+"use client";
+
+/**
+ * useScreenRecorder
+ *
+ * ?´ë¼?´ì–¸???¹í™” ?? * - MediaRecorder API ê¸°ë°˜
+ * - ?¬ëŸ¬ ?¤ë””???¸ëž™ ë¯¹ì‹± ì§€?? * - File System Access API / ?¤ìš´ë¡œë“œ ?´ë°±
+ */
+
+import { useState, useRef, useCallback, useEffect } from "react";
+
+// ============================================
+// Types
+// ============================================
+
+export type RecordingState =
+  | "idle"
+  | "recording"
+  | "paused"
+  | "stopping";
+
+export type NotificationType = "info" | "success" | "error";
+
+interface Notification {
+  type: NotificationType;
+  message: string;
+}
+
+interface UseScreenRecorderOptions {
+  spaceName: string;
+  onError?: (error: string) => void;
+  notificationDuration?: number;
+}
+
+// ============================================
+// Utilities
+// ============================================
+
+function mixAudioTracks(audioTracks: MediaStreamTrack[]): {
+  mixedStream: MediaStream;
+  audioContext: AudioContext;
+} | null {
+  if (audioTracks.length === 0) return null;
+
+  try {
+    const audioContext = new AudioContext();
+    const destination =
+      audioContext.createMediaStreamDestination();
+
+    audioTracks.forEach((track) => {
+      const stream = new MediaStream([track]);
+      const source =
+        audioContext.createMediaStreamSource(stream);
+      source.connect(destination);
+    });
+
+    return { mixedStream: destination.stream, audioContext };
+  } catch (err) {
+    console.error(
+      "[useScreenRecorder] Failed to mix audio tracks:",
+      err
+    );
+    return null;
+  }
+}
+
+function generateFileName(spaceName: string): string {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, "0");
+
+  const dateStr = `${now.getFullYear()}_${pad(now.getMonth() + 1)}_${pad(now.getDate())}`;
+  const timeStr = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  const safeName =
+    spaceName.replace(/[<>:"/\\|?*]/g, "_").trim() || "recording";
+
+  return `${dateStr}_${timeStr}_${safeName}.webm`;
+}
+
+function supportsFileSystemAccess(): boolean {
+  return (
+    typeof window !== "undefined" && "showSaveFilePicker" in window
+  );
+}
+
+type SaveResult =
+  | { status: "saved"; fileName: string }
+  | { status: "cancelled" }
+  | { status: "error"; message: string };
+
+async function saveFile(
+  blob: Blob,
+  fileName: string
+): Promise<SaveResult> {
+  if (supportsFileSystemAccess() && window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [
+          {
+            description: "WebM Video",
+            accept: { "video/webm": [".webm"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return { status: "saved", fileName };
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        return { status: "cancelled" };
+      }
+    }
+  }
+
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return { status: "saved", fileName };
+  } catch {
+    return { status: "error", message: "?Œì¼ ?¤ìš´ë¡œë“œ???¤íŒ¨?ˆìŠµ?ˆë‹¤" };
+  }
+}
+
+// ============================================
+// Hook
+// ============================================
+
+export function useScreenRecorder({
+  spaceName,
+  onError,
+  notificationDuration = 4000,
+}: UseScreenRecorderOptions) {
+  const [recordingState, setRecordingState] =
+    useState<RecordingState>("idle");
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [notification, setNotification] =
+    useState<Notification | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
+  const startTimeRef = useRef<number>(0);
+  const notificationTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  /** ë§ˆìš´???íƒœ ???¸ë§ˆ?´íŠ¸ ??ì§„í–‰ ì¤‘ì¸ onstop??setState/?€???ë¦„ ì°¨ë‹¨ */
+  const mountedRef = useRef(true);
+  /** stopRecording Promise??resolve ??onstop ?œê±°/ë¯¸ë°œ????cleanup??ë°˜ë“œ??settle */
+  const pendingStopResolveRef = useRef<(() => void) | null>(null);
+
+  // ?¸ë§ˆ?´íŠ¸ ?•ë¦¬ ??ì§„í–‰ ì¤??¹í™”/?€?´ë¨¸/?¤ë””???ì› ?Œìˆ˜ (abort/discard ?±ê²©).
+  // ?…ì´ ?Œìœ ?˜ì? ?Šì? ?ë³¸ ?¸ëž™(screenTrack, audioTracks)?€ stop?˜ì? ?ŠëŠ”??(?”ë©´ê³µìœ  ? ì?).
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (notificationTimerRef.current) {
+        clearTimeout(notificationTimerRef.current);
+        notificationTimerRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      const recorder = mediaRecorderRef.current;
+      if (recorder) {
+        // ?¸ë“¤?¬ëŠ” state?€ ë¬´ê??˜ê²Œ ?œê±° ???´ë? stop()?˜ì–´ inactiveì§€ë§?onstop??        // dispatch ?„ì´ê±°ë‚˜ await ì¤‘ì¼ ???ˆìŒ. ì§„í–‰ ì¤?onstop?€ mountedRef ê°€?œë¡œ ì°¨ë‹¨.
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        recorder.onerror = null;
+        if (recorder.state !== "inactive") {
+          try {
+            recorder.stop();
+          } catch {
+            // ?´ë? ì¤‘ë‹¨??          }
+        }
+      }
+      mediaRecorderRef.current = null;
+      chunksRef.current = [];
+      // onstop???¼ì–´??ë¯¸ë°œ?”ë¡œ ?ë‚˜??ê²½ìš°?ë„ await ì¤‘ì¸ stopRecording Promiseë¥?settle
+      if (pendingStopResolveRef.current) {
+        pendingStopResolveRef.current();
+        pendingStopResolveRef.current = null;
+      }
+    };
+  }, []);
+
+  const showNotification = useCallback(
+    (type: NotificationType, message: string) => {
+      if (notificationTimerRef.current) {
+        clearTimeout(notificationTimerRef.current);
+      }
+      setNotification({ type, message });
+      notificationTimerRef.current = setTimeout(() => {
+        setNotification(null);
+      }, notificationDuration);
+    },
+    [notificationDuration]
+  );
+
+  const clearNotification = useCallback(() => {
+    if (notificationTimerRef.current) {
+      clearTimeout(notificationTimerRef.current);
+    }
+    setNotification(null);
+  }, []);
+
+  const handleError = useCallback(
+    (message: string) => {
+      setError(message);
+      onError?.(message);
+    },
+    [onError]
+  );
+
+  const startTimer = useCallback(() => {
+    startTimeRef.current = Date.now() - recordingTime * 1000;
+    timerRef.current = setInterval(() => {
+      setRecordingTime(
+        Math.floor(
+          (Date.now() - startTimeRef.current) / 1000
+        )
+      );
+    }, 1000);
+  }, [recordingTime]);
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const startRecording = useCallback(
+    async (
+      screenTrack: MediaStreamTrack,
+      audioTracks?: MediaStreamTrack[]
+    ) => {
+      try {
+        setError(null);
+        chunksRef.current = [];
+
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+          audioContextRef.current = null;
+        }
+
+        const tracks: MediaStreamTrack[] = [screenTrack];
+
+        if (audioTracks && audioTracks.length > 0) {
+          const mixResult = mixAudioTracks(audioTracks);
+          if (mixResult) {
+            audioContextRef.current = mixResult.audioContext;
+            const mixedAudioTrack =
+              mixResult.mixedStream.getAudioTracks()[0];
+            if (mixedAudioTrack) {
+              tracks.push(mixedAudioTrack);
+            }
+          }
+        }
+        const stream = new MediaStream(tracks);
+
+        const mimeType = MediaRecorder.isTypeSupported(
+          "video/webm;codecs=vp9,opus"
+        )
+          ? "video/webm;codecs=vp9,opus"
+          : MediaRecorder.isTypeSupported(
+                "video/webm;codecs=vp8,opus"
+              )
+            ? "video/webm;codecs=vp8,opus"
+            : "video/webm";
+
+        const recorder = new MediaRecorder(stream, {
+          mimeType,
+          videoBitsPerSecond: 2500000,
+        });
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            chunksRef.current.push(e.data);
+          }
+        };
+
+        recorder.onerror = () => {
+          // 'error'??ë³µêµ¬ ë¶ˆê? ??abortë¡?ê°„ì£¼?˜ê³  ?•ë¦¬?œë‹¤.
+          // ?´í›„ onstop??ë°œí™”?¼ë„ ì¤‘ë³µ ?€??ì²˜ë¦¬?˜ì? ?Šë„ë¡?ë¨¼ì? ?œê±°.
+          recorder.onstop = null;
+          handleError("?¹í™” ì¤??¤ë¥˜ê°€ ë°œìƒ?ˆìŠµ?ˆë‹¤");
+          setRecordingState("idle");
+          stopTimer();
+
+          if (audioContextRef.current) {
+            audioContextRef.current.close().catch(() => {});
+            audioContextRef.current = null;
+          }
+          // ?¤íŒ¨???¹í™” ?ŒíŽ¸ ?ê¸°
+          chunksRef.current = [];
+          // ?íƒœ??idle?¸ë° refê°€ errored recorderë¥?ê°€ë¦¬í‚¤??ë¶ˆì¼ì¹??´ì†Œ
+          // (?ê¸° ?ì‹ ???Œë§Œ ???´ë? ??recorderë¡?êµì²´?ìœ¼ë©?ê±´ë“œë¦¬ì? ?ŠìŒ)
+          if (mediaRecorderRef.current === recorder) {
+            mediaRecorderRef.current = null;
+          }
+          // stopRecording ?€ê¸?ì¤‘ì´ë©?settle ??'error' ??onstop??ë°œí™”?˜ì?
+          // ?Šì„ ???ˆì–´ Promiseê°€ ?êµ¬ pending ?˜ëŠ” ê²ƒì„ ì°¨ë‹¨.
+          // onstop??result.status==="error" ê²½ë¡œ?€ ?™ì¼?˜ê²Œ resolve?˜ë©°,
+          // ?¤ë¥˜??error ?íƒœ/onError ì½œë°±?¼ë¡œ ?¸ì¶œ?ì— ?„ë‹¬?œë‹¤.
+          if (pendingStopResolveRef.current) {
+            pendingStopResolveRef.current();
+            pendingStopResolveRef.current = null;
+          }
+        };
+
+        mediaRecorderRef.current = recorder;
+        recorder.start(1000);
+
+        setRecordingState("recording");
+        setRecordingTime(0);
+        startTimer();
+      } catch (err) {
+        console.error(
+          "[useScreenRecorder] Failed to start recording:",
+          err
+        );
+        handleError("?¹í™”ë¥??œìž‘?????†ìŠµ?ˆë‹¤");
+      }
+    },
+    [handleError, startTimer, stopTimer]
+  );
+
+  const stopRecording = useCallback(async () => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recordingState === "idle") return;
+
+    setRecordingState("stopping");
+    stopTimer();
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    return new Promise<void>((resolve) => {
+      // cleanup??onstop???¼ì–´?´ë„ Promiseë¥?settle?????ˆë„ë¡?resolve ë³´ê?
+      pendingStopResolveRef.current = resolve;
+      recorder.onstop = async () => {
+        const blob = new Blob(chunksRef.current, {
+          type: "video/webm",
+        });
+        const fileName = generateFileName(spaceName);
+
+        const result = await saveFile(blob, fileName);
+
+        chunksRef.current = [];
+        pendingStopResolveRef.current = null;
+
+        // await(?€???¤ì´?¼ë¡œê·? ?™ì•ˆ ?¸ë§ˆ?´íŠ¸?˜ì—ˆ?¼ë©´ state ê°±ì‹ /?Œë¦¼ ì¤‘ë‹¨
+        if (!mountedRef.current) {
+          resolve();
+          return;
+        }
+
+        setRecordingState("idle");
+        setRecordingTime(0);
+
+        switch (result.status) {
+          case "saved":
+            showNotification(
+              "success",
+              "?¹í™”ê°€ ?€?¥ë˜?ˆìŠµ?ˆë‹¤"
+            );
+            break;
+          case "cancelled":
+            showNotification(
+              "info",
+              "?¹í™” ?€?¥ì´ ì·¨ì†Œ?˜ì—ˆ?µë‹ˆ??
+            );
+            break;
+          case "error":
+            handleError(result.message);
+            break;
+        }
+
+        resolve();
+      };
+
+      recorder.stop();
+    });
+  }, [
+    recordingState,
+    spaceName,
+    stopTimer,
+    handleError,
+    showNotification,
+  ]);
+
+  const togglePause = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+
+    if (recordingState === "recording") {
+      recorder.pause();
+      stopTimer();
+      setRecordingState("paused");
+    } else if (recordingState === "paused") {
+      recorder.resume();
+      startTimer();
+      setRecordingState("recording");
+    }
+  }, [recordingState, startTimer, stopTimer]);
+
+  return {
+    recordingState,
+    recordingTime,
+    startRecording,
+    stopRecording,
+    togglePause,
+    error,
+    notification,
+    clearNotification,
+  };
+}
+
+// ============================================
+// Type augmentation for File System Access API
+// ============================================
+declare global {
+  interface Window {
+    showSaveFilePicker?: (options?: {
+      suggestedName?: string;
+      types?: Array<{
+        description: string;
+        accept: Record<string, string[]>;
+      }>;
+    }) => Promise<FileSystemFileHandle>;
+  }
+}
+
+codex
+초기 확인으로는 하니스 중앙화보다 파일별 mock 프리앰블을 유지하는 판단이 코드 구조와 맞아 보입니다. 이제 pagination 유틸과 관련 타입/테스트 관행까지 확인해서 케이스 과소·과대 여부를 보겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'src/lib/pagination.test.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"api-route|auth\\(|@/lib/auth|@/lib/prisma|GET /api/spaces|filter=all|inviteCode|showSaveFilePicker|renderHook|setState\" src package.json tsconfig.json" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'package.json'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'src/lib/pagination.ts'" in C:\Team-jane\FlowSpace
+ succeeded in 311ms:
+src\middleware.ts:2:import { authConfig } from "@/lib/auth.config";
+src\middleware.ts:11:export default auth((req) => {
+src\lib\admin-guard.ts:2:import { auth } from "@/lib/auth";
+src\lib\admin-guard.ts:3:import { prisma } from "@/lib/prisma";
+src\lib\admin-guard.ts:17:  const session = await auth();
+src\stores\space-store.test.ts:25:  useSpaceStore.setState({
+src\stores\space-store.test.ts:59:    expect(calls[0].url).toBe("/api/spaces"); // filter=all → 쿼리 없음
+src\stores\space-store.test.ts:71:    useSpaceStore.setState({ filter: "owned" });
+src\stores\space-store.test.ts:102:    useSpaceStore.setState({ hasMore: false, nextCursor: null });
+src\stores\space-store.test.ts:108:    useSpaceStore.setState({ hasMore: true, nextCursor: "a", isLoadingMore: true });
+src\stores\space-store.test.ts:117:    useSpaceStore.setState({ hasMore: true, nextCursor: "stale" }); // 이전 페이지 잔여 상태 가정
+src\components\spaces\join-space-view.tsx:17:  inviteCode: string;
+src\components\spaces\join-space-view.tsx:20:export function JoinSpaceView({ inviteCode }: JoinSpaceViewProps) {
+src\components\spaces\join-space-view.tsx:29:    fetch(`/api/spaces/join/${inviteCode}`)
+src\components\spaces\join-space-view.tsx:34:  }, [inviteCode]);
+src\components\spaces\join-space-view.tsx:40:      const res = await fetch(`/api/spaces/join/${inviteCode}`, {
+src\app\api\workflows\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\workflows\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\workflows\route.ts:8:    const session = await auth();
+src\app\spaces\[inviteCode]\page.tsx:2:import { auth } from "@/lib/auth";
+src\app\spaces\[inviteCode]\page.tsx:6:  params: Promise<{ inviteCode: string }>;
+src\app\spaces\[inviteCode]\page.tsx:10:  const session = await auth();
+src\app\spaces\[inviteCode]\page.tsx:13:  const { inviteCode } = await params;
+src\app\spaces\[inviteCode]\page.tsx:17:      <JoinSpaceView inviteCode={inviteCode} />
+src\app\dashboard\spaces\[id]\layout.tsx:2:import { prisma } from "@/lib/prisma";
+src\app\spaces\new\page.tsx:2:import { auth } from "@/lib/auth";
+src\app\spaces\new\page.tsx:6:  const session = await auth();
+src\app\dashboard\spaces\[id]\settings\page.tsx:2:import { prisma } from "@/lib/prisma";
+src\app\api\users\me\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\users\me\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\users\me\route.ts:7:  const session = await auth();
+src\app\api\users\me\route.ts:45:  const session = await auth();
+src\app\space\[id]\page.tsx:2:import { auth } from "@/lib/auth";
+src\app\space\[id]\page.tsx:3:import { prisma } from "@/lib/prisma";
+src\app\space\[id]\page.tsx:11:  const session = await auth();
+src\app\onboarding\page.tsx:2:import { auth } from "@/lib/auth";
+src\app\onboarding\page.tsx:6:  const session = await auth();
+src\app\api\spaces\[id]\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\route.ts:9:/** GET /api/spaces/[id] - 공간 상세 */
+src\app\api\spaces\[id]\route.ts:12:    const session = await auth();
+src\app\api\spaces\[id]\route.ts:18:    // select allowlist — accessSecret/inviteCode/ownerId 등 비공개 필드 미반환.
+src\app\api\spaces\[id]\route.ts:87:    const session = await auth();
+src\app\api\spaces\[id]\route.ts:143:    const session = await auth();
+src\features\space\livekit\internal\LiveKitRoomProvider.tsx:73:  const [state, setState] = useState<LiveKitProviderState>({
+src\features\space\livekit\internal\LiveKitRoomProvider.tsx:83:      setState((prev) => ({
+src\features\space\livekit\internal\LiveKitRoomProvider.tsx:109:      setState((prev) => ({
+src\features\space\livekit\internal\LiveKitRoomProvider.tsx:125:      setState((prev) => ({
+src\features\space\livekit\internal\LiveKitRoomProvider.tsx:148:        setState((prev) => ({
+src\features\space\livekit\internal\LiveKitRoomProvider.tsx:178:        setState((prev) => ({
+src\features\space\livekit\internal\LiveKitRoomProvider.tsx:213:    setState((prev) => ({ ...prev, isConnected: true, connectionError: null }));
+src\features\space\livekit\internal\LiveKitRoomProvider.tsx:218:    setState((prev) => ({ ...prev, isConnected: false }));
+src\features\space\livekit\internal\LiveKitRoomProvider.tsx:225:      setState((prev) => ({
+src\app\api\spaces\route.ts:3:import { auth } from "@/lib/auth";
+src\app\api\spaces\route.ts:4:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\route.ts:8: * GET /api/spaces - 내 공간 목록 (슈퍼어드민의 "전체"는 모든 ACTIVE 스페이스).
+src\app\api\spaces\route.ts:14:    const session = await auth();
+src\app\api\spaces\route.ts:93:    const session = await auth();
+src\app\api\spaces\route.ts:159:        inviteCode: space.inviteCode,
+src\app\my-spaces\page.tsx:2:import { auth } from "@/lib/auth";
+src\app\my-spaces\page.tsx:6:  const session = await auth();
+src\app\api\spaces\[id]\messages\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\messages\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\messages\route.ts:5:/** GET /api/spaces/[id]/messages - 채팅 히스토리 (cursor 페이지네이션) */
+src\app\api\spaces\[id]\messages\route.ts:11:    const session = await auth();
+src\app\api\livekit\webhook\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\auth\register\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\auth\[...nextauth]\route.ts:1:import { handlers } from "@/lib/auth";
+src\app\login\page.tsx:4:import { auth } from "@/lib/auth";
+src\app\login\page.tsx:9:  const session = await auth();
+src\app\api\spaces\[id]\members\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\members\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\members\route.ts:15:/** GET /api/spaces/[id]/members - 멤버 목록 */
+src\app\api\spaces\[id]\members\route.ts:18:    const session = await auth();
+src\app\api\spaces\[id]\members\route.ts:72:    const session = await auth();
+src\app\api\spaces\[id]\members\route.ts:147:    const session = await auth();
+src\features\space\hooks\internal\useScreenRecorder.ts:83:    typeof window !== "undefined" && "showSaveFilePicker" in window
+src\features\space\hooks\internal\useScreenRecorder.ts:96:  if (supportsFileSystemAccess() && window.showSaveFilePicker) {
+src\features\space\hooks\internal\useScreenRecorder.ts:98:      const handle = await window.showSaveFilePicker({
+src\features\space\hooks\internal\useScreenRecorder.ts:159:  /** 마운트 상태 — 언마운트 후 진행 중인 onstop의 setState/저장 흐름 차단 */
+src\features\space\hooks\internal\useScreenRecorder.ts:447:    showSaveFilePicker?: (options?: {
+src\features\space\hooks\internal\useScreenRecorder.test.ts:9:import { renderHook, act, cleanup } from "@testing-library/react";
+src\features\space\hooks\internal\useScreenRecorder.test.ts:86:    const { result } = renderHook(() =>
+src\features\space\hooks\internal\useScreenRecorder.test.ts:127:    const { result } = renderHook(() =>
+src\features\space\hooks\internal\useScreenRecorder.test.ts:155:    const { result } = renderHook(() =>
+src\features\space\hooks\internal\useScreenRecorder.test.ts:181:    const { result } = renderHook(() =>
+src\app\api\livekit\token\route.ts:3:import { auth } from "@/lib/auth";
+src\app\api\livekit\token\route.ts:4:import { prisma } from "@/lib/prisma";
+src\app\api\livekit\token\route.ts:153:    const session = await auth();
+src\features\space\hooks\internal\useChatDrag.ts:57:  const [state, setState] = useState<ChatState>(() => {
+src\features\space\hooks\internal\useChatDrag.ts:109:    setState((cur) => {
+src\features\space\hooks\internal\useChatDrag.ts:120:    setState((cur) => {
+src\features\space\hooks\internal\useChatDrag.ts:136:        setState((prev) => {
+src\features\space\hooks\internal\useChatDrag.ts:146:        setState((prev) => {
+src\features\space\hooks\internal\useChatDrag.ts:163:      setState((cur) => {
+src\features\space\hooks\internal\useChatDrag.ts:182:      setState((prev) => {
+src\app\api\spaces\join\[inviteCode]\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\join\[inviteCode]\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\join\[inviteCode]\route.ts:6:  params: Promise<{ inviteCode: string }>;
+src\app\api\spaces\join\[inviteCode]\route.ts:9:/** GET /api/spaces/join/[inviteCode] - 초대 코드로 공간 정보 조회 */
+src\app\api\spaces\join\[inviteCode]\route.ts:12:    const { inviteCode } = await params;
+src\app\api\spaces\join\[inviteCode]\route.ts:15:      where: { inviteCode },
+src\app\api\spaces\join\[inviteCode]\route.ts:47:/** POST /api/spaces/join/[inviteCode] - 초대 코드로 참여 */
+src\app\api\spaces\join\[inviteCode]\route.ts:50:    const session = await auth();
+src\app\api\spaces\join\[inviteCode]\route.ts:55:    const { inviteCode } = await params;
+src\app\api\spaces\join\[inviteCode]\route.ts:59:      where: { inviteCode },
+src\app\api\assets\[id]\route.ts:3:import { auth } from "@/lib/auth";
+src\app\api\assets\[id]\route.ts:4:import { prisma } from "@/lib/prisma";
+src\app\api\assets\[id]\route.ts:14:    const session = await auth();
+src\app\api\assets\[id]\route.ts:53:    const session = await auth();
+src\app\api\assets\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\assets\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\assets\route.ts:8:    const session = await auth();
+src\app\api\guest\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\assets\batch\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\assets\batch\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\assets\batch\route.ts:19:    const session = await auth();
+src\app\api\assets\batch\route.ts:122:    const session = await auth();
+src\app\api\socket\token\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\socket\token\route.ts:4:import { getAuthSecret } from "@/lib/auth-secret";
+src\app\api\socket\token\route.ts:8:  const session = await auth();
+src\app\api\assets\generate\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\assets\generate\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\assets\generate\route.ts:17:    const session = await auth();
+src\app\api\comfyui\capabilities\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\comfyui\capabilities\route.ts:8:    const session = await auth();
+src\app\api\spaces\[id]\map\tiles\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\map\tiles\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\map\tiles\route.ts:12:    const session = await auth();
+src\app\api\spaces\[id]\map\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\map\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\map\route.ts:9:/** GET /api/spaces/[id]/map - 맵 데이터 + 오브젝트 일괄 조회 */
+src\app\api\spaces\[id]\map\route.ts:12:    const session = await auth();
+src\app\api\spaces\[id]\admin\analytics\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\admin\analytics\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\admin\analytics\route.ts:16:    const session = await auth();
+src\app\api\spaces\[id]\admin\announce\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\admin\announce\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\admin\announce\route.ts:11:    const session = await auth();
+src\app\api\spaces\[id]\admin\logs\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\admin\logs\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\admin\logs\route.ts:11:    const session = await auth();
+src\app\api\spaces\[id]\admin\media\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\admin\media\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\admin\media\route.ts:12:    const session = await auth();
+src\app\api\spaces\[id]\admin\media\route.ts:61:    const session = await auth();
+src\app\api\spaces\[id]\admin\members\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\admin\members\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\admin\members\route.ts:14:    const session = await auth();
+src\app\api\spaces\[id]\admin\members\route.ts:52:    const session = await auth();
+src\app\api\spaces\[id]\map\objects\route.ts:3:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\map\objects\route.ts:4:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\map\objects\route.ts:13:    const session = await auth();
+src\app\api\spaces\[id]\admin\messages\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\admin\messages\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\admin\messages\route.ts:11:    const session = await auth();
+src\app\api\spaces\[id]\admin\stats\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\admin\stats\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\admin\stats\route.ts:11:    const session = await auth();
+src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:12:    const session = await auth();
+src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:11:    const session = await auth();
+src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:12:    const session = await auth();
+src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:101:    const session = await auth();
+src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:2:import { auth } from "@/lib/auth";
+src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:3:import { prisma } from "@/lib/prisma";
+src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:12:    const session = await auth();
+
+ succeeded in 331ms:
+import { describe, it, expect } from "vitest";
+import {
+  DEFAULT_PAGE_LIMIT,
+  MAX_PAGE_LIMIT,
+  parsePageLimit,
+  buildCursorPage,
+} from "./pagination";
+
+describe("parsePageLimit", () => {
+  it("null/ë¹ˆê°’ ??ê¸°ë³¸ê°?, () => {
+    expect(parsePageLimit(null)).toBe(DEFAULT_PAGE_LIMIT);
+    expect(parsePageLimit("")).toBe(DEFAULT_PAGE_LIMIT);
+  });
+
+  it("?•ìƒ ?•ìˆ˜ ??ê·¸ë?ë¡?, () => {
+    expect(parsePageLimit("10")).toBe(10);
+    expect(parsePageLimit("50")).toBe(50);
+    expect(parsePageLimit("100")).toBe(MAX_PAGE_LIMIT);
+  });
+
+  it("MAX ì´ˆê³¼ ??MAXë¡??ˆìƒ", () => {
+    expect(parsePageLimit("101")).toBe(MAX_PAGE_LIMIT);
+    expect(parsePageLimit("100000")).toBe(MAX_PAGE_LIMIT);
+  });
+
+  it("0/?Œìˆ˜ ??ê¸°ë³¸ê°?, () => {
+    expect(parsePageLimit("0")).toBe(DEFAULT_PAGE_LIMIT);
+    expect(parsePageLimit("-5")).toBe(DEFAULT_PAGE_LIMIT);
+  });
+
+  it("ë¹„ì •??NaN ? ë°œ ?…ë ¥ ??ê¸°ë³¸ê°?, () => {
+    expect(parsePageLimit("abc")).toBe(DEFAULT_PAGE_LIMIT);
+    expect(parsePageLimit("NaN")).toBe(DEFAULT_PAGE_LIMIT);
+    // parseInt("12.9") === 12 (?Œìˆ˜???ˆì‚­?€ JS parseInt ?™ìž‘ ???ˆìš©)
+    expect(parsePageLimit("12.9")).toBe(12);
+  });
+});
+
+describe("buildCursorPage", () => {
+  const make = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i}` }));
+
+  it("????<= limit ??ë§ˆì?ë§??˜ì´ì§€(hasMore=false, nextCursor=null)", () => {
+    const rows = make(3);
+    const page = buildCursorPage(rows, 5);
+    expect(page.items).toHaveLength(3);
+    expect(page.hasMore).toBe(false);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("????== limit ??ë§ˆì?ë§??˜ì´ì§€(?¬ë¶„ ?†ìŒ)", () => {
+    const rows = make(5);
+    const page = buildCursorPage(rows, 5);
+    expect(page.items).toHaveLength(5);
+    expect(page.hasMore).toBe(false);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("????== limit + 1 ??hasMore=true, ?¬ë¶„ 1ê±??ˆë‹¨, nextCursor=ë§ˆì?ë§??¸ì¶œ??id", () => {
+    const rows = make(6); // limit 5 + 1
+    const page = buildCursorPage(rows, 5);
+    expect(page.items).toHaveLength(5);
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).toBe("s4"); // items[4].id
+    expect(page.items.map((r) => r.id)).not.toContain("s5"); // ?¬ë¶„ ë¯¸ë…¸ì¶?  });
+
+  it("ë¹?ë°°ì—´ ??hasMore=false, nextCursor=null, items=[]", () => {
+    const page = buildCursorPage<{ id: string }>([], 5);
+    expect(page.items).toEqual([]);
+    expect(page.hasMore).toBe(false);
+    expect(page.nextCursor).toBeNull();
+  });
+});
+
+ succeeded in 329ms:
+{
+  "name": "flowspace",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "socket:dev": "cross-env NODE_ENV=development tsx server/index.ts",
+    "livekit:dev": "node scripts/livekit-dev.js",
+    "dev:all": "concurrently \"npm run dev\" \"npm run socket:dev\" \"npm run livekit:dev\"",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.0.0",
+    "@livekit/components-react": "2.9.17",
+    "@prisma/client": "^6.0.0",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "dompurify": "3.3.1",
+    "dotenv": "^17.3.1",
+    "jose": "^6.1.3",
+    "livekit-client": "2.16.0",
+    "livekit-server-sdk": "^2.15.0",
+    "lucide-react": "^0.561.0",
+    "next": "^15.5.9",
+    "next-auth": "^5.0.0-beta.25",
+    "phaser": "^3.90.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.34.5",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "tailwind-merge": "^2.5.0",
+    "tsx": "^4.0.0",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.15",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/dompurify": "3.0.5",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.0.8",
+    "jsdom": "^28.1.0",
+    "playwright": "^1.58.2",
+    "prisma": "^6.0.0",
+    "tailwindcss": "^4.0.15",
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
+  }
+}
+
+ succeeded in 328ms:
+/**
+ * Cursor ê¸°ë°˜ ?˜ì´ì§€?¤ì´??ê³µìš© ?¬í¼ (?œìˆ˜ ?¨ìˆ˜ ??Prisma/React ë¬´ì˜ì¡?.
+ *
+ * ì½”ë“œë² ì´??ê´€ë¡€(`src/app/api/spaces/[id]/messages/route.ts`)?€ ?™ì¼?? * `take: limit + 1` ?¨í„´??ìº¡ìŠ?”í•œ?? ì¿¼ë¦¬?ì„œ limitë³´ë‹¤ 1ê±???ê°€?¸ì˜¨ ?? * `buildCursorPage`ë¡??˜ë¼ `hasMore`/`nextCursor`ë¥??„ì¶œ?œë‹¤.
+ */
+
+/** limit ë¯¸ì????´ìƒì¹???ê¸°ë³¸ ?˜ì´ì§€ ?¬ê¸° */
+export const DEFAULT_PAGE_LIMIT = 50;
+/** ?´ë¼?´ì–¸?¸ê? ?”ì²­ ê°€?¥í•œ ìµœë? ?˜ì´ì§€ ?¬ê¸° (?„ì—­ ëª©ë¡ ??£¼ ë°©ì?) */
+export const MAX_PAGE_LIMIT = 100;
+
+/**
+ * ì¿¼ë¦¬?¤íŠ¸ë§?`limit` ê°’ì„ ?ˆì „???•ìˆ˜ ?˜ì´ì§€ ?¬ê¸°ë¡??•ê·œ?”í•œ??
+ * - null/ë¹ˆê°’/ë¹„ì •??0 ?´í•˜ ??DEFAULT_PAGE_LIMIT
+ * - MAX_PAGE_LIMIT ì´ˆê³¼ ??MAX_PAGE_LIMITë¡??ˆìƒ(cap)
+ */
+export function parsePageLimit(raw: string | null): number {
+  const n = parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_PAGE_LIMIT;
+  return Math.min(n, MAX_PAGE_LIMIT);
+}
+
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/**
+ * `take: limit + 1`ë¡?ì¡°íšŒ????ë°°ì—´???˜ì´ì§€ë¡?ë³€?˜í•œ??
+ * ?‰ì´ limitë³´ë‹¤ ë§Žìœ¼ë©?ë§ˆì?ë§??¬ë¶„) 1ê±´ì„ ?˜ë¼?´ê³  ê·?ì§ì „ ?‰ì˜ idë¥? * ?¤ìŒ cursorë¡??¬ìš©?œë‹¤.
+ *
+ * @param rows  limit + 1 ë§Œí¼ ì¡°íšŒ?????•ë ¬ ?„ë£Œ ?íƒœ, ê°??‰ì? ê³ ìœ  `id` ë³´ìœ )
+ * @param limit ?˜ì´ì§€ ?¬ê¸°
+ */
+export function buildCursorPage<T extends { id: string }>(
+  rows: T[],
+  limit: number
+): CursorPage<T> {
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+  return { items, nextCursor, hasMore };
+}
+
+codex
+스토어 테스트 쪽은 `filter=all`을 쿼리 생략으로 다루고 있어, 서버 라우트에서 일반 사용자의 null/all 동치 멤버십 scope를 고정하는 테스트는 실제 회귀 가치가 있습니다. 남은 확인은 POST 범위와 훅 테스트의 타이밍 안정성입니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'src/stores/space-store.test.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'src/app/api/spaces/[id]/route.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'src/stores/space-store.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'tsconfig.json'" in C:\Team-jane\FlowSpace
+2026-06-21T18:41:37.237410Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.3 seconds
+Output:
+Get-Content : 지정한 경로 src/app/api/spaces/[id]/route.ts에 개체가 없거나 -Include 또는 -Exclude 매개 변수로 필터링되
+었습니다.
+위치 줄:2 문자:1
++ Get-Content -Path 'src/app/api/spaces/[id]/route.ts'
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+ exited 1 in 281ms:
+Get-Content : 지정한 경로 src/app/api/spaces/[id]/route.ts에 개체가 없거나 -Include 또는 -Exclude 매개 변수로 필터링되
+었습니다.
+위치 줄:2 문자:1
++ Get-Content -Path 'src/app/api/spaces/[id]/route.ts'
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+ succeeded in 303ms:
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+
+ succeeded in 306ms:
+import { create } from "zustand";
+
+interface SpaceItem {
+  id: string;
+  name: string;
+  description: string | null;
+  accessType: string;
+  template: { key: string; name: string };
+  maxUsers: number;
+  memberCount: number;
+  myRole: string | null;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  createdAt: string;
+}
+
+interface SpaceStore {
+  spaces: SpaceItem[];
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  filter: "all" | "owned" | "joined";
+  nextCursor: string | null;
+  hasMore: boolean;
+  /**
+   * ì§„í–‰ ì¤??”ì²­ ? í°. fetch/loadMore ?œìž‘ ??ì¦ê??˜ë©°, ?‘ë‹µ ?ìš© ì§ì „
+   * ? í° ?¼ì¹˜ë¥??•ì¸???„í„° ë³€ê²??°ì† ?´ë¦­?¼ë¡œ ?¤ëŠ¦ê²??„ì°©??stale ?‘ë‹µ??   * ë¬´ì‹œ?œë‹¤(?´ì „ ?„í„° ?˜ì´ì§€ê°€ ??ëª©ë¡??append?˜ëŠ” ê²½ìŸ ?íƒœ ì°¨ë‹¨).
+   */
+  _reqId: number;
+
+  setSpaces: (spaces: SpaceItem[]) => void;
+  addSpace: (space: SpaceItem) => void;
+  removeSpace: (id: string) => void;
+  setLoading: (loading: boolean) => void;
+  setFilter: (filter: "all" | "owned" | "joined") => void;
+  fetchSpaces: () => Promise<void>;
+  loadMore: () => Promise<void>;
+}
+
+/** filter ??ì¿¼ë¦¬?¤íŠ¸ë§?(cursor ? íƒ) */
+function buildQuery(filter: SpaceStore["filter"], cursor?: string | null): string {
+  const params = new URLSearchParams();
+  if (filter !== "all") params.set("filter", filter);
+  if (cursor) params.set("cursor", cursor);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export const useSpaceStore = create<SpaceStore>((set, get) => ({
+  spaces: [],
+  isLoading: false,
+  isLoadingMore: false,
+  filter: "all",
+  nextCursor: null,
+  hasMore: false,
+  _reqId: 0,
+
+  setSpaces: (spaces) => set({ spaces }),
+  addSpace: (space) => set((s) => ({ spaces: [space, ...s.spaces] })),
+  removeSpace: (id) =>
+    set((s) => ({ spaces: s.spaces.filter((sp) => sp.id !== id) })),
+  setLoading: (isLoading) => set({ isLoading }),
+  setFilter: (filter) => {
+    set({ filter });
+    get().fetchSpaces();
+  },
+
+  fetchSpaces: async () => {
+    const reqId = get()._reqId + 1;
+    // ë¦¬ë¡œ???„í„° ë³€ê²½ì? ì§„í–‰ ì¤?loadMoreë¥??€ì²´í•œ????isLoadingMore???´ì œ.
+    // (ë¬´íš¨?”ëœ stale loadMore??finally??reqId ë¶ˆì¼ì¹˜ë¡œ ë¦¬ì…‹??ê±´ë„ˆ?°ë?ë¡?
+    //  ?¬ê¸°??? ì œ ?´ì œ?˜ì? ?Šìœ¼ë©?"??ë³´ê¸°" ë²„íŠ¼???êµ¬ ë¹„í™œ?±ìœ¼ë¡?ê³ ì°©??
+    set({ isLoading: true, isLoadingMore: false, _reqId: reqId });
+    try {
+      const res = await fetch(`/api/spaces${buildQuery(get().filter)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (get()._reqId !== reqId) return; // stale (?„í„° ë³€ê²???
+      set({
+        spaces: data.spaces,
+        nextCursor: data.nextCursor ?? null,
+        hasMore: !!data.hasMore,
+      });
+    } finally {
+      if (get()._reqId === reqId) set({ isLoading: false });
+    }
+  },
+
+  loadMore: async () => {
+    const { hasMore, nextCursor, isLoadingMore, isLoading, filter } = get();
+    // isLoading ê°€?? ?„ì²´ ë¦¬ë¡œ??ì¤‘ì—???˜ì´ì§€?¤ì´?˜í•˜ì§€ ?ŠëŠ”??ë¦¬ë¡œ?œê? ì§„í–‰ ì¤?    // loadMoreë¥??€ì²?. ê°€???†ì´ ë¦¬ë¡œ??ì¤?loadMoreê°€ ?¸ì¶œ?˜ë©´ ê³µìœ  _reqIdë¥?    // ì¦ê??œì¼œ ë¦¬ë¡œ?œë? ë¬´íš¨?”í•˜ê³?isLoading??ê³ ì°©?œí‚¤????°©???„ìˆ˜ê°€ ?ê?.
+    if (isLoading || !hasMore || !nextCursor || isLoadingMore) return;
+    const reqId = get()._reqId + 1;
+    set({ isLoadingMore: true, _reqId: reqId });
+    try {
+      const res = await fetch(`/api/spaces${buildQuery(filter, nextCursor)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (get()._reqId !== reqId) return; // stale (?„í„° ë³€ê²??¬ì¡°?Œë¡œ ë¬´íš¨??
+      set((s) => ({
+        spaces: [...s.spaces, ...data.spaces],
+        nextCursor: data.nextCursor ?? null,
+        hasMore: !!data.hasMore,
+      }));
+    } finally {
+      if (get()._reqId === reqId) set({ isLoadingMore: false });
+    }
+  },
+}));
+
+ succeeded in 309ms:
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { useSpaceStore } from "./space-store";
+
+// ============================================
+// space-store cursor ?˜ì´ì§€?¤ì´??+ ê²½ìŸ ?íƒœ(race) ?ŒìŠ¤??// fetchë¥??˜ë™ ?œì–´ ê°€?¥í•œ deferred ëª¨í‚¹?¼ë¡œ ?€ì²´í•´ ?‘ë‹µ ?„ì°© ?œì„œë¥??µì œ?œë‹¤.
+// ============================================
+
+interface DeferredCall {
+  url: string;
+  resolve: (body: unknown) => void;
+  reject: (err: unknown) => void;
+}
+
+let calls: DeferredCall[];
+
+function jsonOk(body: unknown): Response {
+  return { ok: true, json: async () => body } as unknown as Response;
+}
+
+/** ë§ˆì´?¬ë¡œ/ë§¤í¬ë¡??œìŠ¤????flush */
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+function resetStore() {
+  useSpaceStore.setState({
+    spaces: [],
+    isLoading: false,
+    isLoadingMore: false,
+    filter: "all",
+    nextCursor: null,
+    hasMore: false,
+    _reqId: 0,
+  });
+}
+
+beforeEach(() => {
+  calls = [];
+  resetStore();
+  global.fetch = vi.fn(
+    (url: string | URL | Request) =>
+      new Promise<Response>((resolve, reject) => {
+        calls.push({
+          url: String(url),
+          resolve: (body) => resolve(jsonOk(body)),
+          reject,
+        });
+      })
+  ) as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("fetchSpaces", () => {
+  it("1?˜ì´ì§€ ?‘ë‹µ?¼ë¡œ spaces/nextCursor/hasMore ?¸íŒ…", async () => {
+    const p = useSpaceStore.getState().fetchSpaces();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("/api/spaces"); // filter=all ??ì¿¼ë¦¬ ?†ìŒ
+    calls[0].resolve({ spaces: [{ id: "a" }, { id: "b" }], nextCursor: "b", hasMore: true });
+    await p;
+
+    const s = useSpaceStore.getState();
+    expect(s.spaces.map((x) => x.id)).toEqual(["a", "b"]);
+    expect(s.nextCursor).toBe("b");
+    expect(s.hasMore).toBe(true);
+    expect(s.isLoading).toBe(false);
+  });
+
+  it("filter !== all ?´ë©´ ì¿¼ë¦¬?¤íŠ¸ë§ì— filter ?¬í•¨", async () => {
+    useSpaceStore.setState({ filter: "owned" });
+    const p = useSpaceStore.getState().fetchSpaces();
+    expect(calls[0].url).toBe("/api/spaces?filter=owned");
+    calls[0].resolve({ spaces: [], nextCursor: null, hasMore: false });
+    await p;
+    expect(useSpaceStore.getState().hasMore).toBe(false);
+  });
+});
+
+describe("loadMore", () => {
+  it("?¤ìŒ ?˜ì´ì§€ë¥?append ?˜ê³  cursor/hasMore ê°±ì‹ ", async () => {
+    // 1?˜ì´ì§€
+    const p1 = useSpaceStore.getState().fetchSpaces();
+    calls[0].resolve({ spaces: [{ id: "a" }], nextCursor: "a", hasMore: true });
+    await p1;
+
+    // 2?˜ì´ì§€
+    const p2 = useSpaceStore.getState().loadMore();
+    expect(calls).toHaveLength(2);
+    expect(calls[1].url).toBe("/api/spaces?cursor=a");
+    calls[1].resolve({ spaces: [{ id: "b" }], nextCursor: null, hasMore: false });
+    await p2;
+
+    const s = useSpaceStore.getState();
+    expect(s.spaces.map((x) => x.id)).toEqual(["a", "b"]); // append
+    expect(s.nextCursor).toBeNull();
+    expect(s.hasMore).toBe(false);
+    expect(s.isLoadingMore).toBe(false);
+  });
+
+  it("hasMore=false ?ëŠ” cursor ?†ìŒ?´ë©´ fetch ????, async () => {
+    useSpaceStore.setState({ hasMore: false, nextCursor: null });
+    await useSpaceStore.getState().loadMore();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("?´ë? isLoadingMore ì¤‘ì´ë©?ì¤‘ë³µ ?”ì²­ ì°¨ë‹¨", async () => {
+    useSpaceStore.setState({ hasMore: true, nextCursor: "a", isLoadingMore: true });
+    await useSpaceStore.getState().loadMore();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("?„ì²´ ë¦¬ë¡œ??isLoading) ì¤‘ì—??loadMore ë¬´ì‹œ ??ë¦¬ë¡œ??ë¬´íš¨??isLoading ê³ ì°© ë°©ì?", async () => {
+    // fetchSpaces ë¨¼ì? ?œìž‘ ??in-flight (isLoading=true)
+    const pFetch = useSpaceStore.getState().fetchSpaces();
+    expect(calls).toHaveLength(1);
+    useSpaceStore.setState({ hasMore: true, nextCursor: "stale" }); // ?´ì „ ?˜ì´ì§€ ?”ì—¬ ?íƒœ ê°€??
+    // ë¦¬ë¡œ??ì¤?loadMore ?¸ì¶œ ??ê°€?œë¡œ no-op (??fetch ?†ìŒ)
+    await useSpaceStore.getState().loadMore();
+    expect(calls).toHaveLength(1); // loadMoreê°€ ì¶”ê? ?”ì²­ ????
+    // ë¦¬ë¡œ???•ìƒ ?„ë£Œ
+    calls[0].resolve({ spaces: [{ id: "x" }], nextCursor: null, hasMore: false });
+    await pFetch;
+
+    const s = useSpaceStore.getState();
+    expect(s.isLoading).toBe(false); // ê³ ì°© ?†ìŒ
+    expect(s.spaces.map((y) => y.id)).toEqual(["x"]);
+  });
+});
+
+describe("ê²½ìŸ ?íƒœ(race) ???„í„° ë³€ê²?ì¤??„ì°©??stale loadMore ?‘ë‹µ ë¬´ì‹œ", () => {
+  it("loadMore ì§„í–‰ ì¤??„í„° ë³€ê²??? ??²Œ ???´ì „ ?„í„° ?˜ì´ì§€ë¥???ëª©ë¡??append ?˜ì? ?ŠìŒ", async () => {
+    // 1) all ?„í„° 1?˜ì´ì§€ ë¡œë“œ ?„ë£Œ
+    const p1 = useSpaceStore.getState().fetchSpaces();
+    calls[0].resolve({ spaces: [{ id: "a" }], nextCursor: "a", hasMore: true });
+    await p1;
+
+    // 2) all ?„í„° loadMore ?œìž‘ (in-flight, ?„ì§ ë¯¸í•´ê²? ??calls[1]
+    const pMore = useSpaceStore.getState().loadMore();
+    expect(calls[1].url).toBe("/api/spaces?cursor=a");
+
+    // 3) ?„í„°ë¥?ownedë¡?ë³€ê²???fetchSpaces ?¸ë¦¬ê±?in-flight) ??calls[2]
+    useSpaceStore.getState().setFilter("owned");
+    expect(calls[2].url).toBe("/api/spaces?filter=owned");
+
+    // 4) owned ?˜ì´ì§€ê°€ ë¨¼ì? ?„ì°© ???ìš©??(hasMore=true: "??ë³´ê¸°" ë²„íŠ¼ ?¸ì¶œ ?í™©)
+    calls[2].resolve({ spaces: [{ id: "owned1" }], nextCursor: "owned1", hasMore: true });
+    await flush();
+
+    // 5) ?¤ëŠ¦ê²?stale loadMore(all) ?‘ë‹µ ?„ì°© ??ë¬´ì‹œ?˜ì–´????    calls[1].resolve({ spaces: [{ id: "b" }], nextCursor: "b", hasMore: true });
+    await pMore;
+    await flush();
+
+    const s = useSpaceStore.getState();
+    expect(s.filter).toBe("owned");
+    expect(s.spaces.map((x) => x.id)).toEqual(["owned1"]); // 'b' append ????    expect(s.nextCursor).toBe("owned1");
+    expect(s.hasMore).toBe(true);
+    // ?µì‹¬ ?Œê?(codex P2/fixNow): ë¬´íš¨?”ëœ loadMoreê°€ isLoadingMoreë¥?ê³ ì°©?œí‚¤ì§€ ?Šì•„??    // ???„í„°??"??ë³´ê¸°" ë²„íŠ¼???¤ì‹œ ?™ìž‘?œë‹¤.
+    expect(s.isLoadingMore).toBe(false);
+  });
+});
+
+codex
+PowerShell의 `[]` 경로 해석 때문에 상세 라우트 파일 한 번만 다시 읽습니다. POST를 같은 파일에 묶을지 판단하려면 인접 API 테스트 대상의 보안 패턴을 보는 게 도움이 됩니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'src/app/api/spaces/[id]/route.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"describe\\(|vi\\.hoisted|vi\\.mock|NextRequest|new Request|NextResponse\" src/**/*.test.ts src/**/*.test.tsx" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Recurse -Path 'src/app/api' -Filter '*.test.ts' | Select-Object -ExpandProperty FullName" in C:\Team-jane\FlowSpace
+2026-06-21T18:41:42.036473Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.2 seconds
+Output:
+rg: src/**/*.test.ts: 파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다. (os error 123)
+rg: src/**/*.test.tsx: 파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다. (os error 123)
+
+ exited 1 in 232ms:
+rg: src/**/*.test.ts: 파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다. (os error 123)
+rg: src/**/*.test.tsx: 파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다. (os error 123)
+
+ succeeded in 288ms:
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+/** GET /api/spaces/[id] - 瓿店皠 ?侅劯 */
+export async function GET(_request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    // select allowlist ??accessSecret/inviteCode/ownerId ??牍勱车臧??勲摐 氙鸽皹??
+    // ownerId???戧芳 瓴岇澊???愲嫧?╈溂搿滊 臁绊殞 ???戨嫷?愳劀 ?滌櫢?滊嫟.
+    const space = await prisma.space.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        accessType: true,
+        maxUsers: true,
+        status: true,
+        logoUrl: true,
+        primaryColor: true,
+        loadingMessage: true,
+        createdAt: true,
+        ownerId: true,
+        template: { select: { key: true, name: true, assetsPath: true } },
+        owner: { select: { name: true, image: true } },
+        _count: { select: { members: true, chatMessages: true } },
+        members: {
+          where: { userId: session.user.id },
+          select: { role: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!space) {
+      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    }
+
+    // 牍勱车臧?PRIVATE/PASSWORD) 瓿店皠?€ 氅る矂/?る剤/superAdmin?愱矊毵??胳稖
+    const isMember = space.members.length > 0;
+    const isOwner = space.ownerId === session.user.id;
+    const isSuperAdmin = session.user.isSuperAdmin === true;
+    if (space.accessType !== "PUBLIC" && !isMember && !isOwner && !isSuperAdmin) {
+      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      id: space.id,
+      name: space.name,
+      description: space.description,
+      accessType: space.accessType,
+      maxUsers: space.maxUsers,
+      status: space.status,
+      logoUrl: space.logoUrl,
+      primaryColor: space.primaryColor,
+      loadingMessage: space.loadingMessage,
+      createdAt: space.createdAt,
+      template: space.template,
+      owner: space.owner,
+      _count: space._count,
+      myRole: space.members[0]?.role || null,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to fetch space",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/** PATCH /api/spaces/[id] - 瓿店皠 ?橃爼 (OWNER only) */
+export async function PATCH(request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const space = await prisma.space.findUnique({ where: { id } });
+
+    if (!space) {
+      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    }
+    if (space.ownerId !== session.user.id && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = (await request.json()) as {
+      name?: string;
+      description?: string;
+      accessType?: string;
+      accessSecret?: string;
+      maxUsers?: number;
+      logoUrl?: string;
+      primaryColor?: string;
+      loadingMessage?: string;
+    };
+
+    const data: Record<string, unknown> = {};
+    if (body.name !== undefined) data.name = body.name;
+    if (body.description !== undefined) data.description = body.description;
+    if (body.accessType !== undefined) data.accessType = body.accessType;
+    if (body.accessSecret !== undefined) data.accessSecret = body.accessSecret;
+    if (body.maxUsers !== undefined) data.maxUsers = body.maxUsers;
+    if (body.logoUrl !== undefined) data.logoUrl = body.logoUrl;
+    if (body.primaryColor !== undefined) data.primaryColor = body.primaryColor;
+    if (body.loadingMessage !== undefined) data.loadingMessage = body.loadingMessage;
+
+    const updated = await prisma.space.update({
+      where: { id },
+      data,
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to update space",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/** DELETE /api/spaces/[id] - 瓿店皠 ??牅 (soft delete, OWNER only) */
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const space = await prisma.space.findUnique({ where: { id } });
+
+    if (!space) {
+      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    }
+    if (space.ownerId !== session.user.id && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    await prisma.space.update({
+      where: { id },
+      data: { status: "ARCHIVED", deletedAt: new Date() },
+    });
+
+    return NextResponse.json({ message: "Space archived" });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to delete space",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+ succeeded in 341ms:
+codex
+현재 확인 범위에서는 API 라우트 테스트가 아직 없고, WI-011이 사실상 첫 하니스 도입 지점입니다. 기존 테스트 스타일도 파일 로컬 mock과 소형 헬퍼 위주라, 이 방향으로 답을 정리하겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"describe\\(|vi\\.hoisted|vi\\.mock|NextRequest|new Request|NextResponse\" src -g \"*.test.ts\" -g \"*.test.tsx\"" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"collectSourceFiles|extractSpecifiers|violationModuleDir|include:|environment|filter ===|prisma\\.space\\.findMany|pendingStopResolveRef|mountedRef|recorder\\.onstop|showSaveFilePicker\" src/app/api/spaces/route.ts src/features/space/hooks/internal/useScreenRecorder.ts src/features/space/hooks/internal/useScreenRecorder.test.ts src/__tests__/module-boundaries.test.ts vitest.config.ts" in C:\Team-jane\FlowSpace
+ succeeded in 318ms:
+src/features/space/hooks/internal/useScreenRecorder.test.ts:176:    expect(recorder.onstop).toBeNull();
+src/features/space/hooks/internal/useScreenRecorder.test.ts:201:      recorder.onstop?.();
+src/features/space/hooks/internal/useScreenRecorder.ts:83:    typeof window !== "undefined" && "showSaveFilePicker" in window
+src/features/space/hooks/internal/useScreenRecorder.ts:96:  if (supportsFileSystemAccess() && window.showSaveFilePicker) {
+src/features/space/hooks/internal/useScreenRecorder.ts:98:      const handle = await window.showSaveFilePicker({
+src/features/space/hooks/internal/useScreenRecorder.ts:160:  const mountedRef = useRef(true);
+src/features/space/hooks/internal/useScreenRecorder.ts:162:  const pendingStopResolveRef = useRef<(() => void) | null>(null);
+src/features/space/hooks/internal/useScreenRecorder.ts:167:    mountedRef.current = true;
+src/features/space/hooks/internal/useScreenRecorder.ts:169:      mountedRef.current = false;
+src/features/space/hooks/internal/useScreenRecorder.ts:185:        // dispatch 전이거나 await 중일 수 있음. 진행 중 onstop은 mountedRef 가드로 차단.
+src/features/space/hooks/internal/useScreenRecorder.ts:187:        recorder.onstop = null;
+src/features/space/hooks/internal/useScreenRecorder.ts:200:      if (pendingStopResolveRef.current) {
+src/features/space/hooks/internal/useScreenRecorder.ts:201:        pendingStopResolveRef.current();
+src/features/space/hooks/internal/useScreenRecorder.ts:202:        pendingStopResolveRef.current = null;
+src/features/space/hooks/internal/useScreenRecorder.ts:306:          recorder.onstop = null;
+src/features/space/hooks/internal/useScreenRecorder.ts:326:          if (pendingStopResolveRef.current) {
+src/features/space/hooks/internal/useScreenRecorder.ts:327:            pendingStopResolveRef.current();
+src/features/space/hooks/internal/useScreenRecorder.ts:328:            pendingStopResolveRef.current = null;
+src/features/space/hooks/internal/useScreenRecorder.ts:363:      pendingStopResolveRef.current = resolve;
+src/features/space/hooks/internal/useScreenRecorder.ts:364:      recorder.onstop = async () => {
+src/features/space/hooks/internal/useScreenRecorder.ts:373:        pendingStopResolveRef.current = null;
+src/features/space/hooks/internal/useScreenRecorder.ts:376:        if (!mountedRef.current) {
+src/features/space/hooks/internal/useScreenRecorder.ts:447:    showSaveFilePicker?: (options?: {
+src/__tests__/module-boundaries.test.ts:20:function collectSourceFiles(dir: string): string[] {
+src/__tests__/module-boundaries.test.ts:25:      out.push(...collectSourceFiles(full));
+src/__tests__/module-boundaries.test.ts:34:function extractSpecifiers(content: string): string[] {
+src/__tests__/module-boundaries.test.ts:68:function violationModuleDir(fileAbs: string, resolved: string): string | null {
+src/__tests__/module-boundaries.test.ts:83:    const files = collectSourceFiles(SRC_ROOT);
+src/__tests__/module-boundaries.test.ts:88:      for (const spec of extractSpecifiers(content)) {
+src/__tests__/module-boundaries.test.ts:91:        const owner = violationModuleDir(file, resolved);
+vitest.config.ts:7:    environment: "jsdom",
+vitest.config.ts:8:    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+src/app/api/spaces/route.ts:28:    if (filter === "owned") {
+src/app/api/spaces/route.ts:30:    } else if (filter === "joined") {
+src/app/api/spaces/route.ts:32:    } else if (filter === null || filter === "all") {
+src/app/api/spaces/route.ts:45:    const rows = await prisma.space.findMany({
+src/app/api/spaces/route.ts:47:      include: {
+src/app/api/spaces/route.ts:150:      include: {
+
+ succeeded in 354ms:
+src\__tests__\module-boundaries.test.ts:81:describe("module boundaries: 타 모듈 internal/* 직접 import 금지", () => {
+src\stores\space-store.test.ts:55:describe("fetchSpaces", () => {
+src\stores\space-store.test.ts:80:describe("loadMore", () => {
+src\stores\space-store.test.ts:133:describe("경쟁 상태(race) — 필터 변경 중 도착한 stale loadMore 응답 무시", () => {
+src\lib\pagination.test.ts:9:describe("parsePageLimit", () => {
+src\lib\pagination.test.ts:39:describe("buildCursorPage", () => {
+src\features\assets\internal\safe-path.test.ts:12:describe("resolveGeneratedAssetPath", () => {
+src\features\assets\internal\safe-path.test.ts:13:  describe("정상 경로 → generated 루트 하위 절대경로", () => {
+src\features\assets\internal\safe-path.test.ts:40:  describe("path traversal / 경계 밖 → null", () => {
+src\features\space\enforce\internal\contract.test.ts:14:describe("enforce contract: 서명 생성/검증", () => {
+src\features\space\enforce\internal\contract.test.ts:59:describe("enforce contract: replay window", () => {
+src\features\space\enforce\internal\contract.test.ts:80:describe("enforce contract: parseEnforceRequest 스키마 검증", () => {
+src\features\space\hooks\internal\useScreenRecorder.test.ts:83:describe("useScreenRecorder — onerror 경로 (WI-006)", () => {
+src\features\space\chat\internal\chat-parser.test.ts:9:describe("parseInput", () => {
+src\features\space\chat\internal\chat-parser.test.ts:164:describe("isWhisperFormat", () => {
+src\features\space\chat\internal\chat-parser.test.ts:178:describe("extractTargetNickname", () => {
+src\features\space\chat\internal\chat-parser.test.ts:192:describe("getAdminCommandSuggestions", () => {
+src\features\space\chat\internal\chat-filter.test.ts:26:describe("filterMessagesByTab", () => {
+src\features\space\chat\internal\chat-filter.test.ts:64:describe("hasUrl", () => {
+src\features\space\chat\internal\chat-filter.test.ts:82:describe("extractUrls", () => {
+src\features\space\chat\internal\chat-filter.test.ts:98:describe("ensureProtocol", () => {
+src\features\space\chat\internal\chat-filter.test.ts:112:describe("parseContentWithUrls", () => {
+src\features\space\chat\internal\chat-filter.test.ts:136:describe("isLinkMessage", () => {
+src\features\space\chat\internal\chat-filter.test.ts:153:describe("getWhisperDirection", () => {
+src\features\space\chat\internal\chat-filter.test.ts:165:describe("calculateUnreadCounts", () => {
+
+codex
+코드 확인 기준으로는 현재 계획이 대체로 맞습니다. 변경은 하지 않았습니다.
+
+**결정 1**
+
+하니스는 `src/__tests__/helpers/api-route.ts`에 “순수 빌더”만 두고, `vi.hoisted` / `vi.mock` 프리앰블은 각 라우트 테스트 파일에 남기는 쪽에 동의합니다. [vitest.config.ts](C:/Team-jane/FlowSpace/vitest.config.ts:7)가 전역 `jsdom` + `src/**/*.test.ts(x)`만 수집하고 있고, 현재 API 라우트 테스트가 없는 상태라 첫 도입부터 `setupFiles`나 자동 mock을 깔면 `@/lib/auth`, `@/lib/prisma`를 쓰는 다른 테스트까지 암묵 영향권에 넣게 됩니다. 이건 GET `/api/spaces` 회귀 테스트 목적보다 큽니다.
+
+`__mocks__/`도 큰 이득은 제한적입니다. Vitest의 mock 활성화 자체와 테스트별 상태 주입은 어차피 파일 로컬에서 필요하고, 지금 PoC처럼 라우트 import 전에 mock을 고정해야 하는 요구가 명확합니다. 중앙화할 것은 mock wiring이 아니라 `NextRequest` 생성, session/row fixture, json reader 정도가 적절합니다.
+
+`src/__tests__/helpers/` 위치는 boundary 테스트와 충돌하지 않습니다. [module-boundaries.test.ts](C:/Team-jane/FlowSpace/src/__tests__/module-boundaries.test.ts:20)는 `src` 아래 모든 `.ts/.tsx`를 스캔하지만, 금지 조건은 resolved path에 `internal` segment가 있고 호출 파일이 그 moduleDir 밖인 경우입니다. API helper가 `@/lib/auth`, `@/lib/prisma`, `next/server` 또는 일반 fixture만 다루면 문제 없습니다. 단, 이 boundary 파서는 주석의 `import ... from` 패턴도 단순 정규식으로 읽으니, helper 상단 복붙 주석에 cross-module `internal` import 예시는 넣지 않는 게 좋습니다.
+
+**결정 2**
+
+6, 10, 11은 과하지 않습니다.
+
+6번 `filter=all + 일반 사용자 => 멤버십 scope`는 핵심입니다. 클라이언트 스토어는 `filter === "all"`일 때 쿼리를 생략합니다([space-store.ts](C:/Team-jane/FlowSpace/src/stores/space-store.ts:39), [space-store.test.ts](C:/Team-jane/FlowSpace/src/stores/space-store.test.ts:59)). 그래서 서버의 `null`/`all` 일반 사용자 동작이 권한 격리의 실제 방어선입니다.
+
+10번은 이름만 조금 바꾸는 게 좋습니다. 테스트가 증명하는 것은 “cursor가 있어도 `where`에 scope/status가 유지된다”입니다. Prisma의 실제 cursor semantics까지 완전히 보안 증명하는 테스트는 아니므로, “위조 cursor 우회 방지”보다는 “cursor pagination 인자에도 scope가 보존됨” 정도가 정확합니다.
+
+11번 `inviteCode` 미포함은 넣을 가치가 있습니다. [route.ts](C:/Team-jane/FlowSpace/src/app/api/spaces/route.ts:45)의 `findMany`는 scalar 필드를 기본으로 가져올 수 있고, 응답 매핑에서만 allowlist가 됩니다([route.ts](C:/Team-jane/FlowSpace/src/app/api/spaces/route.ts:64)). row fixture에 `inviteCode`를 넣고 응답에 없는지 보는 회귀 테스트가 맞습니다.
+
+추가하면 좋은 핵심은 `status: "ACTIVE"`가 모든 정상 scope에 항상 붙는지, 그리고 invalid filter/401에서 `findMany`가 호출되지 않는지입니다. pagination은 이미 `parsePageLimit`/`buildCursorPage` 단위 테스트가 있으니 라우트 테스트에서는 `take`, `cursor`, `skip`, 응답 trimming 정도만 얇게 보면 충분합니다.
+
+POST 403은 같은 하니스로 매우 싸게 넣을 수는 있지만, WI-011의 GET filter 회귀 범위에서는 제외가 더 깔끔합니다. POST는 body/template/create까지 확장되기 쉬워서 테스트 파일 목적이 흐려질 수 있습니다. 넣는다면 “non-superAdmin은 body parse/prisma 전 403” 한 케이스까지만 별도 `describe("POST guard")`로 제한하는 편이 좋습니다.
+
+**결정 3**
+
+(A)는 WI-006 P3 흡수에 충분합니다. 실제 cleanup이 [useScreenRecorder.ts](C:/Team-jane/FlowSpace/src/features/space/hooks/internal/useScreenRecorder.ts:185)에서 handlers를 제거하고, [line 200](C:/Team-jane/FlowSpace/src/features/space/hooks/internal/useScreenRecorder.ts:200)의 `pendingStopResolveRef`를 settle하는 경로가 미커버였으므로, start → stopRecording pending → unmount → promise resolved를 직접 검증하는 게 가장 결정적입니다.
+
+(B)는 재현 자체는 가능합니다. `window.showSaveFilePicker`를 deferred로 두고, `recorder.onstop` 호출 후 picker가 pending인 동안 unmount한 뒤 picker를 resolve하면 [mountedRef guard](C:/Team-jane/FlowSpace/src/features/space/hooks/internal/useScreenRecorder.ts:376)를 지나게 만들 수 있습니다. 다만 “언마운트 후 setState 없음”은 React 19/RTL에서 신뢰도 높은 observable이 아닙니다. 경고 spy에 의존하면 버전별로 흔들릴 수 있고, cleanup이 이미 `pendingStopResolveRef`를 resolve하므로 stop promise만으로도 guard의 의미를 분리해 증명하기 어렵습니다.
+
+따라서 우선순위는 (A)를 필수로 넣고, (B)는 불안정하면 과감히 빼는 쪽입니다. 넣는다면 “onstop이 saveFile await 중 unmount되어도 onstop promise가 완료된다” 정도의 branch/smoke 테스트로 취급하고, 핵심 성공 기준으로 삼지는 않겠습니다.
+
+**내가 놓칠 위험 1가지**
+
+API route helper의 `makeSpaceRow`가 현재 `GET` 응답 매핑에 필요한 필드만 맞추고 Prisma row의 기본 scalar 노출 특성을 충분히 흉내 내지 않으면, `inviteCode` 같은 민감 필드 allowlist 회귀 테스트가 허술해질 수 있습니다. fixture에는 의도적으로 `inviteCode`, `accessSecret`, `ownerId` 같은 “응답에 나오면 안 되는” 필드를 포함시키는 편이 안전합니다.
+tokens used
+56,646
+코드 확인 기준으로는 현재 계획이 대체로 맞습니다. 변경은 하지 않았습니다.
+
+**결정 1**
+
+하니스는 `src/__tests__/helpers/api-route.ts`에 “순수 빌더”만 두고, `vi.hoisted` / `vi.mock` 프리앰블은 각 라우트 테스트 파일에 남기는 쪽에 동의합니다. [vitest.config.ts](C:/Team-jane/FlowSpace/vitest.config.ts:7)가 전역 `jsdom` + `src/**/*.test.ts(x)`만 수집하고 있고, 현재 API 라우트 테스트가 없는 상태라 첫 도입부터 `setupFiles`나 자동 mock을 깔면 `@/lib/auth`, `@/lib/prisma`를 쓰는 다른 테스트까지 암묵 영향권에 넣게 됩니다. 이건 GET `/api/spaces` 회귀 테스트 목적보다 큽니다.
+
+`__mocks__/`도 큰 이득은 제한적입니다. Vitest의 mock 활성화 자체와 테스트별 상태 주입은 어차피 파일 로컬에서 필요하고, 지금 PoC처럼 라우트 import 전에 mock을 고정해야 하는 요구가 명확합니다. 중앙화할 것은 mock wiring이 아니라 `NextRequest` 생성, session/row fixture, json reader 정도가 적절합니다.
+
+`src/__tests__/helpers/` 위치는 boundary 테스트와 충돌하지 않습니다. [module-boundaries.test.ts](C:/Team-jane/FlowSpace/src/__tests__/module-boundaries.test.ts:20)는 `src` 아래 모든 `.ts/.tsx`를 스캔하지만, 금지 조건은 resolved path에 `internal` segment가 있고 호출 파일이 그 moduleDir 밖인 경우입니다. API helper가 `@/lib/auth`, `@/lib/prisma`, `next/server` 또는 일반 fixture만 다루면 문제 없습니다. 단, 이 boundary 파서는 주석의 `import ... from` 패턴도 단순 정규식으로 읽으니, helper 상단 복붙 주석에 cross-module `internal` import 예시는 넣지 않는 게 좋습니다.
+
+**결정 2**
+
+6, 10, 11은 과하지 않습니다.
+
+6번 `filter=all + 일반 사용자 => 멤버십 scope`는 핵심입니다. 클라이언트 스토어는 `filter === "all"`일 때 쿼리를 생략합니다([space-store.ts](C:/Team-jane/FlowSpace/src/stores/space-store.ts:39), [space-store.test.ts](C:/Team-jane/FlowSpace/src/stores/space-store.test.ts:59)). 그래서 서버의 `null`/`all` 일반 사용자 동작이 권한 격리의 실제 방어선입니다.
+
+10번은 이름만 조금 바꾸는 게 좋습니다. 테스트가 증명하는 것은 “cursor가 있어도 `where`에 scope/status가 유지된다”입니다. Prisma의 실제 cursor semantics까지 완전히 보안 증명하는 테스트는 아니므로, “위조 cursor 우회 방지”보다는 “cursor pagination 인자에도 scope가 보존됨” 정도가 정확합니다.
+
+11번 `inviteCode` 미포함은 넣을 가치가 있습니다. [route.ts](C:/Team-jane/FlowSpace/src/app/api/spaces/route.ts:45)의 `findMany`는 scalar 필드를 기본으로 가져올 수 있고, 응답 매핑에서만 allowlist가 됩니다([route.ts](C:/Team-jane/FlowSpace/src/app/api/spaces/route.ts:64)). row fixture에 `inviteCode`를 넣고 응답에 없는지 보는 회귀 테스트가 맞습니다.
+
+추가하면 좋은 핵심은 `status: "ACTIVE"`가 모든 정상 scope에 항상 붙는지, 그리고 invalid filter/401에서 `findMany`가 호출되지 않는지입니다. pagination은 이미 `parsePageLimit`/`buildCursorPage` 단위 테스트가 있으니 라우트 테스트에서는 `take`, `cursor`, `skip`, 응답 trimming 정도만 얇게 보면 충분합니다.
+
+POST 403은 같은 하니스로 매우 싸게 넣을 수는 있지만, WI-011의 GET filter 회귀 범위에서는 제외가 더 깔끔합니다. POST는 body/template/create까지 확장되기 쉬워서 테스트 파일 목적이 흐려질 수 있습니다. 넣는다면 “non-superAdmin은 body parse/prisma 전 403” 한 케이스까지만 별도 `describe("POST guard")`로 제한하는 편이 좋습니다.
+
+**결정 3**
+
+(A)는 WI-006 P3 흡수에 충분합니다. 실제 cleanup이 [useScreenRecorder.ts](C:/Team-jane/FlowSpace/src/features/space/hooks/internal/useScreenRecorder.ts:185)에서 handlers를 제거하고, [line 200](C:/Team-jane/FlowSpace/src/features/space/hooks/internal/useScreenRecorder.ts:200)의 `pendingStopResolveRef`를 settle하는 경로가 미커버였으므로, start → stopRecording pending → unmount → promise resolved를 직접 검증하는 게 가장 결정적입니다.
+
+(B)는 재현 자체는 가능합니다. `window.showSaveFilePicker`를 deferred로 두고, `recorder.onstop` 호출 후 picker가 pending인 동안 unmount한 뒤 picker를 resolve하면 [mountedRef guard](C:/Team-jane/FlowSpace/src/features/space/hooks/internal/useScreenRecorder.ts:376)를 지나게 만들 수 있습니다. 다만 “언마운트 후 setState 없음”은 React 19/RTL에서 신뢰도 높은 observable이 아닙니다. 경고 spy에 의존하면 버전별로 흔들릴 수 있고, cleanup이 이미 `pendingStopResolveRef`를 resolve하므로 stop promise만으로도 guard의 의미를 분리해 증명하기 어렵습니다.
+
+따라서 우선순위는 (A)를 필수로 넣고, (B)는 불안정하면 과감히 빼는 쪽입니다. 넣는다면 “onstop이 saveFile await 중 unmount되어도 onstop promise가 완료된다” 정도의 branch/smoke 테스트로 취급하고, 핵심 성공 기준으로 삼지는 않겠습니다.
+
+**내가 놓칠 위험 1가지**
+
+API route helper의 `makeSpaceRow`가 현재 `GET` 응답 매핑에 필요한 필드만 맞추고 Prisma row의 기본 scalar 노출 특성을 충분히 흉내 내지 않으면, `inviteCode` 같은 민감 필드 allowlist 회귀 테스트가 허술해질 수 있습니다. fixture에는 의도적으로 `inviteCode`, `accessSecret`, `ownerId` 같은 “응답에 나오면 안 되는” 필드를 포함시키는 편이 안전합니다.

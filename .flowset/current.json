@@ -1,12 +1,12 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-011-test",
   "lastWI": "WI-010-perf",
-  "type": "perf",
-  "status": "MERGED",
+  "type": "test",
+  "status": "VERIFY",
   "integrationBranch": "develop",
-  "branch": "develop",
+  "branch": "test/WI-011-test-route-harness-recorder-settle",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "47022a6",
-  "note": "WI-010-perf(슈퍼어드민 전역 스페이스 목록 cursor 페이지네이션, P3) develop 머지 완료 — PR#10, merge 47022a6(impl ed73930). GET /api/spaces가 페이지네이션 없이 전체 ACTIVE 스페이스를 findMany로 로드하던 스케일 부채(WI-009 슈퍼어드민 전역 scope={}). cursor 페이지네이션(parsePageLimit 기본50·최대100 + cursor, take:limit+1 → buildCursorPage → {spaces,nextCursor,hasMore}, 기존 spaces 유지=하위호환) + orderBy [updatedAt desc, id desc](id 타이브레이커) + 모든 스코프 일관. 클라: space-store loadMore+_reqId 토큰(stale 응답 무시) + space-list-view '더 보기'(전역 가시성 회귀 방지). 신규 순수 헬퍼 src/lib/pagination.ts(+테스트). vitest 92→108. 기계게이트 4/4(tsc 0/lint 0/vitest 108·108/build 0) + 듀얼검증 codex 3R 수렴(r1 FAIL P2/fixNow isLoadingMore 고착 → 수정 529108e / r2 WARNING P3 역방향 누수 → 선제 해소 ed73930 / r3 WARNING P3×1 defer) · evaluator WARNING 9.7(최종 HEAD 재검증, P3×4 defer, 변이검증 5종 검출, scope>cursor 보안 sound) + .pass(fingerprint 2ef1dd0b). 설계 codex consult 1R(경쟁상태 위험 E 지목). 두 검증자 r1 동일 실결함 독립 발견. 다음 큐(전부 P3): WI-011-test(라우트 테스트 하니스 + filter 분기 회귀 + useScreenRecorder unmount settle) / WI-012-refactor(protocol 모듈 분리 + cursor 검증·messages 라우트 DRY[WI-010 흡수] + stopRecording close .catch 통일) / WI-013-perf(GET /api/spaces 핫 쿼리용 Space 복합 인덱스 status+updatedAt desc+id desc 마이그레이션[WI-010 흡수, DB 마이그레이션 승인+EXPLAIN 검증 필요]). 승격 미실행 부채: WI-001/002/003/004/005/006/008/009/010은 develop만, main(라이브) 미반영."
+  "lastVerifiedCommit": "baa2f0c",
+  "note": "WI-011-test(P3 테스트 부채) 듀얼검증 PASS, .pass 생성, develop PR 대기. 테스트 전용(소스 .ts 무수정 — 양 검증자 git diff HEAD -- src/ 빈결과 확인). (1) 신규 재사용 API 라우트 테스트 하니스 src/__tests__/helpers/api-route.ts(순수 빌더 buildGetRequest/buildJsonRequest/makeSession/makeSpaceRow/readJson — vi.mock 프리앰블은 파일로컬 호이스팅이라 중앙화 불가). (2) src/app/api/spaces/route.test.ts: GET filter→scope 분기 17케이스(owned/joined/null·all × 일반/슈퍼어드민, INVALID_FILTER 400, status:ACTIVE 상시 부착, 페이지네이션 take=limit+1/cursor:{id}/skip:1, cursor에도 scope 보존, 응답 allowlist exact-key-set[inviteCode/accessSecret/ownerId/templateId/updatedAt 미노출], POST superAdmin 가드 1건). (3) useScreenRecorder.test.ts: unmount 경로 3건(stopping 중 언마운트 settle[WI-006 P3 흡수, 변이검증됨] / 언마운트 후 stopRecording 즉시 resolve / saveFile await 중 언마운트 mountedRef 가드[고유 delay setTimeout 식별로 변이검증 가능하게 강화]). vitest 108→128(+20). 기계게이트 4/4(tsc 0/lint 0/vitest 128·128/build 0). 설계 codex consult 1R + 듀얼검증 2R(codex r1 WARNING P3x3→r2 PASS 0 issues · evaluator r1 9.3→r2 9.625, 수렴 P3 3건[가드 false-pass·superAdmin scope·allowlist] 선제 강화 후 양측 변이검증 실증) + .pass(fingerprint cfdd572c). 잔여 P3x3 전부 defer=WI-012(POST 커버리지·하니스 미사용경로·GET500 폴백). 큐 잔여: WI-012-refactor / WI-013-perf(전부 P3). 승격 미실행 부채: WI-001~010은 develop만, main(라이브) 미반영."
 }

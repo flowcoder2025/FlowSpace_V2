@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.5,
+    "consistency": 9.8,
+    "specificity": 9.7,
+    "actionability": 9.5
+  },
+  "weightedTotal": 9.625,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/route.test.ts:284-301 (POST describe)",
+      "description": "POST /api/spaces는 비-슈퍼어드민 403 가드만 검증한다. 슈퍼어드민 성공 경로(template.findUnique 조회 → space.create → 201 응답에 inviteCode/template 포함, members.create OWNER)는 미커버다. 이 경로는 app.md data-ownership write-path이자 응답에 inviteCode를 의도적으로 노출하는 유일한 지점인데 회귀 가드가 없다.",
+      "recommendation": "WI-012에서 superAdmin POST happy-path 테스트 추가(space.create 인자에 ownerId=session.user.id, members.create role:OWNER, 201 body key 집합 단언).",
+      "defer": true,
+      "deferRationale": "WI-011 수용 기준은 GET filter 분기 회귀 + 라우트 하니스 + recorder unmount settle. POST의 보안 관련 단언(403 SUPER_ADMIN_REQUIRED, body/prisma 접근 전 차단)은 커버됨. happy-path 커버리지 확대는 별개 범위(WI-012 흡수).",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/route.test.ts (POST 입력검증 분기)",
+      "description": "POST의 입력검증 분기(name/templateKey 누락 → 400, template not found → 404)가 미커버다. route.ts:115-131의 두 분기에 회귀 가드 없음.",
+      "recommendation": "WI-012에서 400/404 분기 케이스 추가.",
+      "defer": true,
+      "deferRationale": "P3 커버리지 폭 확대 — WI-011 핵심 수용 기준 외. 소스 무수정이라 신규 회귀 위험 없음.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/__tests__/helpers/api-route.ts:50-60 (buildJsonRequest), :62-107 (makeSpaceRow)",
+      "description": "하니스 일부가 단언으로 직접 검증되지 않는다: (1) buildJsonRequest의 JSON 본문 round-trip은 POST 403 테스트가 request.json() 도달 전에 반환하므로 어떤 테스트도 파싱 결과를 단언하지 않는다. (2) makeSpaceRow의 status 오버라이드 파라미터는 응답에 status가 매핑되지 않아(allowlist) 실질 효과가 없다. 둘 다 tsc로 타입은 보장되나 행위 단언은 부재.",
+      "recommendation": "WI-012의 POST happy-path 추가 시 buildJsonRequest 본문이 space.create 인자로 전달됨을 단언하면 자연 해소. makeSpaceRow.status는 사용처 생기기 전까지 유지 무해.",
+      "defer": true,
+      "deferRationale": "하니스는 단순 빌더이고 tsc 게이트가 시그니처를 보장. 행위 단언 부재는 미사용 경로 한정이라 false-pass 위험 없음(현 단언들은 mutation으로 실효성 실증됨).",
+      "fixNow": false
+    }
+  ]
+}
