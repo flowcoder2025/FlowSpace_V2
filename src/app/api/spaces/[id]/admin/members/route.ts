@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canActOn, isSpaceRole } from "@/lib/space-role";
+import { dispatchEnforcement, type EnforceAction } from "@/features/space/enforce";
 import type { SpaceRole, ChatRestriction } from "@prisma/client";
 
 interface RouteParams {
@@ -104,6 +105,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     let updatedRestriction: ChatRestriction | undefined;
     let updatedRole: SpaceRole | undefined;
     const actionLabel = action;
+    const actorName = session.user.name ?? undefined;
 
     switch (action) {
       case "changeRole": {
@@ -137,7 +139,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       case "ban":
         updatedRestriction = "BANNED";
         break;
-      case "kick":
+      case "kick": {
         // kick은 멤버 삭제
         await prisma.spaceMember.delete({ where: { id: memberId } });
         await prisma.spaceEventLog.create({
@@ -148,7 +150,19 @@ export async function PATCH(request: Request, { params }: RouteParams) {
             payload: { action: "kick", targetName: target.user?.name || target.displayName },
           },
         });
-        return NextResponse.json({ message: "Member kicked" });
+        // 살아있는 소켓 실시간 추방 (DB 삭제 후 best-effort)
+        let realtimeEnforced = false;
+        if (target.userId) {
+          const r = await dispatchEnforcement({
+            spaceId,
+            userId: target.userId,
+            action: "kick",
+            actorName,
+          });
+          realtimeEnforced = r.enforced;
+        }
+        return NextResponse.json({ message: "Member kicked", realtimeEnforced });
+      }
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
@@ -179,7 +193,22 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       },
     });
 
-    return NextResponse.json({ member: updated });
+    // 살아있는 소켓에 실시간 반영 (ban/mute/unmute/changeRole). DB 갱신 후 best-effort.
+    // changeRole 강등은 권한 회수이므로(인메모리 role 캐시 갱신) 보안상 실시간 반영 필요.
+    let realtimeEnforced = false;
+    if (target.userId) {
+      const enforceAction: EnforceAction = actionLabel === "changeRole" ? "role" : actionLabel;
+      const r = await dispatchEnforcement({
+        spaceId,
+        userId: target.userId,
+        action: enforceAction,
+        role: actionLabel === "changeRole" ? updatedRole : undefined,
+        actorName,
+      });
+      realtimeEnforced = r.enforced;
+    }
+
+    return NextResponse.json({ member: updated, realtimeEnforced });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to update member", details: error instanceof Error ? error.message : undefined },

@@ -6,6 +6,8 @@ on:
     paths:
       - 'server/**'
       - 'src/features/space/socket/internal/types.ts'
+      - 'src/features/space/chat/internal/chat-constants.ts'
+      - 'src/features/space/enforce/internal/contract.ts'
       - 'Dockerfile.socket'
       - 'docker-compose.prod.yml'
 
