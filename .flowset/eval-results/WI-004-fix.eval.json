@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.7,
+    "consistency": 9.7,
+    "specificity": 9.4,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.62,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/features/assets/internal/safe-path.ts:34",
+      "description": "URL-encoded traversal(`%2e%2e`)는 차단되지 않고 ALLOW로 통과한다(독립 PoC 확인). 단 파일시스템은 퍼센트 인코딩을 디코드하지 않으므로 결과 경로는 generated 루트 내부의 리터럴 `%2e%2e` 하위 디렉토리로 해석되어 실제 traversal이 아니다. 존재하지 않는 경로라 unlink는 `.catch(()=>{})`로 무해 no-op. 실제 우회 아님 → 정보성.",
+      "recommendation": "현 동작 무해. 방어 심화가 필요하면 디코드 후 재검증 또는 화이트리스트 문자셋(영숫자/`_-./`)으로 입력을 제한 가능. 현 WI 범위에선 불필요.",
+      "defer": true,
+      "deferRationale": "실제 path traversal 아님(FS가 percent-encoding 미디코드, 결과는 generated 루트 내부 리터럴 디렉토리). 누수·삭제 회귀 없음. 수용 기준은 `../`/절대경로/백슬래시/null byte 차단으로 한정 — 전부 충족.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/assets/internal/safe-path.ts:44-52",
+      "description": "POSIX 정규화 + `/assets/generated/` prefix 게이트를 이미 통과한 단일 드라이브 경로에 대해 `path.relative` 이중 검사는 사실상 잉여다(prefix 검사가 동일 드라이브 내 컨테인먼트를 이미 보장). 결함이 아니라 방어적 중복.",
+      "recommendation": "유지 권장(저비용 심층방어, 향후 정규화 가정 변경 시 안전망). 제거하지 않아도 무방.",
+      "defer": true,
+      "deferRationale": "동작·보안에 무영향인 방어적 중복. 가독성/성능 비용 무시 가능. 수정 불요.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/assets/[id]/route.ts:72-91",
+      "description": "회귀 위험 평가: generated 경계 밖의 정상 GeneratedAsset 경로가 존재하면 해당 파일이 unlink 스킵되어 디스크 누수가 발생할 수 있다. 그러나 전 write 경로 검증 결과(processor.ts ASSET_STORAGE_PATHS/THUMBNAIL_PATH 전부 `assets/generated/*`, register-characters.mjs `/assets/generated/*.png`) 정상 자산은 모두 generated 루트 하위 → 현 시점 누수 가능성 사실상 0. 향후 다른 저장 경로 도입 시에만 부채.",
+      "recommendation": "향후 generated 밖에 자산을 저장하는 코드 경로 도입 시 루트 화이트리스트를 확장하거나 저장 규약을 generated로 강제할 것. 현재는 조치 불요.",
+      "defer": true,
+      "deferRationale": "현 코드베이스의 모든 자산 write가 `/assets/generated/` 하위로 귀결됨을 grep으로 실증 — 정상 삭제 회귀·누수 없음. 전향적 주의사항일 뿐 현 결함 아님.",
+      "fixNow": false
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+WI=WI-004-fix
+commit=bc334a7
+sourceFingerprint=9fae5a70b3351a62cadd9879f87296d3bdc0bf307bbba63aaaa24786f5683f72
+codex=.flowset/eval-results/WI-004-fix.codex.json
+evaluator=.flowset/eval-results/WI-004-fix.eval.json
+merged=.flowset/eval-results/WI-004-fix.merged.json
+gates=tsc,lint,vitest,build
+codexVerdict=PASS
+evaluatorVerdict=WARNING(9.62,P3x3-defer)
+target=develop (PR)
+createdAt=2026-06-22T01:25:00Z

@@ -3,6 +3,7 @@ export { processAssetGeneration } from "./internal/processor";
 export { validateAssetMetadata, validateAssetFilename } from "./internal/validator";
 export { loadWorkflowTemplate, injectWorkflowParams } from "./internal/workflow-loader";
 export { ASSET_SPECS, ASSET_STORAGE_PATHS, generateAssetFilename } from "./internal/specs";
+export { resolveGeneratedAssetPath } from "./internal/safe-path";
 export { loadAssetToPhaser, loadAssetsToPhaser } from "./internal/game-loader";
 export {
   removeBackground,
