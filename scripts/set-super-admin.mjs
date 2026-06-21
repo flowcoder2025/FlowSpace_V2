@@ -14,6 +14,18 @@ config();
 
 const prisma = new PrismaClient();
 
+const USAGE = [
+  "사용법:",
+  "  node scripts/set-super-admin.mjs <email> [true|false]   # 부여(기본) / 회수",
+  "  node scripts/set-super-admin.mjs --list                 # 현재 슈퍼어드민 목록",
+].join("\n");
+
+function usageError(message) {
+  console.error(`[실패] ${message}`);
+  console.error(USAGE);
+  process.exitCode = 1;
+}
+
 async function list() {
   const supers = await prisma.user.findMany({
     where: { isSuperAdmin: true },
@@ -33,7 +45,27 @@ async function main() {
   }
 
   const email = arg;
-  const next = process.argv[3] !== "false"; // 기본 true, 'false' 명시 시에만 회수
+  const flagArg = process.argv[3];
+  const extraArgs = process.argv.slice(4);
+
+  // 잉여 인자 차단 — 오타/실수가 조용히 무시되지 않도록
+  if (extraArgs.length > 0) {
+    usageError(`인자가 너무 많습니다: ${extraArgs.join(" ")}`);
+    return;
+  }
+
+  // 회수/부여 플래그는 명시적으로만 인정 — 오타('flse'/'0'/'False' 등)가 조용히 부여로 처리되지 않도록
+  let next;
+  if (flagArg === undefined) {
+    next = true; // 기본 부여
+  } else if (flagArg === "true") {
+    next = true;
+  } else if (flagArg === "false") {
+    next = false;
+  } else {
+    usageError(`알 수 없는 플래그: '${flagArg}' ('true' 또는 'false' 만 허용)`);
+    return;
+  }
 
   const before = await prisma.user.findUnique({
     where: { email },

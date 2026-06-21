@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     // 공간 생성은 슈퍼어드민만 허용 (생성된 공간의 OWNER 권한은 이후 멤버 PATCH로 위임)
     if (session.user.isSuperAdmin !== true) {
       return NextResponse.json(
-        { error: "Only superAdmin can create spaces" },
+        { error: "Only superAdmin can create spaces", code: "SUPER_ADMIN_REQUIRED" },
         { status: 403 }
       );
     }
