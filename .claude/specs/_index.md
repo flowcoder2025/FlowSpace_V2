@@ -1,8 +1,8 @@
 # FlowSpace Specs Index
 
 ## Drift Tracking
-- Last Reviewed Commit: `a5a4e76`
-- Last Review Date: 2026-05-07
+- Last Reviewed Commit: `49d272e`
+- Last Review Date: 2026-06-21
 
 ## Active Epics
 | Epic | 현재 Phase | 상태 |
@@ -28,6 +28,10 @@
 | [livekit-voicevideo](./livekit-voicevideo/README.md) | 2026-02-20 | 1 (Phase 11) |
 | [parts-avatar-system](./parts-avatar-system/README.md) | 2026-02-21 | 3 (Phase 1~3) |
 | [asset-integration](./asset-integration/README.md) | 2026-02-22 | 1 (연동 수정) |
+
+## Ad-hoc Work (2026-06-21)
+- **WI-007-feat 스페이스 생성 슈퍼어드민 전용 제한**: `POST /api/spaces` 403 가드(`prisma.space.create` 단일 경로) + `/spaces/new` 서버 redirect + 생성 진입점 전수 게이팅(navbar 데스크톱/모바일 + my-spaces toolbar/empty-state) + `scripts/set-super-admin.mjs` 부트스트랩. 듀얼검증 codex PASS·evaluator 9.85. main `2a6e2ed`(PR#3) + develop back-sync. **한계**: 슈퍼어드민 전역 스페이스 뷰(모든 스페이스 조회/관리 버튼) 미구현 — `GET /api/spaces`가 멤버 스페이스만 반환·`space-card` 관리버튼이 myRole 기준. 후속 WI 대상. (`auth/2026-06-21-superadmin-space-creation.md`)
+- **Vercel 배포 인가 함정**: main 프로덕션 배포가 Git 작성자 인가 차단(`team-members-and-roles`)으로 실패 → 작성자를 `flowcoder25@gmail.com`로 변경·빈 커밋 재트리거(`38459d5`)로 해결. (위 스펙 "배포 함정" 섹션)
 
 ## Ad-hoc Work (2026-05-07)
 - **Chrome 146 화면공유 picker 검정 박스** (KNOWN ISSUE, 수용): WebGL canvas + self-capture 재귀에서 picker preview가 검정 fallback. 본인만 잠깐 보이는 시각적 잔재 (공유 영상/타 참가자 영향 없음). 폐기 가설(Scale, backgroundColor, backdrop-filter, preserveDrawingBuffer 모두 무관) + 폐기 해결책(Phaser.CANVAS=타일 줄무늬, display:none=Framebuffer 크래시) 기록. 미검증 가설(antialias:false, selfBrowserSurface) 추후 가능. test-screenshare 진단 페이지 제거 완료. (`livekit-voicevideo/14-chrome146-screenshare-picker.md`)
