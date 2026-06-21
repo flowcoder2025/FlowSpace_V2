@@ -2,11 +2,11 @@
   "activeWI": "WI-006-fix",
   "lastWI": "WI-005-fix",
   "type": "fix",
-  "status": "VERIFY",
+  "status": "PASS",
   "integrationBranch": "develop",
   "branch": "fix/WI-006-fix-screen-recorder-onerror",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "a3de864",
-  "note": "WI-006-fix(useScreenRecorder onerror dangling Promise, P3) 구현 완료 — 기계게이트 4/4(tsc 0/lint 0/vitest 92·92/build 0), 듀얼검증 진행. recorder.onerror가 handleError+idle+stopTimer만 하고 pendingStopResolveRef를 settle하지 않아 'error' 시 onstop 미발화면 stopRecording() Promise 영구 pending이던 버그. onerror를 정상 abort로 강화: onstop=null(중복 저장 차단)+audioContext close+chunks 폐기+mediaRecorderRef===recorder시 null+pendingStopResolveRef settle. resolve 시맨틱은 기존 onstop의 result.status==='error' 경로와 일관(오류는 error 상태/onError 콜백 전달, Promise<void> 계약 유지). 신규 vitest 4(88→92). 경계 변경 아님(설계 codex consult 1R 수행). 클라이언트 훅만 변경 — 서버 esbuild 무관."
+  "lastVerifiedCommit": "5c9fa16",
+  "note": "WI-006-fix(useScreenRecorder onerror dangling Promise, P3) 게이트 PASS — develop PR 대기. 기계게이트 4/4(tsc 0/lint 0/vitest 92·92/build 0) + 듀얼검증(codex r1 PASS 0 issues·evaluator WARNING 9.5, P3×3 defer) + .pass(fingerprint 19ecaf43, impl 5c9fa16). recorder.onerror가 pendingStopResolveRef를 settle하지 않아 'error' 시 onstop 미발화면 stopRecording() Promise 영구 pending이던 버그. onerror를 정상 abort로 강화(onstop=null+audioContext close+chunks 폐기+ref null+pendingStopResolveRef settle). resolve 시맨틱은 기존 onstop error 경로와 일관(Promise<void> 유지). 설계 codex consult 1R. evaluator P3×3 흡수: unmount settle 테스트부재→WI-011 / onerror mountedRef가드→실결함 아님 / stopRecording close .catch→WI-012 선재. 클라이언트 훅만 변경(서버 esbuild 무관). 다음: PR 머지 후 MERGED 전환 → WI-010/011/012(P3)."
 }
