@@ -1,13 +1,12 @@
 {
-  "activeWI": "WI-007-feat",
-  "lastWI": "WI-002-fix",
-  "type": "feat",
-  "status": "ACTIVE",
+  "activeWI": null,
+  "lastWI": "WI-007-feat",
+  "type": null,
+  "status": "IDLE",
   "integrationBranch": "develop",
-  "branch": "feat/WI-007-feat-superadmin-space-creation",
-  "targetBase": "main",
-  "startedAt": "2026-06-21",
+  "branch": "develop",
+  "startedAt": null,
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": "256ae57",
-  "note": "WI-007-feat: 스페이스 생성 슈퍼어드민 전용 제한 + 슈퍼어드민 부트스트랩 스크립트. 사용자 지시로 main에서 분기·머지(별도 작업, 표준 develop 통합 플로우 예외). main에 WI-001/002 미반영 → 변경 자기완결성(main 베이스 컴파일/빌드) 검증이 핵심."
+  "note": "WI-007-feat(스페이스 생성 슈퍼어드민 전용) main 머지 완료 — PR#3, main merge 2a6e2ed (feat 49d272e). 사용자 지시 별도 작업으로 main 직접 타깃. 듀얼검증 codex PASS·evaluator 9.85. ⚠️ develop엔 WI-007 코드 미반영(back-sync 미결). 다음 세션: develop 통합 큐 WI-003-refactor 복귀 + WI-008-fix(WI-007 P3×2)."
 }

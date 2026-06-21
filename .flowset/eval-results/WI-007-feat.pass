@@ -1,0 +1,11 @@
+WI=WI-007-feat
+commit=49d272e
+sourceFingerprint=ebe0bd78732f7e5e6a6df6ca97b0a4111301119096430a0743c4f5ef0db090f7
+codex=.flowset/eval-results/WI-007-feat.codex.json
+evaluator=.flowset/eval-results/WI-007-feat.eval.json
+merged=.flowset/eval-results/WI-007-feat.merged.json
+gates=tsc,lint,vitest,build
+codexVerdict=PASS
+evaluatorVerdict=WARNING(9.85,P3x2-defer)
+target=main (PR#3)
+createdAt=2026-06-21T13:18:00Z

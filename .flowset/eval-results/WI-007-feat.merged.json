@@ -1,0 +1,46 @@
+{
+  "wi": "WI-007-feat",
+  "schemaVersion": 1,
+  "commit": "49d272e",
+  "target": "main (PR#3)",
+  "rounds": 2,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0 },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.85, "scores": { "completeness": 10, "consistency": 10, "specificity": 10, "actionability": 9 }, "issueCount": 2 }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "최종 라운드(r2): codex PASS(issues=[]) · evaluator WARNING(9.85, P3 2건 defer). P0/P1/P2 없음, fixNow=true 없음, 기계 게이트 4/4 PASS(develop 트리 + main 베이스 양쪽 실증) → .pass 생성. 코드는 main에 머지(PR#3, feat commit 49d272e).",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "전역 navbar.tsx '새 스페이스' CTA(데스크톱 83-89 / 모바일 186-192) 미게이트 — 수용기준 #3(생성 진입점 전수 게이팅) 부분 위반",
+      "codex": "PASS (미발견)",
+      "evaluator": "P2 defer (보안영향 0, 서버 redirect+API 403이 하드 차단; UX 회귀)",
+      "status": "RESOLVED — navbar 두 CTA를 session.user.isSuperAdmin 게이팅. r2 codex PASS · evaluator가 진입점 4곳 전수 게이팅 확인(9.85)"
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "scripts/set-super-admin.mjs:35",
+      "description": "argv[3] !== \"false\" 파싱: 'flse'/'False'/'0' 등 오타 입력 시 회수(revoke) 의도가 조용히 부여(grant)로 처리됨.",
+      "assessment": "운영 부트스트랩 스크립트, 즉시 회수 가능. 기능/보안 결함 아님.",
+      "defer": true,
+      "deferRationale": "P3 무해. 후속 KI(WI-008-fix)로 분리 — 회수 인자 화이트리스트 + 미인식 입력 시 에러.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/app/api/spaces/route.ts:75",
+      "description": "403 응답이 영문 메시지이며 app.md invariant #4의 선택적 code? 필드 미병기. 인가 동작은 정상(403).",
+      "assessment": "비치명 일관성 부채. UI 전수 게이팅으로 정상 흐름에서는 미노출.",
+      "defer": true,
+      "deferRationale": "P3. 후속 KI(WI-008-fix). 기존 API 다수가 code 생략 패턴이라 차단 사유 아님.",
+      "fixNow": false
+    }
+  ]
+}
