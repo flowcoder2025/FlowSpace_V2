@@ -17,10 +17,13 @@ COPY prisma/ ./prisma/
 RUN npx prisma generate
 
 COPY server/ ./server/
-# 서버 번들이 직접 import하는 순수 계약 파일만 COPY (배럴 import 금지 — React 끌림 방지)
+# 서버 번들이 직접 import하는 순수 계약/헬퍼 파일만 COPY (배럴 import 금지 — React 끌림 방지)
+# esbuild metafile 검증(WI-012-1): 런타임 src 입력은 chat-constants·enforce contract·auth-secret 3개.
+# socket-events.ts는 type-only(esbuild elide, 번들 미포함)이나 계약 추적용으로 COPY 유지.
 COPY src/features/space/protocol/internal/socket-events.ts ./src/features/space/protocol/internal/socket-events.ts
 COPY src/features/space/chat/internal/chat-constants.ts ./src/features/space/chat/internal/chat-constants.ts
 COPY src/features/space/enforce/internal/contract.ts ./src/features/space/enforce/internal/contract.ts
+COPY src/lib/auth-secret.ts ./src/lib/auth-secret.ts
 COPY tsconfig.json ./
 
 RUN npx esbuild server/index.ts \
