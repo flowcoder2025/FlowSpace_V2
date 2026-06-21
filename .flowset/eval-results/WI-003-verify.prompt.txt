@@ -1,0 +1,28 @@
+너는 FlowSpace(Next.js 15 + Phaser 3)의 독립 블라인드 검증자(codex)다. 아래 WI 구현을 read-only로 독립 채점하라. 반드시 output-schema(JSON)로만 답한다. 결함은 P0~P3로 분류하고, 본 WI 범위 밖이면 defer=true + deferRationale.
+
+## WI-003-refactor 목표/수용기준
+타 모듈의 `internal/*` 직접 import 위반 정리. 아키텍처 규칙: 각 모듈 `module/index.ts`(Public API) + `module/internal/`(Private). 외부는 배럴(index.ts)만 import, 타 모듈 internal/* 직접 import 금지.
+수용기준:
+1. 인앱(src) cross-module internal/* 직접 import 0건.
+2. 배럴 routing 후 tsc/lint/vitest/build 모두 PASS, 런타임 동작 불변(순환 import init 오류 없음).
+3. 서버(별도 esbuild 번들 프로세스)의 순수 계약 import는 본 WI 범위 밖(후속 WI). scripts dev툴도 범위 밖.
+
+## 구현(현재 브랜치 상태)
+- game/index.ts: TILE_INDEX/extractDefaultMapData(런타임)·TilemapResult(타입) 추가 export. editor/index.ts: EditorSystem 추가 export. chat/index.ts: MOVE_THROTTLE_MS·RECONNECTION_* 추가 export.
+- 7개 import 사이트를 배럴로 교체: stores/editor-store.ts, editor/internal/{use-editor,tile-palette-data,editor-system}.ts, game/internal/scenes/main-scene.ts, socket/internal/{use-socket,socket-client}.ts.
+- ESLint no-restricted-imports: `@/**/internal`+`@/**/internal/**` (alias 정밀, 오탐0). 상대경로 cross-module internal은 glob으로 동일모듈 상향과 정밀 구분 불가 → 아래 경계 테스트로 보강.
+- src/__tests__/module-boundaries.test.ts: import 경로를 실제 해석해 cross-module internal 침범(alias·상대경로 모두)을 정밀 차단하는 vitest 테스트(게이트 강제). 음성검증으로 alias·상대경로 위반 포착 실증.
+
+## 사전 고지된 의도적 범위/설계 결정 (이 항목들을 "신규 결함"으로 재보고하지 말 것. 부적절하다고 판단되면 defer 처리하고 deferRationale에 반론을 적어라)
+- (a) editor가 `@/features/space/game/events`(서브패스)를 직접 import: internal/* 위반 아님. `events/`는 EventBridge 공개 계약 서브모듈로 src 17개 사이트·다중 모듈(avatar/editor/game)에서 사용되며 game 배럴이 일부 재노출. 배럴 단일화는 internal/* 정리 범위를 벗어나는 별도 아키텍처 결정 → 후속 boundary WI.
+- (b) 상대경로 cross-module internal의 ESLint 차단: glob 한계로 alias만 ESLint가 막고 상대경로는 경계 테스트가 막음(이중 방어). 이는 의도된 설계.
+- (c) server/**·scripts/** 잔존 internal 직접 import: 수용기준#3상 명시 범위 밖.
+
+## 너가 직접 확인할 것 (repo read-only)
+1. 인앱 cross-module internal 위반 실제 0건인지(src 전수).
+2. editor↔game 순환 위험: game-manager가 MainScene을 lazy import 하여 정적 순환이 없는지.
+3. 배럴 추가 export 심볼/경로 정확성(런타임 값 vs 타입).
+4. 경계 테스트가 실제로 cross-module internal(alias+상대경로)을 잡고 동일모듈을 오탐하지 않는지(로직 정확성).
+5. 위 (a)(b)(c) 외에 본 WI가 새로 유발한 회귀/결함이 있는지.
+
+각 결함에 severity/location/description/recommendation/defer/deferRationale/fixNow를 채워라. 결함 없으면 issues=[] + verdict=PASS.

@@ -1,0 +1,50 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.5,
+    "consistency": 9.0,
+    "specificity": 10,
+    "actionability": 9.5
+  },
+  "weightedTotal": 9.5,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/features/space/chat/index.ts:36-43",
+      "description": "chat 배럴이 통신/소켓 도메인 상수(MOVE_THROTTLE_MS, RECONNECTION_ATTEMPTS/DELAY/DELAY_MAX/TIMEOUT)를 'cross-module integration surface'로 재노출한다. socket-client.ts/use-socket.ts(통신 도메인)가 소비하는 값으로 chat 모듈 Public API에 통신 관심사가 섞인다. 증거: communication.md invariant #1(위치 100ms throttle)·#2(지수 백오프 500ms→5s, 최대 30회)는 통신 도메인 불변식인데 정의가 chat/internal/chat-constants.ts에 위치(독립 grep으로 6개 export const 실재 확인). WI 목표(cross-module internal import 제거)는 달성됐고 의미론적 소유만 chat에 잔류. 주석으로 '후속 WI에서 통신 공유 계약 위치로 이동 예정' 임시성이 정직히 명시됨.",
+      "recommendation": "후속 boundary/communication WI에서 MOVE_THROTTLE_MS·RECONNECTION_* 를 공유 통신 계약 모듈(socket 또는 communication-contract)로 이전하고 chat 배럴에서 제거. DEFAULT_NICKNAME 은 chat 도메인 값이므로 유지 타당.",
+      "defer": true,
+      "deferRationale": "수용기준 #1(in-app cross-module internal import 0건) 충족(독립 grep '@/features/**/internal' 0건, 상대경로 '../**/internal' 0건, module-boundaries vitest 통과). 상수 도메인 재배치는 배럴 경유 import 규칙을 위반하지 않고 값 동일·런타임 무영향. 코드에 이전 계획 명시됨. 정리성 부채로 분리.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/editor/index.ts:18-21, src/features/space/editor/internal/editor-system.ts:9,17 (@/features/space/game/events 서브패스 17개소 사용)",
+      "description": "editor↔game 통합 표면이 잠정적이다. (a) editor 배럴이 EditorSystem 을, game 배럴이 TILE_INDEX/extractDefaultMapData/TilemapResult 를 'cross-module integration surface — 안정 공개 API 아님' 주석과 함께 노출. (b) editor-system.ts 가 game 의 EventBridge 계약을 @/features/space/game/events(공개 서브배럴, events/index.ts 실재 확인) 서브패스로 직접 import. internal/* 위반은 아님(검증: 보안 grep·eslint stdin probe·boundary 테스트 resolver 모두 events 서브패스를 위반으로 판정하지 않음). 다만 단일 배럴 라우팅 미완으로 경계가 아직 프로비저널.",
+      "recommendation": "후속 boundary WI에서 EventBridge 공개 계약을 단일 진입점으로 정리(events 서브배럴을 game 배럴로 통합하거나 정식 공개 계약으로 승격)하고 editor↔game 상호 노출을 공식 계약으로 안정화.",
+      "defer": true,
+      "deferRationale": "WI-003 의도된 범위 결정에 명시됨 — events 서브패스 직접 import는 internal/* 위반이 아니며(EventBridge 공개 계약 서브모듈), 배럴 단일화는 후속 boundary WI 범위. 현 상태로 수용기준 #1·#2 충족(tsc/lint/vitest/build PASS, 런타임 모듈초기화 순환 없음 — game-manager 가 MainScene 을 await import 로 지연 로드하고 editor→game 역참조는 type-only/leaf-data 라 eval-time back-edge 없음).",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "eslint.config.mjs:28 (no-restricted-imports group)",
+      "description": "ESLint no-restricted-imports 는 alias(@/**/internal, @/**/internal/**)만 차단하고 상대경로 cross-module internal 침범(예: '../../chat/internal/x')은 lint 단독으로는 못 잡는다(glob으로 동일모듈 상향 '../../internal/x' 와 구분 불가). SUSPECTED 아님 — 이 갭은 신규 src/__tests__/module-boundaries.test.ts(vitest 게이트)가 import 경로를 실제 해석해 보강한다. 독립 음성검증: resolver 로직을 8개 엣지케이스로 시뮬레이션 — 동일모듈 ./internal·../../internal 오탐 0, cross-module 상대 internal 및 alias internal 양쪽 정확 차단, 'internalStuff' 같은 부분문자열 미오탐(세그먼트 정확매칭) 전부 PASS. eslint stdin probe 로 alias internal 발화·배럴/상대 ./internal 무발화도 실증.",
+      "recommendation": "장기적으로 eslint-plugin-boundaries 등 path-resolving 경계 룰을 도입하면 lint·test 이중 게이트가 단일 도구로 일원화 가능. 현 상태로도 수용기준 충족(lint+test 이중 강제).",
+      "defer": true,
+      "deferRationale": "상대경로 침범 차단이 module-boundaries.test.ts 게이트로 실질 강제되어(vitest 53/53 PASS, 위반 시 실패하도록 resolver 검증 완료) 본 WI 목표(in-app cross-module internal 차단)는 alias+상대 양쪽 모두 게이트로 막힌다. lint 단일도구 일원화는 안정성 개선성 후속 항목.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "server/handlers/chat.ts:12, server/handlers/party.ts:10, server/index.ts:17, scripts/debug-character-pipeline.ts:12 외 (server 10개소, scripts 5개소)",
+      "description": "server/** 및 scripts/** 가 여전히 src/.../internal/* 를 직접 import(server → socket/internal/types·chat/internal/chat-constants; scripts → assets/internal/post-processor·processor·constants·workflow-loader). 캡슐화 경계 관점 잔존이나 eslint globalIgnores(eslint.config.mjs:44-45 server/**·scripts/**)·boundary 테스트(src/ 한정 스캔) 모두 의도적으로 제외. 별도 esbuild 번들/dev툴의 순수 계약·타입 import.",
+      "recommendation": "후속 WI에서 server 번들의 socket/chat 계약을 공유 contract 모듈로 분리(esbuild 경계와 정합), scripts dev툴은 별도 정책 결정.",
+      "defer": true,
+      "deferRationale": "WI-003 수용기준 #3 에서 server(별도 esbuild 번들)·scripts(dev툴)의 순수 계약/internal import 는 명시적으로 범위 밖·defer 로 규정됨. in-app(src) 범위는 cross-module internal import 0건으로 완결.",
+      "fixNow": false
+    }
+  ]
+}
