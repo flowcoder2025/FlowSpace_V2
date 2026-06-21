@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-/** GET /api/spaces - 내 공간 목록 */
+/** GET /api/spaces - 내 공간 목록 (슈퍼어드민의 "전체"는 모든 ACTIVE 스페이스) */
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -10,23 +11,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const searchParams = request.nextUrl.searchParams;
-    const filter = searchParams.get("filter"); // "owned" | "joined" | null (all)
+    const userId = session.user.id;
+    const isSuperAdmin = session.user.isSuperAdmin === true;
+    const filter = request.nextUrl.searchParams.get("filter"); // "owned" | "joined" | "all" | null
 
-    const where =
-      filter === "owned"
-        ? { ownerId: session.user.id }
-        : {
-            members: { some: { userId: session.user.id } },
-          };
+    const memberScope: Prisma.SpaceWhereInput = {
+      members: { some: { userId } },
+    };
+
+    let scope: Prisma.SpaceWhereInput;
+    if (filter === "owned") {
+      scope = { ownerId: userId };
+    } else if (filter === "joined") {
+      scope = memberScope;
+    } else if (filter === null || filter === "all") {
+      // 슈퍼어드민의 "전체"만 전역(모든 ACTIVE), 일반 사용자는 본인 멤버십 스페이스
+      scope = isSuperAdmin ? {} : memberScope;
+    } else {
+      return NextResponse.json(
+        { error: "Invalid filter", code: "INVALID_FILTER" },
+        { status: 400 }
+      );
+    }
 
     const spaces = await prisma.space.findMany({
-      where: { ...where, status: "ACTIVE" },
+      where: { ...scope, status: "ACTIVE" },
       include: {
         template: { select: { key: true, name: true } },
         _count: { select: { members: true } },
         members: {
-          where: { userId: session.user.id },
+          where: { userId },
           select: { role: true },
           take: 1,
         },
@@ -39,7 +53,6 @@ export async function GET(request: NextRequest) {
       name: s.name,
       description: s.description,
       accessType: s.accessType,
-      inviteCode: s.inviteCode,
       template: s.template,
       maxUsers: s.maxUsers,
       memberCount: s._count.members,

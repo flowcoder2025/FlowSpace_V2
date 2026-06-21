@@ -14,6 +14,8 @@ interface SpaceCardProps {
     myRole: string | null;
     primaryColor: string | null;
   };
+  /** 슈퍼어드민이면 멤버 역할과 무관하게 '관리' 진입을 노출 (서버 세션 권위) */
+  isSuperAdmin?: boolean;
 }
 
 const TEMPLATE_LABELS: Record<string, string> = {
@@ -34,9 +36,10 @@ const ACCESS_LABELS: Record<string, string> = {
   PRIVATE: "비공개",
 };
 
-export function SpaceCard({ space }: SpaceCardProps) {
+export function SpaceCard({ space, isSuperAdmin = false }: SpaceCardProps) {
   const router = useRouter();
-  const isAdmin = space.myRole === "OWNER" || space.myRole === "STAFF";
+  const isAdmin =
+    space.myRole === "OWNER" || space.myRole === "STAFF" || isSuperAdmin;
   const templateLabel =
     TEMPLATE_LABELS[space.template.key] ?? space.template.name;
 

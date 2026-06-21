@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 10,
+    "consistency": 10,
+    "specificity": 10,
+    "actionability": 9
+  },
+  "weightedTotal": 9.8,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/route.ts:37-49",
+      "description": "슈퍼어드민 '전체' scope({})는 모든 ACTIVE 스페이스를 제한·페이지네이션 없이 반환한다. 스페이스 수가 커지면 응답 크기/쿼리 비용이 선형 증가(목록 UI도 take/skip 없음). 기능·보안 결함은 아니며 스케일 시 UX/성능 회귀 가능성. 현재 인스턴스 규모에서는 무해.",
+      "recommendation": "전역 목록에 take/cursor 페이지네이션(또는 상한)을 후속 WI로 도입. 현 시점 기능 정상.",
+      "defer": true,
+      "deferRationale": "성능/스케일 부채로 정확성·보안에 무영향. 현재 데이터 규모에서 무해하며 수용 기준 외. KI 등록 후 후속 처리 적합.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/route.ts:7-65 (vitest 커버리지)",
+      "description": "신규 filter 분기(owned/joined/all|null, isSuperAdmin 전역 scope, INVALID_FILTER 400)에 대한 자동 회귀 테스트가 없다. 프로젝트 vitest 52종은 src/features/space/chat/internal(chat-filter/chat-parser)에 국한되어 API 라우트를 전혀 검증하지 않음(git ls-files 확인). 기계게이트 '52/52 PASS'는 사실이나 본 WI 로직과 무관. 비-슈퍼어드민 scope 불변·전역 확대 회귀를 기계적으로 잡아낼 안전망 부재.",
+      "recommendation": "GET /api/spaces 라우트 단위 테스트(슈퍼어드민 전역 vs 일반 멤버십, filter 화이트리스트, INVALID_FILTER 400) 추가를 후속 WI로. 현 구현 자체는 정확.",
+      "defer": true,
+      "deferRationale": "테스트 부채(P3 정의). 코드 분기가 단순·명시적이고 tsc/lint/build 및 본 독립 코드검증으로 정확성 확인됨. API 테스트 하니스가 프로젝트에 부재해 신규 도입은 별도 작업 범위.",
+      "fixNow": false
+    }
+  ]
+}
