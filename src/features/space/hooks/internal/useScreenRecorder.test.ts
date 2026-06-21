@@ -207,3 +207,115 @@ describe("useScreenRecorder — onerror 경로 (WI-006)", () => {
     expect(result.current.notification?.type).toBe("success");
   });
 });
+
+describe("useScreenRecorder — unmount 경로 (WI-006/WI-011)", () => {
+  it("stopping 대기 중 언마운트되면 cleanup이 stopRecording Promise를 settle한다 (영구 pending 차단)", async () => {
+    const { result, unmount } = renderHook(() =>
+      useScreenRecorder({ spaceName: "s" })
+    );
+
+    await act(async () => {
+      await result.current.startRecording(fakeTrack);
+    });
+
+    let settled = false;
+    let stopPromise: Promise<void> | undefined;
+    act(() => {
+      stopPromise = result.current.stopRecording().then(() => {
+        settled = true;
+      });
+    });
+
+    // onstop/onerror 모두 미발화 → 아직 pending
+    expect(settled).toBe(false);
+    expect(result.current.recordingState).toBe("stopping");
+
+    // 언마운트 → cleanup이 onstop을 떼어내고 pendingStopResolveRef를 settle
+    await act(async () => {
+      unmount();
+      await stopPromise;
+    });
+
+    expect(settled).toBe(true);
+  });
+
+  it("언마운트 후 stopRecording을 호출해도 즉시 resolve한다 (dangling 없음)", async () => {
+    const { result, unmount } = renderHook(() =>
+      useScreenRecorder({ spaceName: "s" })
+    );
+
+    await act(async () => {
+      await result.current.startRecording(fakeTrack);
+    });
+
+    act(() => {
+      unmount();
+    });
+
+    // cleanup이 recorder ref를 비웠으므로 stale 콜백이라도 작업 없이 즉시 resolve
+    let settled = false;
+    await act(async () => {
+      await result.current.stopRecording().then(() => {
+        settled = true;
+      });
+    });
+    expect(settled).toBe(true);
+  });
+
+  it("saveFile(showSaveFilePicker) await 중 언마운트되어도 onstop이 hang/throw 없이 완료된다 (mountedRef 가드)", async () => {
+    // showSaveFilePicker를 수동 제어 deferred로 둬서 saveFile을 의도적으로 멈춘다.
+    // (정상 onstop 회귀 테스트는 다운로드 폴백을 쓰므로 이 키를 두지 않는다)
+    let releasePicker: (() => void) | undefined;
+    const pickerPromise = new Promise<never>((_, reject) => {
+      // resolve 대신 AbortError로 종료 → saveFile은 cancelled로 분기
+      releasePicker = () =>
+        reject(
+          Object.assign(new Error("aborted"), { name: "AbortError" })
+        );
+    });
+    (
+      window as unknown as { showSaveFilePicker: () => Promise<never> }
+    ).showSaveFilePicker = vi.fn(() => pickerPromise);
+
+    try {
+      const { result, unmount } = renderHook(() =>
+        useScreenRecorder({ spaceName: "s" })
+      );
+
+      await act(async () => {
+        await result.current.startRecording(fakeTrack);
+      });
+      const recorder = latestRecorder();
+
+      let stopPromise: Promise<void> | undefined;
+      act(() => {
+        stopPromise = result.current.stopRecording();
+      });
+
+      // onstop 발화 → saveFile이 picker에서 멈춤(suspended)
+      let onstopDone: Promise<void> | undefined;
+      act(() => {
+        onstopDone = (
+          recorder.onstop as unknown as (() => Promise<void>) | null
+        )?.();
+      });
+
+      // saveFile 대기 중 언마운트 (mountedRef=false)
+      act(() => {
+        unmount();
+      });
+
+      // picker 종료 → onstop이 mountedRef 가드를 지나 setState 없이 정상 종료
+      await act(async () => {
+        releasePicker?.();
+        await Promise.all([stopPromise, onstopDone]);
+      });
+
+      // 여기 도달 = onstop이 언마운트 후에도 hang/throw 없이 완료됨
+      expect(onstopDone).toBeDefined();
+    } finally {
+      delete (window as unknown as { showSaveFilePicker?: unknown })
+        .showSaveFilePicker;
+    }
+  });
+});
