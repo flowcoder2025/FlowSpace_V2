@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { unlink } from "fs/promises";
-import { join } from "path";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveGeneratedAssetPath } from "@/features/assets";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -68,14 +68,26 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
-    // 파일 시스템에서 실제 파일 삭제
+    // 파일 시스템에서 실제 파일 삭제 (path traversal 방어: generated 루트 밖 경로는 unlink 스킵)
     if (asset.filePath) {
-      const absPath = join(process.cwd(), "public", asset.filePath);
-      await unlink(absPath).catch(() => {});
+      const safePath = resolveGeneratedAssetPath(asset.filePath);
+      if (safePath) {
+        await unlink(safePath).catch(() => {});
+      } else {
+        console.warn(
+          `[assets/DELETE] filePath가 generated 경계를 벗어나 unlink 스킵: assetId=${asset.id}`
+        );
+      }
     }
     if (asset.thumbnailPath) {
-      const absThumb = join(process.cwd(), "public", asset.thumbnailPath);
-      await unlink(absThumb).catch(() => {});
+      const safeThumb = resolveGeneratedAssetPath(asset.thumbnailPath);
+      if (safeThumb) {
+        await unlink(safeThumb).catch(() => {});
+      } else {
+        console.warn(
+          `[assets/DELETE] thumbnailPath가 generated 경계를 벗어나 unlink 스킵: assetId=${asset.id}`
+        );
+      }
     }
 
     await prisma.generatedAsset.delete({
