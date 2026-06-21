@@ -1,0 +1,54 @@
+{
+  "wi": "WI-005-fix",
+  "schemaVersion": 1,
+  "commit": "e8e714c",
+  "implCommits": ["b941897", "958ee52", "e8e714c"],
+  "target": "develop (PR)",
+  "rounds": 3,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0, "rounds": "r1 FAIL(P1 grace-window) → r2 FAIL(P1×2 party-room 잔존 + leave 경로 stale 인가) → r3 PASS(issues=[])" },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.62, "scores": { "completeness": 9.5, "consistency": 9.7, "specificity": 9.8, "actionability": 9.5 }, "issueCount": 3 }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "codex r3 PASS(issues=[]) · evaluator WARNING(9.62, 최종 e8e714c 재채점). P0/P1/P2 없음, fixNow=true 없음, 기계게이트 5/5 PASS(tsc 0/lint 0(기존 LiveKit 경고 1, 무관)/vitest 88·88/next build 0/서버 esbuild 번들). 설계 codex consult 1R 수렴(옵션 B 채택 + HMAC 서명 + DB postcondition 재확인 + changeRole 권한회수 포함 권고 반영). 검증 codex 3R 수렴 — r1/r2가 잡은 grace-window 권한 잔존(P1×3)을 동기 권한 회수(detachSocketFromSpace)로 닫고 leave 경로까지 하드닝. evaluator P3×3 전부 defer(rate-limit→WI-012 인프라/replay nonce→멱등설계상 무해/소켓측 통합테스트→WI-011).",
+  "convergence": [
+    "양측 공통(최종): HMAC-SHA256({ts}.{body}) 서명 fail-closed(비-hex/길이불일치/홀수길이 선제거 후 timingSafeEqual, 시크릿 없으면 503, replay ±30s) + 서명 검증이 DB read보다 선행(무효 요청 Prisma 미도달, DB증폭 DoS 없음).",
+    "양측 공통: ban/kick 동기 권한 회수 — detachSocketFromSpace가 자기 id 제외 모든 room(공간+파티) 이탈 + socket.data(spaceId/partyId/role/restriction/memberId) 무효화. 전 핸들러가 socket.data.spaceId 가드라 grace(250ms) 동안 잔존 권한 0. 물리 disconnect만 지연(패킷 flush).",
+    "양측 공통: DB postcondition 재확인(ban=BANNED/kick=row null/mute=MUTED/unmute=NONE/role=role)으로 시크릿 유출·Next 버그가 임의 추방으로 확대 차단(409). changeRole 강등은 socket.data.role 갱신으로 admin/edit/media 즉시 차단(isAdmin/canEdit live read 확인).",
+    "양측 공통: 다중 탭 player:left/member:kicked 사용자 단위 1회(removeUserPresence), 지연 disconnect는 spaceId 무효화로 leaveSpace 재실행 안 함. leave:space 클라 인자 무시(invariant #3). serverless await+2s timeout, throw 없이 realtimeEnforced.",
+    "양측 공통: 경계 캡슐화(WI-003) 준수 — route는 @/features/space/enforce 배럴, server는 순수 contract.ts 상대 import(esbuild 번들 예외, 문서화). 배포 경로(Dockerfile.socket COPY/deploy-socket.yml/.env.example) 갱신, SOCKET_INTERNAL_SECRET은 AUTH_SECRET과 분리.",
+    "codex 3R 수렴 PASS(0 issues). evaluator P3×3은 codex 미지적이나 전부 무해·defer 정당(실악용 미입증)."
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "server/handlers/enforce.ts (POST /internal/enforce rate-limit 부재)",
+      "assessment": "public 엔드포인트에 요청 rate-limit 없음. 단 DB 접근은 유효 HMAC 뒤에만 도달(서명 검증 선행)이라 증폭 없음. 인프라 방화벽이 1차 방어. codex 미지적(PASS).",
+      "defer": true,
+      "deferRationale": "HMAC+replay+postcondition 다층 방어로 실악용 경로 없음. 인프라 레이트리밋/방화벽은 WI-012(인프라) 범위.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/features/space/enforce/internal/contract.ts (replay ±30s window, nonce 없음)",
+      "assessment": "replay 보호가 시간창(±30s)만, nonce 캐시 없음(Redis-less 설계). 단 모든 액션이 멱등 + postcondition 게이트라 창 내 재사용은 no-op. codex 미지적.",
+      "defer": true,
+      "deferRationale": "멱등 설계상 in-window replay는 동일 합법 제재 재적용(무해). nonce/durability는 멀티 인스턴스 전환(WI-012) 시점에.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "server/handlers/enforce.ts (소켓측 enforce 경로 통합테스트 부재)",
+      "assessment": "detach/grace/다중탭 동작에 대한 자동 통합테스트 없음. contract는 17 단위테스트, 소켓 경로는 코드 정독으로만 검증. codex 미지적.",
+      "defer": true,
+      "deferRationale": "계약 단위테스트로 서명/스키마/replay는 커버. 소켓 행위 통합 하니스는 WI-011-test 범위(API/socket 테스트 하니스 신규 도입).",
+      "fixNow": false
+    }
+  ]
+}
