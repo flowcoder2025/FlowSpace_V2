@@ -17,7 +17,7 @@ export default async function MySpacesPage() {
         </p>
       </header>
 
-      <SpaceListView />
+      <SpaceListView isSuperAdmin={session.user.isSuperAdmin === true} />
     </main>
   );
 }

@@ -5,6 +5,8 @@ import { CreateSpaceForm } from "@/components/spaces/create-space-form";
 export default async function NewSpacePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  // 공간 생성은 슈퍼어드민 전용 (API 가드와 동일 정책)
+  if (session.user.isSuperAdmin !== true) redirect("/my-spaces");
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12 lg:px-8 lg:py-16">
