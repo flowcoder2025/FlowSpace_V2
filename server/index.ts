@@ -11,6 +11,7 @@ import { handleParty } from "./handlers/party";
 import { handleEditor } from "./handlers/editor";
 import { handleMedia } from "./handlers/media";
 import { handleAvatar } from "./handlers/avatar";
+import { handleInternalHttp } from "./handlers/enforce";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -21,9 +22,22 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS || process.env.AUTH_URL || "http:
   .split(",")
   .map((s) => s.trim());
 
-const httpServer = createServer();
+// 내부 enforce 엔드포인트(POST /internal/enforce)를 socket.io 와 동일 httpServer 에서 처리.
+// request 핸들러는 createServer 시점에 전달해야 socket.io(engine.io)가 이를 캡처해
+// non-socket.io 요청에 위임한다. io 는 아래에서 할당되며, 핸들러는 요청 시점(listen 이후)에만
+// 호출되므로 그때 io 는 이미 바인딩돼 있다.
+let io: Server<ClientToServerEvents, ServerToClientEvents>;
 
-const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+const httpServer = createServer((req, res) => {
+  void handleInternalHttp(io, req, res).then((handled) => {
+    if (!handled && !res.writableEnded) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "Not found" }));
+    }
+  });
+});
+
+io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: {
     origin: CORS_ORIGINS,
     methods: ["GET", "POST"],
