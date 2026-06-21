@@ -5,7 +5,6 @@ interface SpaceItem {
   name: string;
   description: string | null;
   accessType: string;
-  inviteCode: string;
   template: { key: string; name: string };
   maxUsers: number;
   memberCount: number;

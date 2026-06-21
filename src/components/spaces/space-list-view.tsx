@@ -79,7 +79,7 @@ export function SpaceListView({ isSuperAdmin = false }: { isSuperAdmin?: boolean
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {spaces.map((space) => (
-            <SpaceCard key={space.id} space={space} />
+            <SpaceCard key={space.id} space={space} isSuperAdmin={isSuperAdmin} />
           ))}
         </div>
       )}
