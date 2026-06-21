@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 10,
+    "consistency": 9.5,
+    "specificity": 10,
+    "actionability": 10
+  },
+  "weightedTotal": 9.875,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "scripts/set-super-admin.mjs:42-45,57-68",
+      "description": "Defect#1 RESOLVED·검증완료. 기존 `process.argv[3] !== \"false\"`가 오타('flse'/'False'/'0')를 조용히 부여(true)로 처리하던 결함을 화이트리스트로 차단. 독립 실행 검증: flagArg가 'flse'/'False'/'0' → exitCode=1 + usage; 잉여인자(['user','true','extra']) → exitCode=1 + usage. 두 실패 분기(extraArgs/unknown-flag)는 모두 `prisma.user.findUnique` 이전에 `return`하므로 인자 검증 통과 후에만 DB 조회/update 발생(보안 OK). 계약 보존: flagArg===undefined→true(기본부여), 'true'→true, 'false'→false, `!arg||arg==='--list'`→list() 분기 최우선 유지, 미존재 사용자(before===null) 명확 실패·멱등(`before.isSuperAdmin===next`→[변경없음]) 분기 모두 무손상. 잔여 부채 없음 — 정보용 기록.",
+      "recommendation": "조치 불요. 회수 인자 파싱 화이트리스트화 수용 기준(1) 완전 충족.",
+      "defer": true,
+      "deferRationale": "결함이 아니라 해소 완료 항목의 검증 기록. 추가 작업 불필요.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/route.ts:86-91",
+      "description": "Defect#2 RESOLVED·검증완료. POST /api/spaces 403 응답에 `code: \"SUPER_ADMIN_REQUIRED\"` 병기 → app.md invariant #4 `{ error: string, code?: string }` 정합. 컨벤션 정합 확인: 코드베이스 전역의 code 값이 SCREAMING_SNAKE·원인중심(route.ts:32 `INVALID_FILTER`, server/handlers/* `SPACE_NOT_FOUND`/`BANNED`/`FORBIDDEN` 등)과 동일 양식. 403 상태코드·인가 가드(`session.user.isSuperAdmin !== true`)·early-return 위치 무변경 → 인가 로직 회귀 없음. code 노출은 인가 실패 사유 식별자일 뿐 비밀/PII 아님 → 정보 누출 아님. create-space-form은 `data.error` 사용으로 클라이언트 회귀 없음. 잔여 부채 없음 — 정보용 기록.",
+      "recommendation": "조치 불요. 403 code 일관화 수용 기준(2) 완전 충족.",
+      "defer": true,
+      "deferRationale": "결함이 아니라 해소 완료 항목의 검증 기록. 추가 작업 불필요.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "scripts/set-super-admin.mjs:42",
+      "description": "SUSPECTED(선재·범위외): `arg === '--list'`와 무인자가 동일하게 list()로 분기하므로, 이메일이 문자 그대로 '--list'인 사용자에게는 이 스크립트로 슈퍼어드민 부여가 불가능(인자 파싱 모호). WI-008 변경분이 아닌 선재 동작이며 운영상 비현실적(이메일='--list' 불가) — 범위 밖. WI-008의 두 수용 기준과 무관하고 회귀를 유발하지 않음.",
+      "recommendation": "조치 불요. 필요 시 별도 정리 WI에서 `--list`를 옵션 플래그로 분리 고려(범위 밖).",
+      "defer": true,
+      "deferRationale": "WI-008 범위 밖 선재 동작이며 비현실적 엣지(이메일='--list'). 본 WI 수용 기준 무관.",
+      "fixNow": false
+    }
+  ]
+}
