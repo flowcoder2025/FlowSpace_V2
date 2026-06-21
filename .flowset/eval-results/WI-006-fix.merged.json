@@ -1,0 +1,53 @@
+{
+  "wi": "WI-006-fix",
+  "schemaVersion": 1,
+  "commit": "5c9fa16",
+  "implCommits": ["5c9fa16"],
+  "target": "develop (PR)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0, "rounds": "r1 PASS(issues=[])" },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.5, "scores": { "completeness": 9.5, "consistency": 9.5, "specificity": 9.5, "actionability": 9.5 }, "issueCount": 3 }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "codex r1 PASS(issues=[]) · evaluator WARNING(9.5). P0/P1/P2 없음, fixNow=true 없음, 기계게이트 4/4 PASS(tsc 0/lint 0(기존 LiveKit 경고 1, 무관)/vitest 92·92/next build 0). WI-006은 클라이언트 훅(useScreenRecorder)만 변경 — 서버 esbuild 번들 무관. 설계 codex consult 1R(settle-in-onerror가 안전망 타임아웃보다 우수: saveFile 진행 중 premature resolve 위험 회피; ref 정리 일관성 보강). evaluator 뮤테이션 테스트로 실증 — onerror를 pre-fix(handleError+idle+stopTimer만)로 되돌리니 test1(영구 pending 차단)·test3(onstop=null)이 5초 타임아웃 FAIL, 수정본 복원 시 4/4 PASS → 테스트가 결함을 실제로 잡음(가짜 PASS 아님). evaluator P3×3 전부 defer.",
+  "convergence": [
+    "양측 공통: dangling Promise 해소 정당 — recorder.onerror에서 pendingStopResolveRef settle. 'error' 시 onstop 미발화면 stopRecording() Promise가 영구 pending이던 것을 차단.",
+    "양측 공통: 3경로(onerror/onstop/unmount cleanup) 상호작용 안전 — 중복 resolve(onerror가 onstop=null + ref 양방향 null 가드, resolve idempotent), 이중 audioContext close(stopRecording이 Promise 생성 전 close+null → onerror/unmount는 null 확인 후 skip), use-after-free/ref 불일치(mediaRecorderRef.current===recorder일 때만 null) 모두 없음.",
+    "양측 공통: 호출부 계약 위반 없음 — ScreenShare.handleToggleRecording는 await stopRecording() 뒤 후속 UI 없음. Promise<void> resolve 시맨틱은 기존 onstop의 result.status==='error' 경로와 일관, 오류는 error 상태/onError 콜백 전달.",
+    "양측 공통: 도메인 rules 위반 없음 — 클라이언트 훅('use client'), 모듈 경계(hooks/internal/) 정합, Prisma/서버 무관, app.md 클라이언트 불변식 무위반.",
+    "codex r1 PASS(0 issues). evaluator P3×3은 codex 미지적이나 전부 무해·defer 정당(범위 밖 선재 부채 2건 + 실결함 아님 1건)."
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/features/space/hooks/internal/useScreenRecorder.test.ts (unmount-during-stopping settle 경로 테스트 부재)",
+      "assessment": "신규 4테스트는 onerror settle/onstop=null/즉시 resolve/정상 onstop 회귀를 커버하나, WI-006이 함께 의존하게 된 unmount cleanup의 pendingStopResolveRef settle 경로(useScreenRecorder.ts:200-203, WI-002 도입)는 미커버. codex 미지적(PASS).",
+      "defer": true,
+      "deferRationale": "해당 cleanup settle 경로는 WI-002 머지 코드로 WI-006 변경분 아님. 회귀 위험 낮음(P3 테스트 부채). WI-011-test로 묶어 처리.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/features/space/hooks/internal/useScreenRecorder.ts onerror (mountedRef 가드 부재)",
+      "assessment": "onerror가 mountedRef 가드 없이 setState. 단 onerror는 동기이고 unmount cleanup이 recorder.onerror=null(line 188)로 떼어내므로 언마운트 후 동일 recorder onerror 발화 경로가 구조적으로 차단됨 → 실제 결함 아님. 비대칭은 의도적·무해. codex 미지적.",
+      "defer": true,
+      "deferRationale": "언마운트 후 onerror 발화 경로가 cleanup의 onerror=null로 차단 — stale setState 도달 불가. 코드 가독성/일관성 차원의 선택사항.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/features/space/hooks/internal/useScreenRecorder.ts:334 (stopRecording audioContext close .catch 누락)",
+      "assessment": "stopRecording의 audioContextRef.current.close()는 .catch()가 없어 onerror(신규)·unmount(기존) 경로와 비대칭. AudioContext.close() reject 시 unhandled rejection 가능. 단 WI-006 변경분 아닌 선재 코드이며, 직전 정상 생성한 컨텍스트가 close에서 reject할 가능성 사실상 없음. codex 미지적.",
+      "defer": true,
+      "deferRationale": "WI-006이 도입한 코드 아님(pre-existing). 실패 가능성 무시 수준. 범위 밖 — 별도 정리(WI-012/후속 cleanup)에서 3경로 close 정책 통일.",
+      "fixNow": false
+    }
+  ]
+}

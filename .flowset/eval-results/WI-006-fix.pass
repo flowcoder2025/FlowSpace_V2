@@ -1,0 +1,11 @@
+WI=WI-006-fix
+commit=5c9fa16
+sourceFingerprint=19ecaf43596a197b80269b612abecb71c6728186e3c10fe599ac071c165f1d5a
+codex=.flowset/eval-results/WI-006-fix.codex.json
+evaluator=.flowset/eval-results/WI-006-fix.eval.json
+merged=.flowset/eval-results/WI-006-fix.merged.json
+gates=tsc,lint,vitest,build
+codexVerdict=PASS(r1, issues=[])
+evaluatorVerdict=WARNING(9.5,P3x3-defer)
+target=develop (PR)
+createdAt=2026-06-22T00:00:00Z
