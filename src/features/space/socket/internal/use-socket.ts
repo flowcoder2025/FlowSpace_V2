@@ -9,7 +9,7 @@ import type {
   MovementData,
 } from "./types";
 import { getSocketClient, disconnectSocket } from "./socket-client";
-import { MOVE_THROTTLE_MS, DEFAULT_NICKNAME } from "@/features/space/chat/internal/chat-constants";
+import { MOVE_THROTTLE_MS, DEFAULT_NICKNAME } from "@/features/space/chat";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 

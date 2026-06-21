@@ -33,6 +33,13 @@ export {
   CHAT_FONT_SIZE_ORDER,
   FONT_SIZE_STORAGE_KEY,
   ADMIN_COMMAND_ALIASES,
+  // Cross-module integration surface (socket → chat): 통신 도메인 공유 상수.
+  // 안정 공개 API가 아니며, 후속 WI에서 통신 공유 계약 위치로 이동 예정.
+  MOVE_THROTTLE_MS,
+  RECONNECTION_ATTEMPTS,
+  RECONNECTION_DELAY,
+  RECONNECTION_DELAY_MAX,
+  RECONNECTION_TIMEOUT,
 } from "./internal/chat-constants";
 export type { ChatFontSize } from "./internal/chat-constants";
 export type {
