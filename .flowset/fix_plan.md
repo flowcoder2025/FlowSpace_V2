@@ -5,13 +5,11 @@
 > 초기 시드 = 2026-06-19 듀얼 블라인드 검증(codex CLI + Claude) 확정 결함.
 
 ## Active WI
-- (없음) — WI-005-fix **develop 머지 완료**(PR#8, merge `a3de864`, impl `e8e714c`). 다음 우선: WI-006-fix(useScreenRecorder onerror, P3) → WI-010/011/012(P3 부채).
+- **WI-006-fix** (VERIFY) — `useScreenRecorder` `recorder.onerror` 경로 pending stopRecording resolve 미종결(P3). 구현 완료, 기계게이트 4/4 PASS, 듀얼검증 진행 중. 브랜치 `fix/WI-006-fix-screen-recorder-onerror`.
 
 ## Queue
 | WI | Type | Status | Goal | Notes |
 |---|---|---|---|---|
-| WI-005-fix | fix | READY | 접속 중 소켓 ban/kick 실시간 추방 (dashboard 제재 시 현재 연결 즉시 종료/room 제거). Next HTTP↔socket.io 크로스프로세스 채널(Redis pub-sub/내부훅/액션별 DB재조회 택1) 설계 필요 | WI-001 듀얼검증서 codex 신규 P2 분리. reconnect는 WI-001 join 게이트가 이미 차단 |
-| WI-006-fix | fix | READY | `useScreenRecorder` `recorder.onerror` 경로에서 pending stopRecording resolve 미종결 → 'error' 이벤트 시 Promise 영구 pending | P3, WI-002 듀얼검증서 evaluator 신규(발산). 무해(자원 누수 없음·기능 무영향). onerror에서도 pendingStopResolveRef settle 또는 안전망 타임아웃 |
 | WI-010-perf | perf | READY | 슈퍼어드민 전역 스페이스 목록 페이지네이션(`GET /api/spaces` scope={} 시 take/cursor 또는 상한) | P3, WI-009 evaluator defer. 기존 엔드포인트도 무페이지네이션 — 회귀 아님, 스케일 부채 |
 | WI-011-test | test | READY | `GET /api/spaces` filter 분기 회귀 테스트(전역 vs 멤버십, 화이트리스트, INVALID_FILTER 400). API 라우트 테스트 하니스(auth/prisma mock) 신규 도입 필요 | P3, WI-009 evaluator defer. 현재 vitest는 chat 유틸 한정 |
 | WI-012-refactor | refactor | READY | 통신 도메인 순수 계약(socket `internal/types`·chat `internal/chat-constants`)을 공유 계약 모듈(예: `protocol/index.ts` 순수, React 무의존)로 승격 → server 10개소·`Dockerfile.socket`·`deploy-socket.yml` 경로 갱신 + chat 오배치 소켓 상수(`MOVE_THROTTLE_MS`/`RECONNECTION_*`) 물리 이동 + EventBridge 공개 계약(`game/events`) 단일 진입점 정리 | P3, WI-003 defer. server는 별도 esbuild 번들이라 배럴 import 불가(React 끌려옴) → 계약 모듈 분리가 정석. 스펙: `.claude/specs/architecture/2026-06-22-module-boundary-encapsulation.md` |

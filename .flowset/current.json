@@ -1,12 +1,12 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-006-fix",
   "lastWI": "WI-005-fix",
   "type": "fix",
-  "status": "MERGED",
+  "status": "VERIFY",
   "integrationBranch": "develop",
-  "branch": "develop",
+  "branch": "fix/WI-006-fix-screen-recorder-onerror",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": "a3de864",
-  "note": "WI-005-fix(접속 중 소켓 ban/kick/mute/unmute/changeRole 실시간 추방, P2) develop 머지 완료 — PR#8, merge a3de864(impl e8e714c). 크로스프로세스 채널 = socket httpServer 내부 POST /internal/enforce webhook(HMAC 서명+replay+postcondition 재확인). ban/kick은 detachSocketFromSpace로 동기 권한 회수(모든 room 이탈+socket.data 무효화) 후 grace disconnect. changeRole 강등 권한회수 포함. Next PATCH는 dispatchEnforcement await(2s timeout, realtimeEnforced). enforce 독립 feature 모듈, server는 contract.ts만 상대 import/COPY. 기계게이트 5/5(tsc/lint/vitest 88·88/build/서버 esbuild). 듀얼검증 codex 3R 수렴(r1/r2 FAIL P1x3 → r3 PASS 0 issues)·evaluator WARNING 9.62(P3x3 defer). .pass fingerprint aa917d91. 설계 codex consult 1R. 다음: WI-006-fix(P3) → WI-010/011/012(P3). WI-001/002/003/004/005/008/009는 develop만 — main 미반영(승격 대상)."
+  "note": "WI-006-fix(useScreenRecorder onerror dangling Promise, P3) 구현 완료 — 기계게이트 4/4(tsc 0/lint 0/vitest 92·92/build 0), 듀얼검증 진행. recorder.onerror가 handleError+idle+stopTimer만 하고 pendingStopResolveRef를 settle하지 않아 'error' 시 onstop 미발화면 stopRecording() Promise 영구 pending이던 버그. onerror를 정상 abort로 강화: onstop=null(중복 저장 차단)+audioContext close+chunks 폐기+mediaRecorderRef===recorder시 null+pendingStopResolveRef settle. resolve 시맨틱은 기존 onstop의 result.status==='error' 경로와 일관(오류는 error 상태/onError 콜백 전달, Promise<void> 계약 유지). 신규 vitest 4(88→92). 경계 변경 아님(설계 codex consult 1R 수행). 클라이언트 훅만 변경 — 서버 esbuild 무관."
 }
