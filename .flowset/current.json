@@ -1,12 +1,12 @@
 {
   "activeWI": null,
-  "lastWI": "WI-006-fix",
-  "type": "fix",
+  "lastWI": "WI-010-perf",
+  "type": "perf",
   "status": "MERGED",
   "integrationBranch": "develop",
   "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "2644b3c",
-  "note": "WI-006-fix(useScreenRecorder onerror dangling Promise, P3) develop 머지 완료 — PR#9, merge 2644b3c(impl 5c9fa16). recorder.onerror가 pendingStopResolveRef를 settle하지 않아 'error' 시 onstop 미발화면 stopRecording() Promise 영구 pending이던 버그. onerror를 정상 abort로 강화(onstop=null+audioContext close+chunks 폐기+mediaRecorderRef===recorder시 null+pendingStopResolveRef settle). resolve 시맨틱은 기존 onstop error 경로와 일관(Promise<void> 유지). 기계게이트 4/4(tsc 0/lint 0/vitest 92·92/build 0) + 듀얼검증(codex r1 PASS 0 issues·evaluator WARNING 9.5, P3×3 defer) + .pass(fingerprint 19ecaf43). 설계 codex consult 1R. evaluator 뮤테이션 테스트 실증. 클라이언트 훅만 변경(서버 esbuild 무관). 다음 큐(전부 P3): WI-010-perf(전역 목록 페이지네이션) / WI-011-test(라우트 테스트 하니스 + useScreenRecorder unmount settle 테스트) / WI-012-refactor(protocol 모듈 분리 + stopRecording close .catch 통일). 승격 미실행 부채: WI-001/002/003/004/005/006/008/009는 develop만, main(라이브) 미반영."
+  "lastVerifiedCommit": "47022a6",
+  "note": "WI-010-perf(슈퍼어드민 전역 스페이스 목록 cursor 페이지네이션, P3) develop 머지 완료 — PR#10, merge 47022a6(impl ed73930). GET /api/spaces가 페이지네이션 없이 전체 ACTIVE 스페이스를 findMany로 로드하던 스케일 부채(WI-009 슈퍼어드민 전역 scope={}). cursor 페이지네이션(parsePageLimit 기본50·최대100 + cursor, take:limit+1 → buildCursorPage → {spaces,nextCursor,hasMore}, 기존 spaces 유지=하위호환) + orderBy [updatedAt desc, id desc](id 타이브레이커) + 모든 스코프 일관. 클라: space-store loadMore+_reqId 토큰(stale 응답 무시) + space-list-view '더 보기'(전역 가시성 회귀 방지). 신규 순수 헬퍼 src/lib/pagination.ts(+테스트). vitest 92→108. 기계게이트 4/4(tsc 0/lint 0/vitest 108·108/build 0) + 듀얼검증 codex 3R 수렴(r1 FAIL P2/fixNow isLoadingMore 고착 → 수정 529108e / r2 WARNING P3 역방향 누수 → 선제 해소 ed73930 / r3 WARNING P3×1 defer) · evaluator WARNING 9.7(최종 HEAD 재검증, P3×4 defer, 변이검증 5종 검출, scope>cursor 보안 sound) + .pass(fingerprint 2ef1dd0b). 설계 codex consult 1R(경쟁상태 위험 E 지목). 두 검증자 r1 동일 실결함 독립 발견. 다음 큐(전부 P3): WI-011-test(라우트 테스트 하니스 + filter 분기 회귀 + useScreenRecorder unmount settle) / WI-012-refactor(protocol 모듈 분리 + cursor 검증·messages 라우트 DRY[WI-010 흡수] + stopRecording close .catch 통일) / WI-013-perf(GET /api/spaces 핫 쿼리용 Space 복합 인덱스 status+updatedAt desc+id desc 마이그레이션[WI-010 흡수, DB 마이그레이션 승인+EXPLAIN 검증 필요]). 승격 미실행 부채: WI-001/002/003/004/005/006/008/009/010은 develop만, main(라이브) 미반영."
 }
