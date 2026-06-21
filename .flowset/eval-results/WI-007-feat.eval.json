@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 10,
+    "consistency": 10,
+    "specificity": 10,
+    "actionability": 9
+  },
+  "weightedTotal": 9.85,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "scripts/set-super-admin.mjs:35",
+      "description": "회수(revoke) 입력 파싱이 `const next = process.argv[3] !== \"false\"` 라서 정확히 문자열 'false'만 회수로 인정한다. 오타(예: `node scripts/set-super-admin.mjs user@x.com flse` 또는 `False`/`0`)를 입력하면 조용히 부여(true)로 처리된다. 멱등성·미존재 사용자 명확실패·--list 등 수용기준 #4의 핵심 동작은 모두 충족하며(검증: before 없음→exitCode 1·update 미실행, before.isSuperAdmin===next→'변경없음', --list/무인자→목록), 본 항목은 권한 회수 운영 시의 방어적 UX 부채일 뿐 기능 결함은 아니다.",
+      "recommendation": "세 번째 인자를 명시적으로 검증(예: 'true'|'false'|'grant'|'revoke'만 허용, 그 외 입력 시 usage 출력 후 exitCode=1)하여 오타 시 의도치 않은 부여를 차단.",
+      "defer": true,
+      "deferRationale": "부트스트랩 전용 운영 스크립트(신뢰된 운영자만 실행)이며 잘못 부여돼도 동일 스크립트로 즉시 회수 가능. 수용기준 #4의 명시 요건(멱등·미존재 명확실패·--list)은 모두 충족. P3 정리 부채로 KI 등록 후 후속 처리 적합.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/route.ts:75",
+      "description": "403 에러 메시지가 영어('Only superAdmin can create spaces')다. create-space-form.tsx:49가 `data.error`를 그대로 사용자에게 노출하므로, UI 차단을 우회해 직접 POST하는 비-슈퍼어드민(또는 race로 폼에 도달한 사용자)에게 영문 메시지가 표시될 수 있다. 보안/인가는 정상 작동(403)하므로 기능 결함 아님 — 코드베이스가 한/영 혼용이라 일관성 측면의 미세 부채.",
+      "recommendation": "프로젝트 에러 메시지 컨벤션에 맞춰 한글화하거나 `code` 필드(app.md invariant #4: `{ error, code? }`)를 병기해 클라이언트가 메시지 대신 코드로 분기하도록 한다.",
+      "defer": true,
+      "deferRationale": "인가 자체는 정상(403). 메시지 문구는 비치명 표시 부채이며 정상 흐름에서는 UI 게이팅(navbar/list-view/페이지 redirect 전수)으로 비-슈퍼어드민이 폼에 도달하지 못한다. P3 정리 부채.",
+      "fixNow": false
+    }
+  ]
+}
