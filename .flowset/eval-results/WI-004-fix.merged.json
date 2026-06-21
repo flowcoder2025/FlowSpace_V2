@@ -1,0 +1,50 @@
+{
+  "wi": "WI-004-fix",
+  "schemaVersion": 1,
+  "commit": "bc334a7",
+  "target": "develop (PR)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0, "rounds": "r1 PASS(issues=[])" },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.62, "scores": { "completeness": 9.7, "consistency": 9.7, "specificity": 9.4, "actionability": 9.6 }, "issueCount": 3 }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "codex PASS(issues=[]) · evaluator WARNING(9.62). P0/P1/P2 없음, fixNow=true 없음, 기계 게이트 4/4 PASS(tsc 0/lint 0(기존 경고 1, 무관)/vitest 71·71/build 0). 설계 codex consult 1R 수렴(컨테인먼트 루트 public/assets/generated로 타이트화 + null byte/백슬래시 거부 보강 — codex가 내 public/ 초안의 미흡점 지적). evaluator P3×3 전부 defer(정보성/방어적중복/전향적주의). evaluator는 16벡터 PoC 독립 실행 — 전부 BLOCK·정상삭제 회귀 0 실증.",
+  "convergence": [
+    "양측 공통: resolveGeneratedAssetPath가 ../·절대경로·백슬래시·null byte·드라이브경계 traversal 전부 차단, 정상 /assets/generated/* 삭제 회귀 0, DB row 삭제는 경계 밖에도 진행(오염 row 정리). 기계 게이트 4/4 PASS.",
+    "양측 공통: 경계 캡슐화(WI-003) 준수 — internal/safe-path.ts + 배럴 export, 라우트는 @/features/assets 배럴 import(internal 직접 import 아님). 서버 API 라우트라 클라이언트 sharp/React-pull 무관.",
+    "codex 0 issues PASS. evaluator P3×3은 발산이나 전부 무해(실제 우회/회귀 아님) — 오케스트레이터 코드 재확인 일치."
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/features/assets/internal/safe-path.ts:34 (URL-encoded %2e%2e)",
+      "assessment": "퍼센트 인코딩 traversal(%2e%2e)은 ALLOW로 통과하나 FS가 미디코드 → generated 루트 내부 리터럴 디렉토리로 해석. 실제 traversal 아님, 존재X 경로라 unlink는 .catch no-op. 수용기준(../·절대·백슬래시·null byte) 범위 밖. codex 미지적(PASS). 오케스트레이터 재확인 일치(무해).",
+      "defer": true,
+      "deferRationale": "실제 path traversal 아님(FS 미디코드, generated 내부 리터럴). 누수·삭제 회귀 없음. 방어 심화는 후속 화이트리스트 문자셋으로 선택 가능.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/features/assets/internal/safe-path.ts:44-52 (path.relative 이중검사)",
+      "assessment": "prefix 게이트 통과 후 단일 드라이브 path.relative 이중검사는 잉여. 결함 아니라 의도된 심층방어(정규화 가정 변경 시 안전망). codex 미지적.",
+      "defer": true,
+      "deferRationale": "동작·보안 무영향 방어적 중복. 유지 권장, 수정 불요.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/app/api/assets/[id]/route.ts:72-91 (generated 밖 정상자산 누수 위험)",
+      "assessment": "generated 경계 밖 정상 GeneratedAsset 경로가 존재하면 unlink 스킵 → 디스크 누수 가능. 그러나 전 write 경로 grep 실증(processor.ts ASSET_STORAGE_PATHS/THUMBNAIL_PATH 전부 assets/generated/*, register-characters.mjs /assets/generated/*) 정상자산 전부 generated 하위 → 현 시점 누수 0. 향후 다른 저장경로 도입 시에만 부채. codex 미지적.",
+      "defer": true,
+      "deferRationale": "현 코드베이스 전 자산 write가 /assets/generated/ 하위로 귀결됨을 실증 — 회귀·누수 없음. 전향적 주의(향후 write-side 중앙화 WI에서 흡수).",
+      "fixNow": false
+    }
+  ]
+}
