@@ -22,4 +22,4 @@ paths:
 8. **에러 세분화**: chat:error / whisper:error / party:error / admin:error (code + message)
 9. **인증 토큰**: `/api/socket/token` → jose JWT 발급 → 서버 미들웨어 검증
 
-이벤트 타입은 `src/features/space/socket/internal/types.ts` 참조
+이벤트 타입·transport 상수는 `src/features/space/protocol` 모듈 참조 (SSOT: `protocol/internal/socket-events.ts`, `protocol/internal/socket-constants.ts`)

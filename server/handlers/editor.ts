@@ -2,7 +2,7 @@ import type { Server, Socket } from "socket.io";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
-} from "../../src/features/space/socket/internal/types";
+} from "../../src/features/space/protocol/internal/socket-events";
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;

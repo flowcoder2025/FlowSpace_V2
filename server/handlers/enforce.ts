@@ -15,7 +15,7 @@ import type { Server, Socket } from "socket.io";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
-} from "../../src/features/space/socket/internal/types";
+} from "../../src/features/space/protocol/internal/socket-events";
 import {
   ENFORCE_PATH,
   ENFORCE_SIGNATURE_HEADER,

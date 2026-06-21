@@ -3,7 +3,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
   PlayerData,
-} from "../../src/features/space/socket/internal/types";
+} from "../../src/features/space/protocol/internal/socket-events";
 import { getPrisma } from "../lib/prisma";
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;

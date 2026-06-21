@@ -2,7 +2,7 @@ import type { Server, Socket } from "socket.io";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
-} from "../../src/features/space/socket/internal/types";
+} from "../../src/features/space/protocol/internal/socket-events";
 import { spacePlayersMap } from "./room";
 import { getPrisma } from "../lib/prisma";
 import {
