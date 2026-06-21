@@ -5,7 +5,7 @@
 > 초기 시드 = 2026-06-19 듀얼 블라인드 검증(codex CLI + Claude) 확정 결함.
 
 ## Active WI
-- (없음) — WI-005-fix **듀얼검증 통과, develop PR 대기**(commit `e8e714c`). 다음 우선: WI-006-fix(useScreenRecorder onerror, P3) → WI-010/011/012(P3 부채).
+- (없음) — WI-005-fix **develop 머지 완료**(PR#8, merge `a3de864`, impl `e8e714c`). 다음 우선: WI-006-fix(useScreenRecorder onerror, P3) → WI-010/011/012(P3 부채).
 
 ## Queue
 | WI | Type | Status | Goal | Notes |
