@@ -7,9 +7,10 @@ import type {
   ServerToClientEvents,
   PlayerData,
   MovementData,
-} from "./types";
+} from "@/features/space/protocol";
 import { getSocketClient, disconnectSocket } from "./socket-client";
-import { MOVE_THROTTLE_MS, DEFAULT_NICKNAME } from "@/features/space/chat";
+import { MOVE_THROTTLE_MS } from "@/features/space/protocol";
+import { DEFAULT_NICKNAME } from "@/features/space/chat";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 

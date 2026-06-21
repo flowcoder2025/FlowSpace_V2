@@ -1,11 +1,11 @@
 import { io, Socket } from "socket.io-client";
-import type { ClientToServerEvents, ServerToClientEvents } from "./types";
+import type { ClientToServerEvents, ServerToClientEvents } from "@/features/space/protocol";
 import {
   RECONNECTION_ATTEMPTS,
   RECONNECTION_DELAY,
   RECONNECTION_DELAY_MAX,
   RECONNECTION_TIMEOUT,
-} from "@/features/space/chat";
+} from "@/features/space/protocol";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 

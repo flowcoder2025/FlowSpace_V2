@@ -1,4 +1,8 @@
 // Socket.io 이벤트 타입 (event-protocol.md 준수)
+//
+// 통신 도메인 순수 계약 (protocol 모듈 SSOT).
+// 클라이언트(socket 모듈)·서버(별도 esbuild 번들)가 공유하는 이벤트/페이로드 타입.
+// React/Node/Phaser 무의존 — 순수 타입만. (WI-012-1: socket/internal/types.ts에서 승격)
 
 /** 플레이어 정보 */
 export interface PlayerData {

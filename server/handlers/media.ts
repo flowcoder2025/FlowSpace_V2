@@ -7,7 +7,7 @@ import type { Server, Socket } from "socket.io";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
-} from "../../src/features/space/socket/internal/types";
+} from "../../src/features/space/protocol/internal/socket-events";
 import { getPrisma } from "../lib/prisma";
 import {
   recordingStates,

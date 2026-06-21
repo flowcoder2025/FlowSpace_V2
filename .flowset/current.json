@@ -1,12 +1,12 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-012-1-refactor",
   "lastWI": "WI-011-test",
-  "type": "test",
-  "status": "MERGED",
+  "type": "refactor",
+  "status": "VERIFY",
   "integrationBranch": "develop",
-  "branch": "develop",
+  "branch": "refactor/WI-012-1-refactor-protocol-contract",
   "startedAt": "2026-06-22",
-  "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
+  "requiredGates": ["tsc", "lint", "vitest", "build", "esbuild-server", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": "2b91419",
-  "note": "WI-011-test(P3 테스트 부채) develop 머지 완료 — PR#11, merge 2b91419(impl a066359/r2 baa2f0c). 테스트 전용(소스 .ts 무수정 — 양 검증자 git diff HEAD -- src/ 빈결과 확인). (1) 신규 재사용 API 라우트 테스트 하니스 src/__tests__/helpers/api-route.ts(순수 빌더 buildGetRequest/buildJsonRequest/makeSession/makeSpaceRow/readJson — vi.mock 프리앰블은 파일로컬 호이스팅이라 중앙화 불가). (2) src/app/api/spaces/route.test.ts: GET filter→scope 분기 17케이스(owned/joined/null·all × 일반/슈퍼어드민, INVALID_FILTER 400, status:ACTIVE 상시 부착, 페이지네이션 take=limit+1/cursor:{id}/skip:1, cursor에도 scope 보존, 응답 allowlist exact-key-set[inviteCode/accessSecret/ownerId/templateId/updatedAt 미노출], POST superAdmin 가드 1건). (3) useScreenRecorder.test.ts: unmount 경로 3건(stopping 중 언마운트 settle[WI-006 P3 흡수, 변이검증됨] / 언마운트 후 stopRecording 즉시 resolve / saveFile await 중 언마운트 mountedRef 가드[고유 delay setTimeout 식별로 변이검증 가능하게 강화]). vitest 108→128(+20). 기계게이트 4/4(tsc 0/lint 0/vitest 128·128/build 0). 설계 codex consult 1R + 듀얼검증 2R(codex r1 WARNING P3x3→r2 PASS 0 issues · evaluator r1 9.3→r2 9.625, 수렴 P3 3건[가드 false-pass·superAdmin scope·allowlist] 선제 강화 후 양측 변이검증 실증) + .pass(fingerprint cfdd572c). 잔여 P3x3 전부 defer=WI-012(POST 커버리지·하니스 미사용경로·GET500 폴백). 큐 잔여: WI-012-refactor / WI-013-perf(전부 P3). 승격 미실행 부채: WI-001~010은 develop만, main(라이브) 미반영."
+  "note": "WI-012-1-refactor(WI-012 분할 1/2, codex consult D6) VERIFY: S1 protocol 모듈 분리 + S2 소켓상수 물리이동. 신규 src/features/space/protocol(socket-events 타입 + socket-constants RECONNECTION_*/MOVE_THROTTLE_MS + 순수 배럴). socket/internal/types.ts 삭제→socket/index.ts facade. server 9개소·Dockerfile.socket·deploy-socket.yml·문서 갱신. enforce 잔류·DEFAULT_NICKNAME chat 잔류. 추가로 선재 P1 해소: server/middleware/auth.ts가 쓰는 src/lib/auth-secret.ts(WI-001 도입)가 Dockerfile COPY 누락이던 것 추가(metafile로 src 런타임입력 3개 전수 COPY 실증). 기계게이트 5/5+esbuild metafile. 듀얼검증: codex r1 P3(doc)→수정, r2 P1(auth-secret COPY)+P3(원장)→수정, evaluator PASS 10.0. S3~S6은 후속 WI-012-2. 직전 WI-011-test develop 머지 완료 — PR#11, merge 2b91419(impl a066359/r2 baa2f0c). 테스트 전용(소스 .ts 무수정 — 양 검증자 git diff HEAD -- src/ 빈결과 확인). (1) 신규 재사용 API 라우트 테스트 하니스 src/__tests__/helpers/api-route.ts(순수 빌더 buildGetRequest/buildJsonRequest/makeSession/makeSpaceRow/readJson — vi.mock 프리앰블은 파일로컬 호이스팅이라 중앙화 불가). (2) src/app/api/spaces/route.test.ts: GET filter→scope 분기 17케이스(owned/joined/null·all × 일반/슈퍼어드민, INVALID_FILTER 400, status:ACTIVE 상시 부착, 페이지네이션 take=limit+1/cursor:{id}/skip:1, cursor에도 scope 보존, 응답 allowlist exact-key-set[inviteCode/accessSecret/ownerId/templateId/updatedAt 미노출], POST superAdmin 가드 1건). (3) useScreenRecorder.test.ts: unmount 경로 3건(stopping 중 언마운트 settle[WI-006 P3 흡수, 변이검증됨] / 언마운트 후 stopRecording 즉시 resolve / saveFile await 중 언마운트 mountedRef 가드[고유 delay setTimeout 식별로 변이검증 가능하게 강화]). vitest 108→128(+20). 기계게이트 4/4(tsc 0/lint 0/vitest 128·128/build 0). 설계 codex consult 1R + 듀얼검증 2R(codex r1 WARNING P3x3→r2 PASS 0 issues · evaluator r1 9.3→r2 9.625, 수렴 P3 3건[가드 false-pass·superAdmin scope·allowlist] 선제 강화 후 양측 변이검증 실증) + .pass(fingerprint cfdd572c). 잔여 P3x3 전부 defer=WI-012(POST 커버리지·하니스 미사용경로·GET500 폴백). 큐 잔여: WI-012-refactor / WI-013-perf(전부 P3). 승격 미실행 부채: WI-001~010은 develop만, main(라이브) 미반영."
 }
