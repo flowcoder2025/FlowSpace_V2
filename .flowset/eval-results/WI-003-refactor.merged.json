@@ -1,0 +1,60 @@
+{
+  "wi": "WI-003-refactor",
+  "schemaVersion": 1,
+  "commit": "PENDING-final",
+  "target": "develop (PR)",
+  "rounds": 4,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0, "rounds": "r1 WARNING(P2 eslint alias만)→r2 WARNING(P3 루트미포착+오탐)→r3 WARNING(P2 events서브패스+P3 상대경로)→r4 PASS(issues=[])" },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.5, "scores": { "completeness": 9.5, "consistency": 9.0, "specificity": 10, "actionability": 9.5 }, "issueCount": 4 }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "codex r4 PASS(issues=[]) · evaluator WARNING(9.5). P0/P1/P2 없음, fixNow=true 없음, 기계 게이트 5/5 PASS(tsc/lint/vitest 53·53/build/서버 esbuild 번들). 설계 codex consult 1R(A 배럴 routing·B 서버 예외문서화·C scripts 제외) + 검증 codex 4R 수렴. codex의 fixable 지적(P2 eslint alias-only→루트포착, P3 상대경로 미차단)은 라운드 내 해소: ESLint alias 정밀 차단 + module-boundaries vitest 테스트로 상대경로까지 이중 강제. evaluator P3×4 전부 defer(범위밖/후속WI/정리부채).",
+  "convergence": [
+    "양측 공통: in-app(src) cross-module internal/* import 0건 달성, editor↔game 순환 없음(MainScene lazy import), 배럴 추가 export 심볼/경로 정확, 게이트 전부 PASS.",
+    "양측 공통: server/scripts 잔존 internal import는 수용기준 #3 범위 밖(defer).",
+    "codex 지적→해소: ESLint 가드 정밀화(alias 루트+하위) + boundary vitest 테스트(상대경로 포함 정밀 차단)."
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/features/space/chat/index.ts (MOVE_THROTTLE_MS/RECONNECTION_* 재노출)",
+      "assessment": "정리부채. cross-module internal import 규칙은 위반 안 함(배럴 경유). 통신 상수의 도메인 소유만 chat에 잔류 — 후속 통신 계약 모듈로 이전 예정(주석 명시). codex는 미지적(PASS).",
+      "defer": true,
+      "deferRationale": "수용기준 #1 충족. 값 동일·런타임 무영향. 후속 boundary/communication WI로 분리.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator", "codex(r3 P2)"],
+      "divergent": false,
+      "location": "@/features/space/game/events 서브패스 직접 import (17개소) + editor↔game 통합표면 잠정성",
+      "assessment": "internal/* 위반 아님(events/는 EventBridge 공개 계약 서브모듈, 다중 모듈 17개소 사용, game 배럴 일부 재노출). 배럴 단일화는 별도 아키텍처 결정. codex r3 P2(fixNow)였으나 의도 범위 고지 후 r4 PASS — 후속 boundary WI로 합의.",
+      "defer": true,
+      "deferRationale": "WI-003 범위(internal/* 정리) 밖. 후속 boundary WI에서 EventBridge 공개 계약 단일 진입점 정리.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator", "codex(r3 P3)"],
+      "divergent": false,
+      "location": "eslint.config.mjs no-restricted-imports (상대경로 cross-module internal 미차단)",
+      "assessment": "ESLint glob은 상대경로 cross-module를 동일모듈 상향과 정밀 구분 불가. → src/__tests__/module-boundaries.test.ts(vitest 게이트)가 경로 해석으로 상대경로까지 정밀 차단(이중 방어). 음성검증 실증.",
+      "defer": true,
+      "deferRationale": "boundary vitest 테스트로 실질 강제(상대경로 위반 시 게이트 실패). lint 단일도구 일원화는 후속 안정성 개선.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "server/** (10개소) + scripts/** (5개소) 잔존 internal 직접 import",
+      "assessment": "별도 esbuild 번들(server) / dev툴(scripts)의 순수 계약·타입 import. eslint globalIgnores + boundary 테스트 src/ 한정으로 의도적 제외.",
+      "defer": true,
+      "deferRationale": "수용기준 #3 명시 범위 밖. 후속 WI(protocol/contract 모듈 분리)에서 server 계약 정리.",
+      "fixNow": false
+    }
+  ]
+}
