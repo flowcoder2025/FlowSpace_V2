@@ -109,6 +109,25 @@ describe("loadMore", () => {
     await useSpaceStore.getState().loadMore();
     expect(calls).toHaveLength(0);
   });
+
+  it("전체 리로드(isLoading) 중에는 loadMore 무시 — 리로드 무효화/isLoading 고착 방지", async () => {
+    // fetchSpaces 먼저 시작 → in-flight (isLoading=true)
+    const pFetch = useSpaceStore.getState().fetchSpaces();
+    expect(calls).toHaveLength(1);
+    useSpaceStore.setState({ hasMore: true, nextCursor: "stale" }); // 이전 페이지 잔여 상태 가정
+
+    // 리로드 중 loadMore 호출 → 가드로 no-op (새 fetch 없음)
+    await useSpaceStore.getState().loadMore();
+    expect(calls).toHaveLength(1); // loadMore가 추가 요청 안 함
+
+    // 리로드 정상 완료
+    calls[0].resolve({ spaces: [{ id: "x" }], nextCursor: null, hasMore: false });
+    await pFetch;
+
+    const s = useSpaceStore.getState();
+    expect(s.isLoading).toBe(false); // 고착 없음
+    expect(s.spaces.map((y) => y.id)).toEqual(["x"]);
+  });
 });
 
 describe("경쟁 상태(race) — 필터 변경 중 도착한 stale loadMore 응답 무시", () => {
