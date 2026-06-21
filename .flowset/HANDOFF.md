@@ -1,12 +1,15 @@
 # HANDOFF
 
 ## Active WI
-(없음) — WI-009-feat **develop 머지 완료**(PR#4, merge `08fc2b9`). 다음 세션 우선은 **WI-008-fix(WI-007 P3×2)** → **WI-003-refactor(경계 위반)**.
+(없음) — WI-008-fix **듀얼검증 PASS·`.pass` 생성 완료**(commit `e19d8be`, feature/WI-008-fix-superadmin-p3-cleanup). **develop PR 머지만 남음**. 다음 세션 우선은 **WI-003-refactor(경계 위반)** → WI-004-fix(assets DELETE 경로격리).
 
-## ⚠️ 다음 세션 우선 — WI-008-fix (WI-007 듀얼검증 P3×2 해소)
-- READY. (1) `scripts/set-super-admin.mjs` 회수 인자 화이트리스트화 — `argv[3] !== "false"` 파싱이 오타('flse'/'0' 등)를 조용히 grant 처리. 미인식 입력 시 에러로. (2) `POST /api/spaces` 403 응답에 `code` 필드 병기(app.md invariant #4 정합). 둘 다 P3 무해, WI-007 evaluator(9.85) defer.
-- 그다음 WI-003-refactor(`internal/*` 직접 import 위반: editor↔game, server→socket/chat).
+## ⚠️ 다음 세션 우선 — WI-003-refactor (경계 위반 정리)
+- READY. 타 모듈 `internal/*` 직접 import 위반 정리: editor↔game, server→socket/chat. 영향 분석 절차(grep 확장자 필터 없이 + 동의어 2차 검색) 필수. 모듈 구조: `module/index.ts`(Public) + `module/internal/`(Private), index.ts만 외부 노출.
+- 그다음: WI-004-fix(`api/assets/[id]` DELETE 경로격리 `../` 차단, P2) → WI-005-fix(소켓 ban/kick 실시간 크로스프로세스, P2) → WI-006/010/011(P3 부채).
 - **진행 방식(사용자 확정 2026-06-21)**: 모든 WI는 develop 정상 플로우 — `feature/WI-NNN` 분기 → 기계게이트(tsc/lint/vitest/build) → 듀얼검증(codex CLI + evaluator-agent) → `.pass` → **develop PR 머지**(프로세스 07상 사용자 승인 불요). 라이브 반영이 필요하면 그때 develop→main **승격**(process 07; 승인 필요 + main 푸시 작성자 = 인가 계정 `flowcoder25@gmail.com`).
+
+## Done 추가 (이번 세션, 2026-06-21)
+- **WI-008-fix**: WI-007 듀얼검증 defer P3×2 해소. (1) `set-super-admin.mjs` 회수 인자 화이트리스트화(`flagArg` 'true'/'false'만 인정, 오타·잉여인자 usage+exit1, `--list`/무인자 분기 최우선 유지, 기본 부여 계약 보존). (2) `POST /api/spaces` 403에 `code:"SUPER_ADMIN_REQUIRED"` 병기(invariant #4). 기계게이트 4/4 PASS + 듀얼검증(codex PASS·evaluator 9.875, P3×3 전부 defer) + `.pass`(fingerprint 6a288939). 설계 codex consult 1R. commit `e19d8be`. **develop PR 머지 대기**.
 
 ## main↔develop 정합 + 배포 상태 (2026-06-21)
 - develop = WI-001 + WI-002 + WI-007 + **WI-009**(PR#4 `08fc2b9`) + 원장. develop ⊇ main.
