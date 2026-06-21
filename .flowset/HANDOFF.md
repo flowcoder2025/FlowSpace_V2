@@ -8,7 +8,7 @@
 - 현재 한계(코드 확인): `GET /api/spaces`가 "내가 멤버인 스페이스"만 반환(`members: { some: { userId } }`) → 슈퍼어드민도 멤버 아닌 스페이스는 목록에 없음. `src/components/spaces/space-card.tsx`의 `isAdmin = myRole==="OWNER"|"STAFF"` → 슈퍼어드민 관리버튼 미표시.
 - **백엔드 인가는 이미 통과**: `requireSpaceAdmin()`이 슈퍼어드민을 항상 통과 → `/dashboard/spaces/<id>` 직접 URL 접근은 됨. UI 진입점/목록만 없음.
 - 구현 방향: (1) `GET /api/spaces` — `session.user.isSuperAdmin`이면 전체 ACTIVE 스페이스 반환(+ 응답에 슈퍼어드민 표식), (2) `space-card` — 슈퍼어드민이면 myRole 무관 '관리' 노출. (3) my-spaces 페이지는 이미 `isSuperAdmin` prop 보유.
-- **라이브 반영 주의**: main 타깃이면 배포 작성자 = 인가 계정(`flowcoder25@gmail.com`) 유지 필요(아래 배포 함정).
+- **진행 방식(사용자 확정 2026-06-21)**: WI-007의 main-직접 머지는 일회성 예외였음. **이후 작업(WI-009 포함)은 develop 정상 플로우** — `feature/WI-NNN` 분기 → 기계게이트 → 듀얼검증 → `.pass` → **develop PR 머지**. 라이브 반영이 필요해지면 그때 develop→main **승격**(process 07; 승격 시 main 푸시 작성자 = 인가 계정 `flowcoder25@gmail.com` 주의).
 
 ## main↔develop 정합 + 배포 상태 (2026-06-21)
 - **WI-007이 main + develop 양쪽 반영** + **라이브 프로덕션 배포 완료**.
