@@ -126,8 +126,8 @@ describe("경쟁 상태(race) — 필터 변경 중 도착한 stale loadMore 응
     useSpaceStore.getState().setFilter("owned");
     expect(calls[2].url).toBe("/api/spaces?filter=owned");
 
-    // 4) owned 페이지가 먼저 도착 → 적용됨
-    calls[2].resolve({ spaces: [{ id: "owned1" }], nextCursor: null, hasMore: false });
+    // 4) owned 페이지가 먼저 도착 → 적용됨 (hasMore=true: "더 보기" 버튼 노출 상황)
+    calls[2].resolve({ spaces: [{ id: "owned1" }], nextCursor: "owned1", hasMore: true });
     await flush();
 
     // 5) 뒤늦게 stale loadMore(all) 응답 도착 → 무시되어야 함
@@ -138,7 +138,10 @@ describe("경쟁 상태(race) — 필터 변경 중 도착한 stale loadMore 응
     const s = useSpaceStore.getState();
     expect(s.filter).toBe("owned");
     expect(s.spaces.map((x) => x.id)).toEqual(["owned1"]); // 'b' append 안 됨
-    expect(s.nextCursor).toBeNull();
-    expect(s.hasMore).toBe(false);
+    expect(s.nextCursor).toBe("owned1");
+    expect(s.hasMore).toBe(true);
+    // 핵심 회귀(codex P2/fixNow): 무효화된 loadMore가 isLoadingMore를 고착시키지 않아야
+    // 새 필터의 "더 보기" 버튼이 다시 동작한다.
+    expect(s.isLoadingMore).toBe(false);
   });
 });

@@ -67,7 +67,10 @@ export const useSpaceStore = create<SpaceStore>((set, get) => ({
 
   fetchSpaces: async () => {
     const reqId = get()._reqId + 1;
-    set({ isLoading: true, _reqId: reqId });
+    // 리로드/필터 변경은 진행 중 loadMore를 대체한다 → isLoadingMore도 해제.
+    // (무효화된 stale loadMore의 finally는 reqId 불일치로 리셋을 건너뛰므로,
+    //  여기서 선제 해제하지 않으면 "더 보기" 버튼이 영구 비활성으로 고착됨)
+    set({ isLoading: true, isLoadingMore: false, _reqId: reqId });
     try {
       const res = await fetch(`/api/spaces${buildQuery(get().filter)}`);
       if (!res.ok) return;
