@@ -92,18 +92,30 @@ export function applyEnforcement(io: IO, req: EnforceRequest): number {
         ? "관리자에 의해 이 공간에서 차단되었습니다."
         : "관리자에 의해 이 공간에서 추방되었습니다.";
 
-    // 주변 플레이어에게 1회 알림(사용자 단위). player:left 는 각 소켓 disconnect 시 발생.
-    io.to(req.spaceId).emit("member:kicked", {
-      memberId: req.userId,
-      nickname,
-      kickedBy: actor,
-    });
-
+    // 1) 각 타겟 소켓: 사유 통지 후 **동기 권한 회수**.
+    //    모든 이벤트 핸들러는 socket.data.spaceId 로 인가하므로(chat/party/movement/
+    //    editor/media/avatar 전부 `if (!spaceId) return`), 즉시 spaceId 를 비우고 room 을
+    //    떠나면 grace 동안의 권한 잔존(악의적 chat/admin/editor/media 전송)이 닫힌다.
+    //    재-join 은 WI-001 join 게이트(DB 멤버십·BANNED 재검증)가 차단. role/restriction 도
+    //    방어적으로 강등. 물리 disconnect 만 grace 후로 미뤄 space:error 패킷 flush 를 보장.
     for (const s of targets) {
       s.emit("space:error", { code, message });
-      // grace 후 강제 종료 — disconnect 핸들러가 leaveSpace(presence 정리)를 수행
+      s.leave(req.spaceId);
+      s.data.spaceId = undefined;
+      s.data.role = "PARTICIPANT";
+      s.data.restriction = "BANNED";
       setTimeout(() => s.disconnect(true), DISCONNECT_GRACE_MS);
     }
+
+    // 2) presence 정리 + 주변 알림은 **사용자 단위 1회**(다중 탭 중복 player:left 방지).
+    //    타겟은 이미 room 을 떠났으므로 자기 알림은 받지 않고, spaceId 를 비웠으므로
+    //    지연된 disconnect 핸들러의 leaveSpace 도 재실행되지 않는다.
+    if (players) {
+      players.delete(req.userId);
+      if (players.size === 0) spacePlayersMap.delete(req.spaceId);
+    }
+    io.to(req.spaceId).emit("member:kicked", { memberId: req.userId, nickname, kickedBy: actor });
+    io.to(req.spaceId).emit("player:left", { userId: req.userId });
   } else if (req.action === "mute" || req.action === "unmute") {
     const restriction = req.action === "mute" ? "MUTED" : "NONE";
     for (const s of targets) s.data.restriction = restriction;
@@ -155,15 +167,17 @@ export async function handleInternalHttp(
     return true;
   }
 
-  // body 수집 (size limit 초과 시 즉시 중단)
+  // body 수집 (byte 단위 size limit 초과 시 즉시 중단 — 멀티바이트 UTF-8 정확 측정)
   let raw = "";
+  let receivedBytes = 0;
   let tooLarge = false;
   for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > ENFORCE_MAX_BODY_BYTES) {
+    receivedBytes += (chunk as Buffer).length; // chunk 은 Buffer → .length 가 byte 수
+    if (receivedBytes > ENFORCE_MAX_BODY_BYTES) {
       tooLarge = true;
       break;
     }
+    raw += chunk;
   }
   if (tooLarge) {
     sendJson(res, 413, { error: "Body too large" });
