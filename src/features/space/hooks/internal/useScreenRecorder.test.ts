@@ -262,7 +262,14 @@ describe("useScreenRecorder — unmount 경로 (WI-006/WI-011)", () => {
     expect(settled).toBe(true);
   });
 
-  it("saveFile(showSaveFilePicker) await 중 언마운트되어도 onstop이 hang/throw 없이 완료된다 (mountedRef 가드)", async () => {
+  it("saveFile await 중 언마운트되면 mountedRef 가드가 unmount 후 상태/알림 갱신을 차단한다", async () => {
+    // 가드 관측 전략: React 19에서 'unmount 후 setState'는 관측 불가하므로,
+    // 가드가 막는 showNotification의 setTimeout(_, notificationDuration)을
+    // 고유 delay로 식별한다. 가드가 살아있으면 onstop이 showNotification에
+    // 도달하기 전에 return → 해당 setTimeout이 예약되지 않는다.
+    const NOTIF_DELAY = 123456; // React/RTL 내부가 쓰지 않는 고유 값
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
     // showSaveFilePicker를 수동 제어 deferred로 둬서 saveFile을 의도적으로 멈춘다.
     // (정상 onstop 회귀 테스트는 다운로드 폴백을 쓰므로 이 키를 두지 않는다)
     let releasePicker: (() => void) | undefined;
@@ -273,13 +280,17 @@ describe("useScreenRecorder — unmount 경로 (WI-006/WI-011)", () => {
           Object.assign(new Error("aborted"), { name: "AbortError" })
         );
     });
+    const pickerSpy = vi.fn(() => pickerPromise);
     (
       window as unknown as { showSaveFilePicker: () => Promise<never> }
-    ).showSaveFilePicker = vi.fn(() => pickerPromise);
+    ).showSaveFilePicker = pickerSpy;
 
     try {
       const { result, unmount } = renderHook(() =>
-        useScreenRecorder({ spaceName: "s" })
+        useScreenRecorder({
+          spaceName: "s",
+          notificationDuration: NOTIF_DELAY,
+        })
       );
 
       await act(async () => {
@@ -299,20 +310,26 @@ describe("useScreenRecorder — unmount 경로 (WI-006/WI-011)", () => {
           recorder.onstop as unknown as (() => Promise<void>) | null
         )?.();
       });
+      expect(pickerSpy).toHaveBeenCalledTimes(1); // saveFile이 await 지점에 진입
 
       // saveFile 대기 중 언마운트 (mountedRef=false)
       act(() => {
         unmount();
       });
 
-      // picker 종료 → onstop이 mountedRef 가드를 지나 setState 없이 정상 종료
+      // picker 종료 → onstop이 mountedRef 가드를 지나 setState/알림 없이 정상 종료
       await act(async () => {
         releasePicker?.();
         await Promise.all([stopPromise, onstopDone]);
       });
 
-      // 여기 도달 = onstop이 언마운트 후에도 hang/throw 없이 완료됨
+      // onstop이 hang/throw 없이 완료됨
       expect(onstopDone).toBeDefined();
+      // 가드가 showNotification 도달을 차단 → 고유 delay의 알림 타이머 미예약
+      const scheduledNotif = setTimeoutSpy.mock.calls.some(
+        (c) => c[1] === NOTIF_DELAY
+      );
+      expect(scheduledNotif).toBe(false);
     } finally {
       delete (window as unknown as { showSaveFilePicker?: unknown })
         .showSaveFilePicker;

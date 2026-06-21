@@ -120,6 +120,29 @@ describe("GET /api/spaces — filter → scope 분기", () => {
     expect(lastFindManyArg().where).toEqual({ status: "ACTIVE" });
   });
 
+  it("filter=owned + 슈퍼어드민 → 본인 소유로만 제한(전역화되지 않음)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "admin", isSuperAdmin: true }));
+
+    await GET(buildGetRequest("/api/spaces", { filter: "owned" }));
+
+    // 슈퍼어드민이라도 명시적 owned 필터는 전역이 아닌 본인 소유로 좁혀야 한다.
+    expect(lastFindManyArg().where).toEqual({
+      ownerId: "admin",
+      status: "ACTIVE",
+    });
+  });
+
+  it("filter=joined + 슈퍼어드민 → 본인 멤버십으로만 제한(전역화되지 않음)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "admin", isSuperAdmin: true }));
+
+    await GET(buildGetRequest("/api/spaces", { filter: "joined" }));
+
+    expect(lastFindManyArg().where).toEqual({
+      members: { some: { userId: "admin" } },
+      status: "ACTIVE",
+    });
+  });
+
   it("미허용 filter → 400 INVALID_FILTER 이고 prisma를 건드리지 않는다", async () => {
     mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: true }));
 
@@ -210,13 +233,39 @@ describe("GET /api/spaces — 응답 매핑 allowlist", () => {
       myRole: "OWNER",
       template: { key: "OFFICE", name: "오피스" },
     });
-    // 노출되면 안 되는 필드 (회귀 가드)
-    expect(space).not.toHaveProperty("inviteCode");
-    expect(space).not.toHaveProperty("accessSecret");
-    expect(space).not.toHaveProperty("ownerId");
-    expect(space).not.toHaveProperty("status");
-    expect(space).not.toHaveProperty("_count");
-    expect(space).not.toHaveProperty("members");
+
+    // 정확한 key 집합 단언 — 추가/누락 어느 쪽이든 회귀를 검출한다.
+    // (fixture에 담긴 inviteCode/accessSecret/ownerId/status/templateId/updatedAt/
+    //  _count/members 등 raw row 필드가 응답에 새지 않음을 한 번에 보장)
+    expect(Object.keys(space).sort()).toEqual(
+      [
+        "accessType",
+        "createdAt",
+        "description",
+        "id",
+        "logoUrl",
+        "maxUsers",
+        "memberCount",
+        "myRole",
+        "name",
+        "primaryColor",
+        "template",
+      ].sort()
+    );
+
+    // 민감/내부 필드는 명시적으로도 부재 확인 (가독성·의도 명시)
+    for (const leaked of [
+      "inviteCode",
+      "accessSecret",
+      "ownerId",
+      "status",
+      "templateId",
+      "updatedAt",
+      "_count",
+      "members",
+    ]) {
+      expect(space).not.toHaveProperty(leaked);
+    }
   });
 
   it("비멤버 행은 myRole이 null로 매핑된다", async () => {
