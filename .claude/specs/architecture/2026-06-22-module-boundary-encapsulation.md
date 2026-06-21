@@ -39,9 +39,9 @@
 
 ## B. 서버 cross-process 순수 계약 import — 본 WI 범위 밖 (후속 WI)
 
-`server/`(별도 esbuild 단일 번들 프로세스)는 `socket/internal/types.ts`(순수 타입)·`chat/internal/chat-constants.ts`(순수 const, React 무의존)를 직접 import한다.
+`server/`(별도 esbuild 단일 번들 프로세스)는 순수 계약 파일을 직접 import한다(React 무의존). WI-012-1 이후 현재 기준: `protocol/internal/socket-events.ts`(소켓 이벤트 타입)·`chat/internal/chat-constants.ts`(`DEFAULT_NICKNAME`/`MAX_CONTENT_LENGTH`/`RATE_LIMIT_MS`)·`enforce/internal/contract.ts`(제재 계약).
 
-- **배럴 routing 불가**: `socket/index.ts`·`chat/index.ts` 배럴은 `useSocket`/`useChat` 등 React 훅을 함께 export → 서버 번들이 배럴을 import하면 React+클라 트리 전체가 esbuild 번들에 끌려와 빌드가 깨진다. Dockerfile.socket이 순수 계약 파일 2개만 명시 COPY하는 이유.
+- **배럴 routing 불가**: `socket/index.ts`·`chat/index.ts` 배럴은 `useSocket`/`useChat` 등 React 훅을 함께 export → 서버 번들이 배럴을 import하면 React+클라 트리 전체가 esbuild 번들에 끌려와 빌드가 깨진다. Dockerfile.socket이 순수 계약 파일만(현재 3개: socket-events·chat-constants·enforce contract) 명시 COPY하는 이유.
 - **예외 범위(좁게 한정)**: React 의존성 없는 **순수 계약 파일에 한해**, **서버 프로세스(`server/**`)에서만** cross-process import 허용. 인앱(`src` 간) import에는 적용하지 않는다.
 - **기계적 정합**: ESLint `globalIgnores`에 `server/**`·`scripts/**` 등록됨 → 서버/스크립트는 lint 대상 외. boundary 테스트도 `src/` 한정 스캔.
 - **후속 WI(boundary/protocol) — 해소됨(WI-012-1, 2026-06-22)**: socket 이벤트 타입(`socket/internal/types.ts`)과 오배치 소켓 상수(`MOVE_THROTTLE_MS`/`RECONNECTION_*`)를 신규 순수 계약 모듈 `src/features/space/protocol`로 승격. server 9개소·`Dockerfile.socket` COPY·`deploy-socket.yml` paths·`communication.md`/`event-protocol.md` 포인터 갱신. 위 표 행 6/7의 chat 배럴 임시 routing은 제거되고 socket 모듈이 `@/features/space/protocol` 배럴에서 직접 소비. enforce 계약은 이미 독립 안정화되어 잔류(codex consult D1). `DEFAULT_NICKNAME`은 채팅 도메인 표시값이라 chat 잔류(D2). 스펙: `.claude/specs/architecture/2026-06-22-protocol-contract-module.md`.
