@@ -1,0 +1,60 @@
+﻿추천안은 **삭제 전용 resolver를 `public/assets/generated` 경계로 두는 것**입니다. `GeneratedAsset.filePath`의 정상 생산 경로가 모두 `/assets/generated/...`이고, `register-characters.mjs`의 수동 등록 경로도 그 안에 있으므로 `public/` 전체를 허용할 이유가 없습니다.
+
+**권장 구현**
+`src/features/assets/internal/safe-path.ts`에는 `resolveGeneratedAssetPath()`처럼 도메인명을 드러내는 이름을 두세요. 핵심은 raw DB path를 바로 `resolve()`하지 말고, 먼저 public URL path로 정규화한 뒤 generated root 안인지 확인하는 겁니다.
+
+```ts
+import path, { posix as posixPath } from "path";
+
+const GENERATED_ASSETS_ROOT = path.resolve(
+  process.cwd(),
+  "public",
+  "assets",
+  "generated"
+);
+
+export function resolveGeneratedAssetPath(publicPath: string): string | null {
+  if (!publicPath || publicPath.includes("\0") || publicPath.includes("\\")) {
+    return null;
+  }
+
+  const normalized = posixPath.normalize(
+    `/${publicPath.replace(/^\/+/, "")}`
+  );
+
+  if (
+    normalized === "/assets/generated" ||
+    !normalized.startsWith("/assets/generated/")
+  ) {
+    return null;
+  }
+
+  const absPath = path.resolve(process.cwd(), "public", normalized.slice(1));
+  const relativePath = path.relative(GENERATED_ASSETS_ROOT, absPath);
+
+  if (
+    relativePath === "" ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath)
+  ) {
+    return null;
+  }
+
+  return absPath;
+}
+```
+
+이 형태가 좋은 이유는 다음입니다.
+
+- `public/` 전체가 아니라 GeneratedAsset의 실제 소유 영역만 unlink 대상이 됩니다.
+- `/assets/generated/foo.png` 같은 DB URL path는 정상 처리됩니다.
+- `../../x`, `/../../x`, `/assets/generated/../x`, `..\..\x`, `C:/...`, `C:\...`, `/`는 거부됩니다.
+- `unlink()`는 symlink 자체를 제거하므로, 이번 DELETE 방어에서는 `realpath`까지는 과합니다. 나중에 read/write에 재사용한다면 별도 검토가 필요합니다.
+
+DELETE 라우트는 [src/app/api/assets/[id]/route.ts](C:/Team-jane/FlowSpace/src/app/api/assets/[id]/route.ts:72)에서 `join(process.cwd(), "public", asset.filePath)`를 없애고 resolver 결과가 있을 때만 unlink하면 됩니다. **resolver가 `null`이어도 DB row는 삭제하는 게 맞습니다.** 이미 권한 검사가 끝난 상태라서, 오염된 path 때문에 row 삭제까지 막으면 관리자/사용자가 악성 row를 치울 수 없습니다. 대신 `console.warn` 정도로 asset id와 field명을 남기는 것이 좋습니다.
+
+위치는 `src/features/assets/internal/safe-path.ts`가 맞고, [src/features/assets/index.ts](C:/Team-jane/FlowSpace/src/features/assets/index.ts:1)에서 export하세요. `@/lib`로 빼기에는 “public generated asset만 삭제 가능”이라는 도메인 규칙이 강합니다.
+
+쓰기 측은 이번 WI에 섞지 않는 걸 권합니다. 현재 [processor.ts](C:/Team-jane/FlowSpace/src/features/assets/internal/processor.ts:206)는 `ASSET_STORAGE_PATHS` 상수와 `generateAssetFilename()` sanitize를 거쳐 저장하고, [register-characters.mjs](C:/Team-jane/FlowSpace/scripts/register-characters.mjs:13)도 하드코딩된 `/assets/generated/...`만 넣습니다. 이번 P2는 “DB에 이미 악성 path가 들어간 경우 DELETE unlink가 밖을 지우는 문제”이므로, write-side 중앙화는 후속 WI로 분리하는 게 범위가 깔끔합니다.
+
+테스트는 `src/features/assets/internal/safe-path.test.ts`에 추가하고, 최소 케이스는 정상 `/assets/generated/x.png`, `assets/generated/characters/x.png`, 거부 `../../etc/passwd`, `/../../x`, `..\\..\\x`, `C:/Windows/win.ini`, `C:\\Windows\\win.ini`, `/assets/generated/../x.png`, `/assets/other.png`, `/`, `/assets/generated` 정도면 충분합니다.
