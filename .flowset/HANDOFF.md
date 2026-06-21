@@ -3,11 +3,11 @@
 ## Active WI
 (없음) — WI-007-feat **main 머지 완료**(별도 작업). 다음 세션은 develop 통합 큐 **WI-003-refactor**부터 + **WI-008-fix**(WI-007 P3×2).
 
-## ⚠️ main↔develop 분기 상태 (2026-06-21, 중요)
-- **WI-007-feat가 main에만 있고 develop엔 없음**. 사용자 지시로 슈퍼어드민 스페이스 생성 제한을 main에 직접 머지(별도 작업, 표준 develop 통합 플로우 예외).
-- main `2a6e2ed` = `11b04ac`(기존 동결) + WI-007(`49d272e`). **WI-001/002는 여전히 main 미반영.**
-- develop `<ledger>` = WI-001/002 + 원장만. **WI-007 코드 미반영.**
-- **back-sync 미결**: develop을 WI-007과 정합화하려면 `git merge origin/main`(main→develop) 권고. 미실행 시 develop엔 슈퍼어드민 제한 없음(향후 develop→main 승격 시 main의 WI-007은 보존됨 — 충돌/리버트 없음 확인).
+## main↔develop 정합 상태 (2026-06-21)
+- **WI-007-feat가 main + develop 양쪽에 반영됨**. 사용자 지시로 main에 먼저 직접 머지(별도 작업) 후 **back-sync 완료**(main→develop merge).
+- main `2a6e2ed` = `11b04ac`(동결 베이스) + WI-007(`49d272e`). **WI-001/002는 여전히 main 미반영**(승격 대기).
+- develop = WI-001/002 + WI-007(back-sync) + 원장. tsc/vitest PASS 확인.
+- 결과: develop ⊇ main (WI-007 공통). 향후 develop→main 승격 시 WI-001/002가 main에 합류, WI-007 충돌 없음.
 
 ## Ground Truth
 - Integration branch: `develop` (origin/develop 동기화 — 원장 커밋 포함)

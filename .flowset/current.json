@@ -8,5 +8,5 @@
   "startedAt": null,
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": "256ae57",
-  "note": "WI-007-feat(스페이스 생성 슈퍼어드민 전용) main 머지 완료 — PR#3, main merge 2a6e2ed (feat 49d272e). 사용자 지시 별도 작업으로 main 직접 타깃. 듀얼검증 codex PASS·evaluator 9.85. ⚠️ develop엔 WI-007 코드 미반영(back-sync 미결). 다음 세션: develop 통합 큐 WI-003-refactor 복귀 + WI-008-fix(WI-007 P3×2)."
+  "note": "WI-007-feat(스페이스 생성 슈퍼어드민 전용) main 머지 완료 — PR#3, main merge 2a6e2ed (feat 49d272e). 사용자 지시 별도 작업으로 main 직접 타깃. 듀얼검증 codex PASS·evaluator 9.85. back-sync 완료(main→develop merge, develop도 WI-007 반영). 다음 세션: develop 통합 큐 WI-003-refactor 복귀 + WI-008-fix(WI-007 P3×2)."
 }
