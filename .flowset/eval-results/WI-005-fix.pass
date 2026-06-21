@@ -1,0 +1,11 @@
+WI=WI-005-fix
+commit=e8e714c
+sourceFingerprint=aa917d9159845ad2635a8d85072d49b9e544f8075fe374ced47add03051b0c66
+codex=.flowset/eval-results/WI-005-fix.codex.r3.json
+evaluator=.flowset/eval-results/WI-005-fix.eval.json
+merged=.flowset/eval-results/WI-005-fix.merged.json
+gates=tsc,lint,vitest,build,server-esbuild
+codexVerdict=PASS(r3, r1/r2 FAIL P1x3 해소)
+evaluatorVerdict=WARNING(9.62,P3x3-defer)
+target=develop (PR)
+createdAt=2026-06-21T17:11:08Z

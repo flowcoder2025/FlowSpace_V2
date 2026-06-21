@@ -1,12 +1,12 @@
 {
   "activeWI": null,
-  "lastWI": "WI-004-fix",
-  "type": null,
-  "status": "IDLE",
+  "lastWI": "WI-005-fix",
+  "type": "fix",
+  "status": "VERIFIED_PR_PENDING",
   "integrationBranch": "develop",
-  "branch": "develop",
-  "startedAt": null,
+  "branch": "fix/WI-005-fix-socket-realtime-ban-kick",
+  "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "67531b4",
-  "note": "WI-004-fix(DELETE /api/assets/[id] path traversal 차단, CWE-22 P2) develop 머지 완료 — PR#7, merge 67531b4 (impl bc334a7 + 검증산출물 c732516). resolveGeneratedAssetPath()로 public/assets/generated 경계 격리(백슬래시/null byte 거부 + POSIX URL 정규화 + prefix 검사 + path.relative 이중검사). 경계 밖 unlink 스킵+warn, DB row 삭제는 진행. vitest 18케이스(53→71). 기계게이트 4/4 PASS. 듀얼검증 codex PASS 0 issues·evaluator 9.62(P3x3 defer). 설계 codex consult 1R(컨테인먼트 루트 public→public/assets/generated 타이트화). write-side 중앙화는 WI-012 후속. 다음: WI-005-fix(소켓 ban/kick 실시간 크로스프로세스 P2, 경계변경→codex consult 필수). WI-001/002/003/008/009/004는 develop만 — main 미반영(승격 대상)."
+  "lastVerifiedCommit": "e8e714c",
+  "note": "WI-005-fix(접속 중 소켓 ban/kick/mute/unmute/changeRole 실시간 추방, P2) 듀얼검증 통과 — develop PR 대기. 크로스프로세스 채널 = socket httpServer 내부 POST /internal/enforce webhook(HMAC 서명+replay+postcondition 재확인). ban/kick은 detachSocketFromSpace로 동기 권한 회수(모든 room 이탈+socket.data 무효화) 후 grace disconnect. changeRole 강등 권한회수 포함. Next PATCH는 dispatchEnforcement await(2s timeout, realtimeEnforced). enforce 독립 feature 모듈, server는 contract.ts만 상대 import/COPY. 기계게이트 5/5(tsc/lint/vitest 88·88/build/서버 esbuild). 듀얼검증 codex 3R 수렴(r1/r2 FAIL P1x3 → r3 PASS 0 issues)·evaluator WARNING 9.62(P3x3 defer). .pass fingerprint aa917d91. 설계 codex consult 1R. 다음: WI-006-fix(P3) → WI-010/011/012(P3). WI-001/002/003/004/005/008/009는 develop만 — main 미반영(승격 대상)."
 }
