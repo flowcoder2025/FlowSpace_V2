@@ -1,0 +1,82 @@
+{
+  "wi": "WI-010-perf",
+  "schemaVersion": 1,
+  "commit": "ed73930",
+  "target": "develop (PR 예정)",
+  "rounds": 3,
+  "reviewers": {
+    "codex": { "verdict": "WARNING", "issueCount": 1, "rounds": 3, "convergence": "r1 FAIL(P2 fixNow) -> r2 WARNING(P3x2 defer) -> r3 WARNING(P3x1 defer)" },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.7, "scores": { "completeness": 9.8, "consistency": 9.6, "specificity": 9.8, "actionability": 9.6 }, "issueCount": 4, "runs": 2, "note": "1차(수정 전) WARNING 9.62 P3x3 -> 최종 HEAD 재검증 WARNING 9.7 P3x4(모두 defer)" }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "최종 수렴: codex r3 WARNING(P3x1 defer, 인덱스 마이그레이션) · evaluator(최종 HEAD ed73930) WARNING 9.7(P3x4 전부 defer). P0/P1/P2 없음, fixNow=true 없음, 기계게이트 4/4 PASS(tsc 0/lint 0(기존 LiveKit 경고 1건만)/vitest 108·108(92->+16)/next build 0) -> .pass 생성. 듀얼검증이 r1에서 동일 실결함(필터 변경 중 loadMore 무효화 시 isLoadingMore 고착 — codex P2/fixNow, evaluator P3) 독립 발견 -> 수정(529108e). codex r2가 역방향 누수(리로드 중 loadMore -> isLoading 고착) P3 defer 추가 지적 -> 동일 race 모델이라 선제 해소(ed73930, loadMore isLoading 가드). evaluator 최종 변이검증 5종 전부 검출(두 수정 가드 모두 테스트 보호 실증). 보안 sound(scope가 cursor보다 우선 적용 -> 권한 밖 노출 없음). 남은 P3는 전부 후속 부채(인덱스/cursor검증/DRY).",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "필터 변경이 진행 중 loadMore를 무효화하면 stale loadMore의 finally가 _reqId 불일치로 isLoadingMore 리셋을 스킵, fetchSpaces는 isLoadingMore 미처리 -> isLoadingMore true 고착 -> 새 필터 hasMore여도 '더 보기' 영구 비활성.",
+      "codex": "FAIL (P2, fixNow:true)",
+      "evaluator": "WARNING 9.62 (동일 결함 P3 defer, 자가복구 가능 판단)",
+      "status": "RESOLVED — 두 검증자 독립 발견. fetchSpaces 시작 시 isLoadingMore:false 선제 해제로 수정(529108e). 회귀 테스트 강화(교체 응답 hasMore:true + isLoadingMore===false 단언, 변이검증)."
+    },
+    {
+      "round": 2,
+      "issue": "역방향 누수: loadMore가 isLoading 가드 부재 -> 전체 리로드 중 호출되면 공유 _reqId를 올려 리로드 무효화 + isLoading 고착(스테일 렌더/비-UI 호출자 한정).",
+      "codex": "WARNING (P3 defer, fixNow:false)",
+      "evaluator": "(해당 라운드 미실행 — 최종 재검증에서 수정본 확인)",
+      "status": "RESOLVED — P3 defer였으나 동일 race 모델 + 한 줄 무위험 가드라 선제 해소(ed73930, loadMore 가드에 isLoading 추가). 회귀 테스트 추가(fetchSpaces in-flight 중 loadMore -> no-op + isLoading 고착 없음)."
+    },
+    {
+      "round": 3,
+      "issue": "잔여 결함 점검.",
+      "codex": "WARNING (P3x1: schema.prisma 복합 인덱스 부재 — defer)",
+      "evaluator": "WARNING 9.7 (P3x4 전부 defer)",
+      "status": "CONVERGED — 양측 P0/P1/P2·fixNow 없음. 남은 P3는 전부 후속 부채(코드 정확성/보안 무영향)."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["codex", "evaluator"],
+      "divergent": false,
+      "location": "prisma/schema.prisma (Space 인덱스)",
+      "description": "GET /api/spaces 핫 쿼리(where status=ACTIVE, orderBy [updatedAt desc, id desc])에 매칭되는 복합 인덱스 부재. 행 수 증가 시(슈퍼어드민 전역) DB가 필터 후 정렬을 위해 큰 후보셋을 스캔/소트할 수 있어 쿼리플랜 스케일은 부분 해소.",
+      "assessment": "WI-010 목표(무제한 응답 크기 위험 해소 + cursor 정확성)는 충족. 인덱스는 응답 크기와 별개의 쿼리플랜 레이어. DB 마이그레이션 승인 + 프로덕션 쿼리플랜(EXPLAIN) 검증 필요.",
+      "defer": true,
+      "deferRationale": "스키마 마이그레이션 승인 + 환경별 쿼리플랜 검증이 필요한 별개 범위. 후속 DB-perf WI로 분리(status + updatedAt desc + id desc 복합 인덱스 + owned/joined 변형).",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/app/api/spaces/route.ts (cursor 검증)",
+      "description": "위조/타-스코프/없는 cursor id에 대한 명시적 검증 없음. 최악의 경우 부정확한 경계 또는 500, 데이터 누출 없음(scope가 cursor보다 우선 적용).",
+      "assessment": "비악용성(보안 무영향). 기존 messages/route.ts 관례와 동일. 설계 codex consult D에서도 preflight 조회 불필요로 판단.",
+      "defer": true,
+      "deferRationale": "P3 하드닝. 공통 cursor 검증 도입은 별도 범위 -> WI-012/공통 하드닝.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/app/api/spaces/[id]/messages/route.ts (DRY)",
+      "description": "신규 buildCursorPage/parsePageLimit가 캡슐화한 cursor/limit 로직을 messages/route.ts가 여전히 인라인으로 중복 보유. 신규 코드 자체는 올바르게 분리됨.",
+      "assessment": "선재 중복(이번 WI 신규 코드 아님). WI-010 doc-comment가 messages 라우트를 관례 출처로 인용.",
+      "defer": true,
+      "deferRationale": "선재 코드 리팩토링은 범위 밖 -> WI-012-refactor(messages 라우트도 공용 헬퍼 채택).",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/lib/pagination.ts / src/stores/space-store.ts (관찰)",
+      "description": "관찰(결함 아님): limit 헬퍼의 상한은 서버측 방어이며 클라(buildQuery)는 limit를 전송하지 않음. 서버 상한이 의도된 방어선이라 안전.",
+      "assessment": "설계 의도(서버측 상한이 1차 방어). 클라 비노출이 더 안전.",
+      "defer": true,
+      "deferRationale": "결함 아님 — 변경 불요.",
+      "fixNow": false
+    }
+  ]
+}

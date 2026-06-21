@@ -1,0 +1,13 @@
+WI=WI-010-perf
+commit=ed73930
+sourceFingerprint=2ef1dd0b67d662873a2fccdb4dc2a9a04213cf500982f268d8511363fc438999
+fingerprintScope=changeset(6 files: src/app/api/spaces/route.ts, src/components/spaces/space-list-view.tsx, src/lib/pagination.ts, src/lib/pagination.test.ts, src/stores/space-store.ts, src/stores/space-store.test.ts)
+codex=.flowset/eval-results/WI-010-perf.codex.r3.json
+evaluator=.flowset/eval-results/WI-010-perf.eval.json
+merged=.flowset/eval-results/WI-010-perf.merged.json
+gates=tsc,lint,vitest,build
+codexVerdict=WARNING(P3x1-defer,3R-수렴:r1-FAIL-P2fixNow->r2-WARNING->r3-WARNING)
+evaluatorVerdict=WARNING(9.7,P3x4-defer,최종HEAD재검증)
+gateDecision=PASS
+target=develop (PR 예정)
+createdAt=2026-06-22T03:30:00Z
