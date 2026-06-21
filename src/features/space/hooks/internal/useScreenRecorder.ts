@@ -301,9 +301,32 @@ export function useScreenRecorder({
         };
 
         recorder.onerror = () => {
+          // 'error'는 복구 불가 — abort로 간주하고 정리한다.
+          // 이후 onstop이 발화돼도 중복 저장/처리하지 않도록 먼저 제거.
+          recorder.onstop = null;
           handleError("녹화 중 오류가 발생했습니다");
           setRecordingState("idle");
           stopTimer();
+
+          if (audioContextRef.current) {
+            audioContextRef.current.close().catch(() => {});
+            audioContextRef.current = null;
+          }
+          // 실패한 녹화 파편 폐기
+          chunksRef.current = [];
+          // 상태는 idle인데 ref가 errored recorder를 가리키는 불일치 해소
+          // (자기 자신일 때만 — 이미 새 recorder로 교체됐으면 건드리지 않음)
+          if (mediaRecorderRef.current === recorder) {
+            mediaRecorderRef.current = null;
+          }
+          // stopRecording 대기 중이면 settle — 'error' 시 onstop이 발화되지
+          // 않을 수 있어 Promise가 영구 pending 되는 것을 차단.
+          // onstop의 result.status==="error" 경로와 동일하게 resolve하며,
+          // 오류는 error 상태/onError 콜백으로 호출자에 전달된다.
+          if (pendingStopResolveRef.current) {
+            pendingStopResolveRef.current();
+            pendingStopResolveRef.current = null;
+          }
         };
 
         mediaRecorderRef.current = recorder;
