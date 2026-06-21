@@ -106,8 +106,11 @@ export function handleRoom(io: IO, socket: TypedSocket) {
     );
   });
 
-  socket.on("leave:space", ({ spaceId }) => {
-    leaveSpace(io, socket, spaceId);
+  socket.on("leave:space", () => {
+    // 클라이언트가 보낸 spaceId 는 신뢰하지 않는다(communication invariant #3) —
+    // 서버가 인가한 socket.data.spaceId 만 사용.
+    const spaceId = socket.data.spaceId;
+    if (spaceId) leaveSpace(io, socket, spaceId);
   });
 
   // 연결 해제 시 자동 퇴장
@@ -119,20 +122,38 @@ export function handleRoom(io: IO, socket: TypedSocket) {
   });
 }
 
-function leaveSpace(io: IO, socket: TypedSocket, spaceId: string) {
-  const userId = socket.data.userId;
-  const players = getSpacePlayers(spaceId);
-
-  players.delete(userId);
-  socket.leave(spaceId);
-
-  // 다른 플레이어에게 퇴장 알림
-  io.to(spaceId).emit("player:left", { userId });
-
-  // 빈 공간 정리
-  if (players.size === 0) {
-    spacePlayersMap.delete(spaceId);
+/**
+ * 소켓을 공간에서 물리적으로 분리: 자기 id 를 제외한 모든 room(공간 + 파티) 이탈 +
+ * 공간 범위 socket.data 무효화. 이후 모든 이벤트 핸들러가 socket.data.spaceId 가드로
+ * early-return 하므로 stale 인가(퇴장/추방 후 잔존 chat/admin/editor/media)가 차단된다.
+ * presence/broadcast 는 호출측 책임(단일 소켓 분리라 사용자 단위 알림과 분리).
+ */
+export function detachSocketFromSpace(socket: TypedSocket): void {
+  for (const room of [...socket.rooms]) {
+    if (room !== socket.id) socket.leave(room);
   }
+  socket.data.spaceId = undefined;
+  socket.data.partyId = undefined;
+  socket.data.partyName = undefined;
+  socket.data.role = undefined;
+  socket.data.restriction = undefined;
+  socket.data.memberId = undefined;
+}
 
-  console.log(`[Room] ${userId} left ${spaceId} (${players.size} players)`);
+/** presence 에서 사용자 제거 + 주변에 player:left 1회(사용자 단위, 다중 탭 중복 방지). */
+export function removeUserPresence(io: IO, spaceId: string, userId: string): void {
+  const players = spacePlayersMap.get(spaceId);
+  if (players) {
+    players.delete(userId);
+    if (players.size === 0) spacePlayersMap.delete(spaceId);
+  }
+  io.to(spaceId).emit("player:left", { userId });
+}
+
+/** 단일 소켓 퇴장(leave:space/disconnect): presence 정리 1회 + 자기 소켓 분리. */
+export function leaveSpace(io: IO, socket: TypedSocket, spaceId: string) {
+  const userId = socket.data.userId;
+  removeUserPresence(io, spaceId, userId);
+  detachSocketFromSpace(socket);
+  console.log(`[Room] ${userId} left ${spaceId}`);
 }
