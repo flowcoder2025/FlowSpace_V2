@@ -1,12 +1,12 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-020-fix",
   "lastWI": "WI-016-chore",
-  "type": null,
-  "status": "PROMOTED_LIVE_ALL_TARGETS_CD_RESTORED",
+  "type": "fix",
+  "status": "VERIFYING",
   "integrationBranch": "develop",
-  "branch": "develop",
+  "branch": "fix/WI-020-fix-middleware-public-asset",
   "startedAt": "2026-06-22",
-  "requiredGates": ["tsc", "lint", "vitest", "build", "server-esbuild", "promotion-approval"],
-  "lastVerifiedCommit": "50d9af0",
-  "note": "✅ 승격 완료(2026-06-22): develop→main PR#18 rebase 머지 → main HEAD 50d9af0(author=flowcoder25 보존). Vercel Production ● Ready(신 WI-001~016 코드 라이브, author 인가 통과). prod DB 마이그레이션 적용 완료(migrate deploy: WI-013 Space 복합인덱스 생성+구 Space_status_idx 제거[7행 즉시]·WI-016 isShared no-op[IF NOT EXISTS], _prisma_migrations 3건 SoT 정합). 사전검증 전수 실측: 기계게이트 green / OCI esbuild 번들+metafile COPY 완전성 / 🔴AUTH_SECRET 해소(라이브 OCI가 로컬 .env 44자 시크릿 서명 JWT 검증 성공→prod=44자≥32 확정, live 웹 HTTP200→Vercel==OCI transitive) / WI-016 prod 컬럼 존재 확정 / 적대검증 19에이전트=승격차단 코드결함 0. **✅ OCI 소켓도 배포 완료**(사용자 'ssh키 있잖아'): ~/.ssh/flowspace-oci로 SSH→git pull(06cf9c5→50d9af0 FF)+빌드+재배포, 신 컨테이너 Up(healthy) 포트3002, 실사용자 접속·룸입장 로그 실증(신코드 AUTH 검증 라이브 작동). **OCI 배포함정**: 자동배포 OCI_SSH_PRIVATE_KEY 미설정+OCI는 docker-compose v1만(v2 명령 없음)+v1 recreate 버그 KeyError ContainerConfig → 우회=build→rm -f -s socket→up -d --no-build(fresh up). 롤백이미지 flowspace-v2_socket:rollback-pre-promo 보존. **남은 선택**: WI-005 실시간제재는 OCI .env SOCKET_INTERNAL_SECRET 미설정이라 degrade(DB+재접속차단은 동작) → OCI+Vercel 동일 시크릿+Vercel SOCKET_INTERNAL_URL 설정 시 활성(Vercel env는 사용자 권한). develop↔main rebase 분기 back-sync 정합. **✅ CD 자동배포 복구**(사용자 지시): OCI_SSH_PRIVATE_KEY secret 등록 + deploy-socket.yml 수정(docker-compose v1 + build→rm→up --no-build 우회 + workflow_dispatch + 헬스체크, PR#19 main fc66b44) → gh workflow run 테스트 ✓25s 성공. **🔴 미해결(사용자 DNS 권한): v2-socket.flow-coder.com NXDOMAIN — 라이브는 임시 nip.io로 운영(방치 정상, 정식 전환은 DNS A레코드+Vercel NEXT_PUBLIC_SOCKET_URL).**"
+  "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
+  "lastVerifiedCommit": "",
+  "note": "WI-020-fix 미들웨어 public 정적에셋 회귀 — 미인증 시 /Logo.png 이 /login 으로 307 리다이렉트(WI-001 strict화 부작용, 승격으로 라이브화)돼 로그인 페이지 로고 깨짐. 수정: 인라인 분류를 순수함수 src/lib/route-access.ts(isPublicRequest + PUBLIC_FILES allowlist=['/Logo.png'])로 추출, 미들웨어가 호출. 확장자 전체 통과(/\\.\\w+$/) 대신 명시 allowlist(codex 적대 설계 협의 권고 — /api/spaces/foo.png 확장자 우회 표면 회피, deny-by-default 보존). 회귀테스트 9(route-access.test.ts). 기계게이트 4/4(tsc0/lint0/vitest 174·174[+9]/build0). 설계 codex consult 1R(WI-020-consult). 듀얼검증 중."
 }

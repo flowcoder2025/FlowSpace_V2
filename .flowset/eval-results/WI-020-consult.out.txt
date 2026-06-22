@@ -1,0 +1,11 @@
+**결론:** 옵션1/2 그대로는 “즉시 전면 인증 우회”라고 보긴 어렵지만, 둘 다 미들웨어의 deny-by-default 보안 경계를 넓게 허뭅니다. 특히 옵션2는 더 위험합니다. 권장은 “확장자 전체 통과”가 아니라 `public/`에 실제 존재하는 정적 파일만 통과시키는 방식입니다.
+
+A. `/\.[A-Za-z0-9]+$/`는 현재 앱에서 우회 표면을 만듭니다. 예: `/space/foo.png`, `/spaces/foo.png`, `/dashboard/spaces/foo.png`, `/api/spaces/foo.png`, `/api/assets/foo.png`. 현재는 페이지/route handler 내부에도 `auth()` 가드가 대체로 있어서 즉시 데이터 노출로 이어질 가능성은 낮지만, 미들웨어 차단은 건너뜁니다. 향후 dot 포함 ID나 slug를 받는 보호 라우트가 내부 가드를 빠뜨리면 바로 취약해집니다. `%2e`는 단순 JS URL pathname 기준으로는 regex에 안 걸리지만, Next/Vercel 정규화 단계 차이를 보안 근거로 삼으면 안 됩니다. path traversal은 `pathname` 기반이라 파일시스템 탈출보다는 “정규화 후 의도치 않은 public 판정” 쪽을 테스트해야 합니다.
+
+B. 옵션2는 옵션1보다 더 넓습니다. `.*\\..*`는 점이 경로 어디에 있어도 미들웨어를 아예 안 태우므로 `/dashboard/spaces/foo.png/members` 같은 경로도 제외될 수 있습니다. 옵션1은 끝 세그먼트가 확장자처럼 끝날 때만 통과합니다. 그래도 둘 다 “보호 라우트는 점을 포함하지 않는다”는 미래 가정에 의존합니다. 추천은 옵션3이 아니라, 코드에서 명시 public asset allowlist를 두는 쪽입니다. 예: `pathname === "/Logo.png"` 또는 `pathname.startsWith("/assets/")`처럼 public 디렉터리의 공개 자산 namespace만 허용. `robots.txt`, `manifest.webmanifest`, `opengraph-image.png` 등도 필요 시 명시 추가.
+
+C. `/_next/image`는 matcher에서 제외돼도, 최적화기가 원본 `/Logo.png`를 가져오는 과정에서 원본 요청이 307을 받으면 이미지 응답이 아니라 리다이렉트/HTML 로그인 흐름이 됩니다. 그래서 로고가 깨지는 설명은 타당합니다. `/Logo.png` 원본이 200으로 통과되면 최적화 경로도 정상화될 가능성이 높습니다.
+
+D. 회귀 테스트는 최소 이 네 개가 좋습니다: 미인증 `GET /Logo.png`는 200, 미인증 `GET /assets/tiles/wood-floor.png`도 공개 의도라면 200, 미인증 `GET /space/foo.png` 또는 `/dashboard/spaces/foo.png`는 여전히 `/login` 리다이렉트, 미인증 `GET /api/spaces`와 `/api/spaces/foo.png`는 인증 차단 유지. 마지막 케이스가 확장자 우회 재개방을 잡습니다.
+
+E. 놓친 위험: login `callbackUrl` 오염입니다. 정적 파일 요청이 로그인으로 리다이렉트되면서 `/login?callbackUrl=/Logo.png`가 생겼고, 로그인 폼이 그 값을 그대로 `router.push(callbackUrl)`에 씁니다. 지금은 same-origin pathname이라 큰 문제는 아니지만, callbackUrl 처리에는 “내부 경로만 허용” 검증을 별도로 두는 게 맞습니다.
