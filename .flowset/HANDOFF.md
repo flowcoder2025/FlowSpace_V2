@@ -1,7 +1,14 @@
 # HANDOFF
 
-## Active WI
-(없음) — **✅ develop→main 승격 완료(2026-06-22)** + **✅ WI-020-fix(로그인 로고 회귀) 완료·승격·라이브검증**. WI-001~016 + WI-020 라이브 반영. READY 큐 비어 있음(WI-017~019 BACKLOG).
+## Active WI — WI-019-fix (develop PR 대기)
+**✅ WI-019-fix (assets 상세 GET 응답 allowlist) 구현·듀얼검증·`.pass` 완료. develop PR 머지만 남음.**
+- 브랜치 `fix/WI-019-fix-assets-get-allowlist`(HEAD `e3762f0`, base=develop). 커밋: impl `d725837` → codex P3 강화 `5fef58d` → 검증산출물 `e3762f0`.
+- **무엇**: `GET /api/assets/[id]`가 raw `GeneratedAsset` 전체 행(+민감 `prompt`/`workflow`/`comfyuiJobId`)을 반환하던 것을 `select` + 공개 DTO(`toPublicGeneratedAsset`, `features/assets/internal/public-asset.ts`+배럴)로 정형화 (WI-014 동일 클래스). **핵심**: 민감 3필드가 `metadata`(Json)에도 중복 저장(generate/batch 라우트가 `GeneratedAssetMetadata` 전체 JSON 저장) → top-level allowlist만으론 우회 노출 → `PUBLIC_METADATA_KEYS` allowlist로 metadata 정규화. userId는 권한판정 select·DTO 미포함. 무회귀(소비처 3곳 실측 보존).
+- **검증**: 설계 codex consult 1R(metadata 우회 적출) + 듀얼 블라인드 1R 수렴 codex WARNING(P3x1 defer, **즉시 해소**)·evaluator WARNING 9.78(P0/P1 0, P3x3 defer) + `.pass`(`0b92337e`). 기계게이트 4/4(tsc0/lint0/vitest 192·192/build0). 회귀 테스트 18·변이검증 실증.
+- **다음 액션**: `gh pr create --base develop` (PR 본문 `.flowset/eval-results/WI-019-pr-body.md`) → 머지. 후속 **WI-021**(목록 `GET /api/assets` route.ts:47 `prompt:true` 선재누출, evaluator P3 발굴, `toPublicGeneratedAsset` 재사용 검토).
+
+## 이전 상태 (참고)
+**✅ develop→main 승격 완료(2026-06-22)** + **✅ WI-020-fix(로그인 로고 회귀) 완료·승격·라이브검증** + V1→V2 컷오버 e2e 검증(사용자 정상확인). WI-001~016 + WI-020 라이브 반영. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-021(assets 목록 GET).
 
 ## ✅ WI-020-fix (2026-06-22) — 미들웨어 public 정적에셋 회귀 (사용자 발견)
 미인증 시 `/Logo.png`이 `/login`으로 307 리다이렉트 → 로그인 페이지 로고 깨짐(WI-001 strict화 부작용, 승격으로 라이브화). 순수함수 `src/lib/route-access.ts`(isPublicRequest + PUBLIC_FILES allowlist) 추출, 미들웨어 호출. **확장자 전체통과 거부·명시 allowlist**(codex 적대 협의: 확장자 우회 표면 회피). 회귀테스트 9. 듀얼검증 codex WARNING·evaluator 9.78(P0/P1 0, 변이검증 5종). PR#20→develop, PR#21 승격→main `9cde274`. **라이브 검증: /Logo.png 307→200 image/png**. 교훈: **미들웨어 deny-by-default 하드닝(WI-001) 시 public/ 루트 정적파일이 보호라우트로 잡히는 회귀** — matcher는 `_next/static·_next/image·favicon.ico`만 제외하므로 public 루트파일(Logo.png)은 코드 allowlist 필요.
