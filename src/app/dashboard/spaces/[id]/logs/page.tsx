@@ -7,6 +7,8 @@ import {
   localDateToStartInstant,
   localDateToEndInstant,
 } from "@/components/dashboard/date-range";
+import { ExportCsvButton } from "@/components/dashboard/export-csv-button";
+import { logsToCsv, downloadCsv, csvFilename } from "@/components/dashboard/csv-export";
 
 // 표시용 이벤트 타입 옵션(서버는 SpaceEventType enum으로 검증 — SSOT). "" = 전체.
 const EVENT_TYPES = [
@@ -111,6 +113,13 @@ export default function LogsPage() {
             onChange={(e) => setEndDate(e.target.value)}
             aria-label="종료 날짜"
             className="text-sm border border-line rounded px-3 py-1.5"
+          />
+          <ExportCsvButton
+            disabled={logs.length === 0}
+            label={`CSV 내보내기 (로드된 ${logs.length}건)`}
+            onExport={() =>
+              downloadCsv(csvFilename("logs", spaceId, new Date()), logsToCsv(logs))
+            }
           />
         </div>
       </div>
