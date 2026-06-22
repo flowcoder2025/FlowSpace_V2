@@ -1,0 +1,1 @@
+{"reviewer":"codex","schemaVersion":1,"scores":null,"weightedTotal":null,"verdict":"PASS","issues":[],"notes":"r1 WARNING(P2 fixNow: Members 로드 실패 시 error 인라인+빈 상태 동시 렌더 / P3: filterMembers 우선순위 약한 오라클) → r2 e1ca2f7 PASS(members.length===0 분기 error?null:빈상태로 실패≠빈목록 분리 + 표시명 우선순위 ||체인 reorder 변이검증 테스트 2종). 능동 실측: tsc0/lint0err/git diff --check 통과."}
