@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 9.9,
+    "specificity": 9.9,
+    "actionability": 9.7
+  },
+  "weightedTotal": 9.83,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/features/space/socket/internal/socket-client.ts:192-197 (finally — `if (pendingClient === pending)` 가드)",
+      "description": "P2-1 finally 가드의 `pendingClient === pending` 식별 조건이 변이검증으로 보호되지 않는다. 독립 변이검증 실증: 해당 조건을 `pendingClient = null`(무조건)로 무력화해도 socket-client.test.ts 17케이스 전부 PASS(가드 무력화 → 거짓통과). 이 조건은 '더 새로운 생성(2세대) in-flight 중 1세대 finally가 2세대 pendingClient를 잘못 null화'하는 인터리빙을 막는 방어인데, 현 dedupe 테스트(L249-257)는 단일 세대 동시 호출만 커버해 2세대 중첩 시나리오 미검증. (증거: M6 변이검증 — 조건 제거 후 npx vitest run socket-client.test.ts → 17 passed)",
+      "recommendation": "1세대 생성이 resolve된 뒤(active 소켓 비재사용 강제) 2세대 getSocketClient()를 시작시켜, 1세대 finally가 2세대 pendingClient를 null화하지 않음을 단언하는 케이스 추가. 가드 무력화 시 FAIL 나도록 변이검증으로 잠금. 후속 테스트 부채 WI로 흡수 가능.",
+      "defer": true,
+      "deferRationale": "dedupe 핵심 경로(`if (pendingClient) return pendingClient`)는 M2 변이검증으로 차단 실증됨(가드 제거→fetch/io 2회→FAIL). finally의 `=== pending` 조건은 추가 방어층으로, 미보호 시 최악 영향은 드문 인터리빙에서 transient 추가 fetch/io 1회(기능/보안 무영향, 누수 아님 — 직전 socket은 L162-167에서 정리). P0/P1 0이라 게이트 무관.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/socket/internal/use-socket.ts:22-34 (socketTokenErrorMessage 매핑)",
+      "description": "socketTokenErrorMessage(4코드 → 사용자 메시지) 매핑 자체에 대한 단언 테스트가 없다(use-socket.test.ts는 생명주기 race 2케이스만 — 매핑 미검증). 코드↔문자열이 잘못 스왑돼도(예: UNAUTHORIZED↔NETWORK_FAILURE) 검출 못 함. catch 분기의 'SocketTokenError → 코드별 / 그 외 → generic 폴백'(L506-510)은 use-socket.test.ts가 getSocketClient를 mock하나 reject 경로(catch)를 직접 단언하지 않는다.",
+      "recommendation": "socketTokenErrorMessage를 export해 4코드 각각 고유 메시지 반환 단언 + getSocketClient mock reject로 catch의 generic 폴백 보존(비-SocketTokenError) 변이검증. 후속 테스트 WI 흡수 가능.",
+      "defer": true,
+      "deferRationale": "메시지 매핑은 순수 표시 로직(보안/기능 무영향). switch가 default 없이 4코드 전부 return하므로 코드 추가 시 tsc 누락 경고 가능(exhaustive). generic 폴백('소켓 연결에 실패했습니다.')은 pre-WI-017 동작 verbatim 보존(diff상 instanceof 분기 추가만, 비-SocketTokenError 경로 무변). P0/P1 0.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/socket/internal/socket-client.ts:79-85 (NETWORK_FAILURE 메시지 interpolation)",
+      "description": "SUSPECTED(저위험): NETWORK_FAILURE 에러 메시지가 networkErr.message를 interpolation한다. 현재 fetch URL이 상대경로('/api/socket/token')라 시크릿 미포함이고, 토큰 값 자체는 어떤 SocketTokenError 메시지에도 미포함(전수 확인: L79-84/92-103/109-125 — status·정적 문자열만, 토큰 0). use-socket catch는 이 message가 아닌 코드 기반 사용자 메시지를 표시(L506-510)하므로 현 UI 노출 없음(networkErr.message는 console.error 로그에만 도달). 향후 절대 URL/프록시 도입 시 fetch 예외에 내부 호스트/포트가 로그에 노출 가능.",
+      "recommendation": "networkErr.message interpolation을 정적 사유 문자열로 대체하거나, 노출이 콘솔 로그로 한정됨을 주석 명시. 저우선.",
+      "defer": true,
+      "deferRationale": "토큰 누출 0 실증. networkErr.message는 사용자 UI 미전파(코드→socketTokenErrorMessage 매핑), console.error 로그에만 도달. 현재 fetch URL 상대경로라 시크릿 부재. 가설적 미래 위험이라 즉시수정 불요. P0/P1 0.",
+      "fixNow": false
+    }
+  ]
+}
