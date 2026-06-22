@@ -16,6 +16,13 @@ import type { AssetType, AssetStatus, Prisma } from "@prisma/client";
  * 공개 metadata 키 allowlist — 렌더링/폴링에 필요한 비민감 키만.
  * 제외: prompt·workflow·comfyuiJobId(민감), id·type·name·status·filePath·
  * thumbnailPath·fileSize(top-level 중복), batchId(내부 그룹핑).
+ *
+ * ⚠️ `error` 제외 (WI-024, CWE-209): 비동기 생성 실패 시 generate/batch가
+ * `metadata.error`에 저장하는 값이 과거엔 raw `error.message`였다(ComfyUI 내부 URL·
+ * 파일 경로·스택 단편 포함 가능). 저장값은 이제 generic으로 정규화되지만
+ * (`GENERATION_FAILURE_MESSAGE`), **기존 DB 행은 여전히 raw를 보유**하므로 응답
+ * 계층에서도 `error`를 allowlist에서 제외해 기존·신규 행 모두 차단한다(심층 방어).
+ * 폴링 계약은 `status` 필드(FAILED)만으로 충분하다 — 실패 사유 raw 노출 불필요.
  */
 export const PUBLIC_METADATA_KEYS = [
   "width",
@@ -28,7 +35,6 @@ export const PUBLIC_METADATA_KEYS = [
   "seed",
   "generatedAt",
   "processingTime",
-  "error",
 ] as const;
 
 export interface PublicGeneratedAsset {

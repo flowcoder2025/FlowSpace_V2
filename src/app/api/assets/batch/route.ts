@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { internalErrorResponse } from "@/lib/api-error";
-import { processAssetGeneration } from "@/features/assets";
+import { processAssetGeneration, GENERATION_FAILURE_MESSAGE } from "@/features/assets";
 import type { CreateAssetParams } from "@/features/assets";
 
 const ASSET_TYPE_MAP = {
@@ -85,14 +85,14 @@ export async function POST(request: Request) {
           });
         })
         .catch(async (error) => {
+          // raw 에러는 서버 로그에만 (WI-024, CWE-209): metadata.error로 저장하면
+          // GET /api/assets/[id] 응답으로 내부 정보가 새 나간다 → generic으로 정규화.
+          console.error("[POST /api/assets/batch] 비동기 에셋 생성 실패", error);
           await prisma.generatedAsset.update({
             where: { id: dbAsset.id },
             data: {
               status: "FAILED",
-              metadata: {
-                batchId,
-                error: error instanceof Error ? error.message : "Unknown error",
-              },
+              metadata: { batchId, error: GENERATION_FAILURE_MESSAGE },
             },
           });
         });
