@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { internalErrorResponse } from "@/lib/api-error";
 import { processAssetGeneration } from "@/features/assets";
 import type { CreateAssetParams } from "@/features/assets";
 
@@ -106,13 +107,7 @@ export async function POST(request: Request) {
       { status: 202 }
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to start batch generation",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/assets/batch", error, "Failed to start batch generation");
   }
 }
 
@@ -160,12 +155,6 @@ export async function GET(request: NextRequest) {
       pending: assets.length - completed - failed,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch batch status",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/assets/batch", error, "Failed to fetch batch status");
   }
 }

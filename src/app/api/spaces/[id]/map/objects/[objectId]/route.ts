@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -85,13 +86,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(updated);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to update map object",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("PATCH /api/spaces/[id]/map/objects/[objectId]", error, "Failed to update map object");
   }
 }
 
@@ -135,12 +130,6 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ deleted: true });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to delete map object",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("DELETE /api/spaces/[id]/map/objects/[objectId]", error, "Failed to delete map object");
   }
 }

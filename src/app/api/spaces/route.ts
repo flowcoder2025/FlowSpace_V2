@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
+import { internalErrorResponse } from "@/lib/api-error";
 
 /**
  * GET /api/spaces - 내 공간 목록 (슈퍼어드민의 "전체"는 모든 ACTIVE 스페이스).
@@ -77,13 +78,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ spaces: result, nextCursor, hasMore });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch spaces",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces", error, "Failed to fetch spaces");
   }
 }
 
@@ -167,12 +162,6 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to create space",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/spaces", error, "Failed to create space");
   }
 }

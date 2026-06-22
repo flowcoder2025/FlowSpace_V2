@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalErrorResponse } from "@/lib/api-error";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -68,12 +69,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
       objects: space.mapObjects,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch map data",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces/[id]/map", error, "Failed to fetch map data");
   }
 }

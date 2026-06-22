@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -66,9 +67,6 @@ export async function GET(request: Request, { params }: RouteParams) {
       })),
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch analytics", details: error instanceof Error ? error.message : undefined },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces/[id]/admin/analytics", error, "Failed to fetch analytics");
   }
 }

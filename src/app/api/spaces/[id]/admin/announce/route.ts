@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -61,9 +62,6 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ message });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to send announcement", details: error instanceof Error ? error.message : undefined },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/spaces/[id]/admin/announce", error, "Failed to send announcement");
   }
 }

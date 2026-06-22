@@ -387,13 +387,21 @@ describe("GET /api/assets — 입력 검증 (WI-022)", () => {
 });
 
 describe("GET /api/assets — 에러 처리", () => {
-  it("prisma 예외 시 500 폴백", async () => {
+  it("prisma 예외 시 500 폴백 (원본 에러 메시지 미노출 — WI-023)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
-    mockPrisma.generatedAsset.findMany.mockRejectedValue(new Error("db down"));
+    mockPrisma.generatedAsset.findMany.mockRejectedValue(
+      new Error("connect ECONNREFUSED 10.0.0.1:5432 schema=public")
+    );
     mockPrisma.generatedAsset.count.mockResolvedValue(0);
 
     const res = await GET(buildGetRequest("/api/assets"));
+    const body = (await readJson<Record<string, unknown>>(res));
 
     expect(res.status).toBe(500);
+    // CWE-209: 내부 에러 원문(DB 호스트/스키마)을 클라이언트에 흘리지 않는다.
+    expect(JSON.stringify(body)).not.toContain("ECONNREFUSED");
+    expect(body.details).toBeUndefined();
+    expect(body).toEqual({ error: "Failed to fetch assets" });
   });
 });

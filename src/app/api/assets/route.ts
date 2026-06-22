@@ -3,6 +3,7 @@ import { AssetType, AssetStatus } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parsePageLimit, parsePageNumber } from "@/lib/pagination";
+import { internalErrorResponse } from "@/lib/api-error";
 import { toPublicAssetListItem } from "@/features/assets";
 
 /** limit 미지정 시 기본 페이지 크기 (WI-022 이전 동작 보존). */
@@ -118,12 +119,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch assets",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/assets", error, "Failed to fetch assets");
   }
 }

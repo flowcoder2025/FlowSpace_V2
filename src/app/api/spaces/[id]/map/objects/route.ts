@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -82,12 +83,6 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(mapObject, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to create map object",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/spaces/[id]/map/objects", error, "Failed to create map object");
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -47,12 +48,6 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ id: updated.id, saved: true });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to save tile data",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("PUT /api/spaces/[id]/map/tiles", error, "Failed to save tile data");
   }
 }

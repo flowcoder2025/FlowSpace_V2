@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -48,10 +49,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ grants: enrichedGrants });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch media data", details: error instanceof Error ? error.message : undefined },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces/[id]/admin/media", error, "Failed to fetch media data");
   }
 }
 
@@ -111,9 +109,6 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ grant }, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to create grant", details: error instanceof Error ? error.message : undefined },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/spaces/[id]/admin/media", error, "Failed to create grant");
   }
 }

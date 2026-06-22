@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { unlink } from "fs/promises";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { resolveGeneratedAssetPath, toPublicGeneratedAsset } from "@/features/assets";
 
@@ -53,13 +54,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json(toPublicGeneratedAsset(asset));
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch asset",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/assets/[id]", error, "Failed to fetch asset");
   }
 }
 
@@ -112,12 +107,6 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ message: "Asset deleted" });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to delete asset",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("DELETE /api/assets/[id]", error, "Failed to delete asset");
   }
 }
