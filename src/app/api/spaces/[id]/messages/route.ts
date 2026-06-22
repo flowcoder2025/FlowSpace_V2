@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
+import { internalErrorResponse } from "@/lib/api-error";
 
 /** GET /api/spaces/[id]/messages - 채팅 히스토리 (cursor 페이지네이션) */
 export async function GET(
@@ -84,12 +85,6 @@ export async function GET(
       hasMore,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch messages",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces/[id]/messages", error, "Failed to fetch messages");
   }
 }

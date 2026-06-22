@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import {
   canActOn,
@@ -56,13 +57,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ members: result });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch members",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces/[id]/members", error, "Failed to fetch members");
   }
 }
 
@@ -131,13 +126,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       { status: 201 }
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to join space",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/spaces/[id]/members", error, "Failed to join space");
   }
 }
 
@@ -228,12 +217,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(updated);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to update member",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("PATCH /api/spaces/[id]/members", error, "Failed to update member");
   }
 }

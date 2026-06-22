@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalErrorResponse } from "@/lib/api-error";
 import { createGuestSession, validateGuestSession } from "@/lib/guest";
 import { prisma } from "@/lib/prisma";
 
@@ -59,13 +60,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(guest, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to create guest session",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/guest", error, "Failed to create guest session");
   }
 }
 

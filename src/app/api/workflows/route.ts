@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 /** GET /api/workflows - 워크플로우 목록 */
@@ -37,12 +38,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ workflows });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch workflows",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/workflows", error, "Failed to fetch workflows");
   }
 }

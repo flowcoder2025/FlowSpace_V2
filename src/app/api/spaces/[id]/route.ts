@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { internalErrorResponse } from "@/lib/api-error";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -71,13 +72,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       myRole: space.members[0]?.role || null,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch space",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces/[id]", error, "Failed to fetch space");
   }
 }
 
@@ -141,13 +136,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(updated);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to update space",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("PATCH /api/spaces/[id]", error, "Failed to update space");
   }
 }
 
@@ -176,12 +165,6 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ message: "Space archived" });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to delete space",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("DELETE /api/spaces/[id]", error, "Failed to delete space");
   }
 }

@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 9.9,
+    "specificity": 10,
+    "actionability": 9.7
+  },
+  "weightedTotal": 9.85,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/assets/[id]/route.ts:GET (toPublicGeneratedAsset → PUBLIC_METADATA_KEYS) + src/app/api/assets/generate/route.ts:101 / batch/route.ts:94",
+      "description": "비-500 잔존 경로: 비동기 생성 실패 시 raw error.message가 GeneratedAsset.metadata.error 컬럼에 저장되고(generate/batch catch는 의도적 미변경, 본 WI 범위 명시 제외) WI-019 도입 PUBLIC_METADATA_KEYS allowlist가 'error'를 포함하므로 GET /api/assets/[id] 응답에 그 원문이 도달한다. 이번 WI의 500 catch 정보위생과 별개 클래스이나, 동일 CWE-209 표면이 라우트 응답에 여전히 존재함을 독립 확인. 누출 본문은 5xx 폴백이 아니라 owner-gated 상세 응답이라 표면이 좁고, 본 WI 수용 기준(500 catch details 제거)과 분리된 선재 결정이다.",
+      "recommendation": "후속 WI에서 metadata.error를 PUBLIC_METADATA_KEYS에서 제외하거나 저장 시점에 generic 메시지로 정규화(현재 internalErrorResponse 정책과 정합). 본 WI 범위 밖이므로 차단하지 않음.",
+      "defer": true,
+      "deferRationale": "본 WI 수용 기준은 '500 catch 블록의 details: error.message 일괄 제거'로 명시되며, generate/batch의 metadata.error 저장은 ledger·코드 주석 모두 의도적 미변경으로 선언됨. owner/superAdmin 게이트 하 상세 응답이라 5xx 임의노출보다 표면 좁음. 선재 WI-019 allowlist 결정 영역으로 별 WI 후속이 타당.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/api-error.ts:28",
+      "description": "헬퍼가 구조화 로거 대신 console.error를 직접 사용한다. 운영에서 context 태그 검색·집계가 문자열 grep에 의존한다. 기존 코드베이스 전 라우트가 동일하게 console.error를 쓰고 있어 패턴 정합이며 결함은 아니다 (SUSPECTED 아님 — 사실 확인됨, 단지 개선 여지).",
+      "recommendation": "프로젝트 전반 로깅 표준 도입 시 일괄 전환. 단독 변경은 불필요.",
+      "defer": true,
+      "deferRationale": "기존 25개 라우트가 모두 console.error 패턴이며 본 WI는 그 패턴을 중앙화·보존한 것이 목적. 단독 로거 도입은 범위 확대이자 무관 변경.",
+      "fixNow": false
+    }
+  ]
+}
