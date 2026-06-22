@@ -120,9 +120,23 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (body.primaryColor !== undefined) data.primaryColor = body.primaryColor;
     if (body.loadingMessage !== undefined) data.loadingMessage = body.loadingMessage;
 
+    // 응답 allowlist — accessSecret/inviteCode/ownerId/mapData 등 비공개 필드 미반환
+    // (GET /api/spaces/[id] 상세 응답과 동일한 select 정책).
     const updated = await prisma.space.update({
       where: { id },
       data,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        accessType: true,
+        maxUsers: true,
+        status: true,
+        logoUrl: true,
+        primaryColor: true,
+        loadingMessage: true,
+        createdAt: true,
+      },
     });
 
     return NextResponse.json(updated);
