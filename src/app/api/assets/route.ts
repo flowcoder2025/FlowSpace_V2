@@ -16,7 +16,7 @@ const ASSET_STATUS_VALUES = new Set<string>(Object.values(AssetStatus));
 
 /**
  * 쿼리 enum 필터를 정규화(trim+대문자)·검증한다.
- * - null/빈값 → undefined (필터 미적용)
+ * - null/빈값/공백-only → undefined (필터 미적용; trim 후 비면 "미지정"과 동일 취급)
  * - allowlist 불일치 → null (호출부가 400 INVALID_FILTER로 처리)
  * - 유효 → 정규화된 대문자 enum 값
  */
@@ -24,8 +24,8 @@ function normalizeEnumFilter(
   raw: string | null,
   allowed: Set<string>
 ): string | undefined | null {
-  if (!raw) return undefined;
-  const value = raw.trim().toUpperCase();
+  const value = raw?.trim().toUpperCase();
+  if (!value) return undefined;
   return allowed.has(value) ? value : null;
 }
 
