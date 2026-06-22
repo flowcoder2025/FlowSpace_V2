@@ -47,6 +47,7 @@ function makeAssetSelectRow(overrides: Record<string, unknown> = {}) {
       prompt: "secret prompt",
       workflow: "character-default",
       comfyuiJobId: "comfy-job-xyz",
+      accessSecret: "should-never-leak",
       batchId: "batch-9",
     },
     createdAt: new Date("2026-06-22T00:00:00.000Z"),
@@ -153,6 +154,7 @@ describe("GET /api/assets/[id] — 응답 allowlist", () => {
     expect(body.metadata.prompt).toBeUndefined();
     expect(body.metadata.workflow).toBeUndefined();
     expect(body.metadata.comfyuiJobId).toBeUndefined();
+    expect(body.metadata.accessSecret).toBeUndefined();
     expect(body.metadata.batchId).toBeUndefined();
   });
 

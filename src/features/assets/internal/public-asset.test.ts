@@ -30,6 +30,10 @@ function makeAssetRow(
     prompt: "secret generation prompt",
     workflow: "character-default",
     comfyuiJobId: "comfy-job-xyz",
+    // 미래 드리프트 가드 — allowlist가 이런 민감 키로 확대되면 exact-key 단언이 깨져야 함
+    accessSecret: "should-never-leak",
+    token: "secret-token",
+    clientSecret: "cs-xxx",
     // top-level 중복 (제거)
     id: "asset-1",
     type: "character",
@@ -108,17 +112,51 @@ describe("toPublicGeneratedAsset", () => {
     expect(meta.prompt).toBeUndefined();
     expect(meta.workflow).toBeUndefined();
     expect(meta.comfyuiJobId).toBeUndefined();
+    expect(meta.accessSecret).toBeUndefined();
+    expect(meta.token).toBeUndefined();
+    expect(meta.clientSecret).toBeUndefined();
     // 내부 그룹핑/중복 필드도 제거
     expect(meta.batchId).toBeUndefined();
     expect(meta.id).toBeUndefined();
     expect(meta.filePath).toBeUndefined();
   });
 
-  it("정규화된 metadata는 PUBLIC_METADATA_KEYS의 부분집합만 가진다", () => {
+  it("정규화된 metadata 키 집합은 fixture의 공개 키와 정확히 일치한다 (allowlist 확대 false-pass 차단)", () => {
     const { metadata } = toPublicGeneratedAsset(makeAssetRow());
-    const allowed = new Set<string>(PUBLIC_METADATA_KEYS);
-    for (const key of Object.keys(metadata as Record<string, unknown>)) {
-      expect(allowed.has(key)).toBe(true);
+    // PUBLIC_METADATA_KEYS를 오라클로 쓰지 않고 리터럴 기대값으로 잠근다 —
+    // allowlist에 민감 키(accessSecret 등)가 추가되면(또는 공개 키가 누락되면)
+    // 이 단언이 깨진다. 자기참조 부분집합 검사의 false-pass 차단.
+    expect(Object.keys(metadata as Record<string, unknown>).sort()).toEqual(
+      [
+        "columns",
+        "format",
+        "frameHeight",
+        "frameWidth",
+        "generatedAt",
+        "height",
+        "processingTime",
+        "rows",
+        "seed",
+        "width",
+      ].sort()
+    );
+  });
+
+  it("PUBLIC_METADATA_KEYS 상수 자체가 알려진 민감/내부 키를 포함하지 않는다", () => {
+    const forbidden = [
+      "prompt",
+      "workflow",
+      "comfyuiJobId",
+      "accessSecret",
+      "token",
+      "clientSecret",
+      "id",
+      "userId",
+      "filePath",
+    ];
+    const keys = PUBLIC_METADATA_KEYS as readonly string[];
+    for (const key of forbidden) {
+      expect(keys.includes(key)).toBe(false);
     }
   });
 
