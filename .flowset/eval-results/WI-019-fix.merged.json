@@ -1,0 +1,41 @@
+{
+  "wi": "WI-019-fix",
+  "schemaVersion": 1,
+  "commit": "5fef58d",
+  "target": "develop (PR 예정)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": {
+      "verdict": "WARNING",
+      "issueCount": 1,
+      "rounds": 1,
+      "convergence": "r1 WARNING (P3 defer, fixNow:false): metadata allowlist 테스트가 PUBLIC_METADATA_KEYS 자체를 오라클로 써 부분집합만 검사 → allowlist가 새 민감 키(accessSecret 등)로 확대되면 false-pass 가능. codex 명시: '현재 GET /api/assets/[id]에 prompt/workflow/comfyuiJobId/userId 누출은 없음'. 도구 부수(rg regex parse error)는 codex 내부 ripgrep 호출 quirk — verdict JSON 정상 산출(-o 권위), 제품 결함 아님."
+    },
+    "evaluator": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.78,
+      "scores": { "completeness": 9.7, "consistency": 9.9, "specificity": 10.0, "actionability": 9.6 },
+      "issueCount": 3,
+      "runs": 1,
+      "note": "WARNING 9.78 (P0/P1 0, P3x3 전부 defer). 코드 기반 누출 차단 확정(generate/route.ts:90·batch/route.ts:79가 GeneratedAssetMetadata 전체를 metadata에 중복 저장 → prompt/workflow/comfyuiJobId 실재, allowlist가 정확 배제, 저장키 전수 대조로 누락 민감키 0). 소비처 3곳(game-loader·sprite-generator·test-chibi-generation) 전수 무회귀. 변이검증 3종 전부 검출(metadata 통째→4 FAIL·prompt 추가→2 FAIL·userId 누출→4 FAIL). P3: ①assets/route.ts:47 동일클래스 선재 누출(목록 prompt:true, shared=true 분기 넓음 — 범위 밖 후속WI) ②allowlist 동기화 드리프트(deny-by-default 안전방향) ③GeneratedAssetForPublic userId 미선언(tsc0·런타임무영향·함수 주석에 의도 문서화됨)."
+    }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "보안/정보위생 응답 정형화 WI(WI-014 동일 클래스, assets/[id] 상세). 듀얼 블라인드 1R 수렴: codex WARNING(P3x1 defer) · evaluator WARNING 9.78(P3x3 defer). 차단 이슈(P0/P1/P2·fixNow) 0. 핵심 설계(codex consult 적출): prompt/workflow/comfyuiJobId가 metadata(Json)에 중복 저장되므로 top-level allowlist만으로 부족 → PUBLIC_METADATA_KEYS allowlist로 metadata 정규화 + select(userId는 권한판정 fetch·DTO 미포함). 양 검증자 독립으로 '현재 실누출 없음' 확정. codex P3(테스트 self-referential 오라클 false-pass)는 defer 표시였으나 WI-011 교훈(테스트 결함 즉시 강화)에 따라 즉시 해소: fixture 민감 extras(accessSecret/token/clientSecret) + 리터럴 exact-key-set 단언 + PUBLIC_METADATA_KEYS 상수 직접 가드. 변이검증 실증(accessSecret allowlist 추가 시 4 테스트 FAIL). 소비처 3곳 무회귀 독립 실증(필요 필드 전부 보존). 기계게이트 4/4(tsc0/lint0[선재 LiveKit 경고1·WI무관]/vitest 192·192/next build0). -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "실 누출 없음(양 검증자 독립 확정). 잔여는 테스트 강건성(codex)·동일클래스 선재 별도라우트(evaluator)·문서 nit.",
+      "codex": "WARNING (P3x1 defer: metadata allowlist 테스트 self-referential 오라클)",
+      "evaluator": "WARNING 9.78 (P3x3 defer)"
+    }
+  ],
+  "resolvedThisWI": [
+    "codex P3(테스트 false-pass 경로): fixture 민감 extras + 리터럴 exact-key-set 단언 + 상수 가드 테스트로 해소(commit 5fef58d). 변이검증으로 폐쇄 실증."
+  ],
+  "deferred": [
+    "P3 (evaluator) src/app/api/assets/route.ts:47 — 목록 GET /api/assets select에 prompt:true(특히 shared=true는 타인 공유자산 노출 표면 넓음). 동일 클래스·별 라우트·변경 범위 밖(WI-014→WI-019 분리 선례) → 후속 WI 후보(WI-021).",
+    "P3 (evaluator) public-asset.ts:18 allowlist 공개키 동기화 드리프트 — deny-by-default라 신규 민감키 자동 차단(보안 안전 방향).",
+    "P3 (evaluator) public-asset.ts:50 GeneratedAssetForPublic userId 미선언 — tsc0·런타임 무영향, toPublicGeneratedAsset 주석에 의도 문서화됨."
+  ]
+}

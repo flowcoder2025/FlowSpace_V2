@@ -1,0 +1,16 @@
+WI=WI-019-fix
+commit=5fef58d
+sourceFingerprint=0b92337e3b246459b75203a0da3ae0bc8be72f5703a8a41edf046413ec0db417
+fingerprintScope=changeset(5 source files vs develop: api/assets/[id]/route.ts + route.test.ts + features/assets/index.ts + internal/public-asset.ts + public-asset.test.ts). 검증된 changeset 감사 기록. 커밋 후 워킹트리 clean이라 Stop 게이트는 changed=0(fp empty e3b0c44)으로 통과. eval-results .json/.md/.pass는 소스 fingerprint 범위 외(.ts/.tsx/.prisma만 추적).
+codex=.flowset/eval-results/WI-019-fix.codex.json
+evaluator=.flowset/eval-results/WI-019-fix.eval.json
+merged=.flowset/eval-results/WI-019-fix.merged.json
+consult=.flowset/eval-results/WI-019-consult-r1.out.txt
+gates=tsc,lint,vitest,build
+gatesEvidence=tsc 0 / lint 0(선재 LiveKit 경고 1·WI무관) / vitest 192·192 / next build 0
+codexVerdict=r1 WARNING(P3x1 defer: metadata allowlist 테스트 self-referential 오라클 — 실누출 없음 명시) -> 즉시 해소(5fef58d)
+evaluatorVerdict=r1 WARNING(9.78 P3x3 defer: 목록라우트 선재누출·allowlist드리프트·userId 미선언 nit)
+gateDecision=PASS
+followUp=WI-021 후보 — GET /api/assets(목록 route.ts:47) prompt:true 선재 누출 정형화(동일 클래스, shared=true 분기는 타인 공유자산 노출 표면 넓음). evaluator P3 흡수.
+target=develop (PR 예정)
+createdAt=2026-06-22T20:37:00+09:00
