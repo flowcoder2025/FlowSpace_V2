@@ -1,12 +1,12 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-013-perf",
   "lastWI": "WI-012-2-refactor",
-  "type": "refactor",
-  "status": "MERGED",
+  "type": "perf",
+  "status": "VERIFY",
   "integrationBranch": "develop",
-  "branch": "develop",
+  "branch": "perf/WI-013-perf-space-index",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "986747a",
-  "note": "WI-012-2-refactor(WI-012 분할 2/2 cleanup) develop 머지 완료 — PR#13, merge 986747a(impl f3058be). S3 EventBridge 단일진입점(game 배럴 30 payload 명시노출 + editor/avatar 통일 + ESLint **/game/events 차단) + S4 useScreenRecorder close() L263+L357 .catch 4경로 통일(+AudioContext 스텁 변이검증 2건) + S5 messages 2라우트 cursor를 src/lib/pagination.ts 헬퍼 통일(응답계약 보존, admin hasMore 미추가 D5, +라우트 테스트 11) + S6 POST/api/spaces 커버리지 201/401/400/404/500+GET500(테스트전용·route.ts 무변경). 기계게이트 4/4(vitest 128→147). 듀얼검증 codex r1 PASS 0 issues·evaluator 9.8(P3x1 defer) + .pass(16c001a0). WI-012 전체(1+2) 완결. 큐 잔여: WI-013-perf(Space 복합 인덱스 마이그레이션 — DB 승인+프로덕션 EXPLAIN 필요). 승격 미실행 부채: WI-001~012-2 develop만, main(라이브) 미반영."
+  "lastVerifiedCommit": "a390df8",
+  "note": "WI-013-perf VERIFY: GET /api/spaces 핫 쿼리용 Space 복합 인덱스. schema @@index([status]) 제거→@@index([status, updatedAt(Desc), id(Desc)]) + 마이그레이션 20260622120000_space_hot_query_index(CREATE→DROP 순, force-add). 설계 codex consult D1~D5(단일 복합·Prisma 네이티브 full·redundant status 제거·prod CONCURRENTLY via direct). 로컬검증 prisma validate/migrate diff/기계게이트 5/5(prisma generate 0/tsc 0/lint 0/vitest 147·147/build 0). 듀얼검증 codex r1 PASS 0 issues·evaluator 9.78(P3x2: #1 migration순서[eca0ff2 해소]·#2 D2 joined 보류[의도된 prod-gate 후속]) + .pass(c206e20b). **prod 적용 + 프로덕션 EXPLAIN(cursor seek 효율)은 사용자 승인 게이트(미실행)**. 직전 WI-012-2 develop 머지(PR#13, 986747a)."
 }
