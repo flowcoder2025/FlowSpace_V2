@@ -174,9 +174,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       updateData.restrictedBy = session.user.id;
     }
 
+    // 응답 allowlist — restrictedBy 등 관리 메타·식별자 미반환(member-table는 본문 미사용).
     const updated = await prisma.spaceMember.update({
       where: { id: memberId },
       data: updateData,
+      select: { id: true, role: true, restriction: true },
     });
 
     // 이벤트 로그 기록
