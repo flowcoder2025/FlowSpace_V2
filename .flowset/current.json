@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-024-fix",
-  "lastWI": "WI-023-fix",
-  "type": "fix",
-  "status": "WI_024_VERIFY",
+  "activeWI": null,
+  "lastWI": "WI-024-fix",
+  "type": null,
+  "status": "WI_024_MERGED_DEVELOP",
   "integrationBranch": "develop",
-  "branch": "fix/WI-024-fix-metadata-error-leak",
+  "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "3cd7d04",
-  "note": "WI-024-fix(assets metadata.error 정보 노출 차단, CWE-209). 비동기 에셋 생성 실패 시 raw error.message가 GeneratedAsset.metadata.error에 저장되고 WI-019 PUBLIC_METADATA_KEYS('error' 포함)를 거쳐 GET /api/assets/[id] 응답으로 도달하던 정보 노출(WI-023과 동일 클래스). 설계 codex consult 1R 수렴 C안(A+B): B 단독은 기존 DB 행이 이미 raw 보유라 불완전 → A로 기존·신규 응답 계층 차단 필요. (A) PUBLIC_METADATA_KEYS에서 'error' 제거(기존 raw 행도 즉시 응답 차단). (B) generate/batch .catch가 raw는 console.error 서버 로그에만, DB엔 generic GENERATION_FAILURE_MESSAGE 저장(features/assets/internal/constants.ts, 배럴 노출). 백필 운영 스크립트 scripts/backfill-failed-asset-error.mjs(dry-run 기본·멱등·prod=사용자 게이트). 회귀 테스트 +6: public-asset L170 보존→차단 뒤집기+generic 제거+PUBLIC_METADATA_KEYS forbidden에 error 추가 / 라우트 실패경로(raw 미저장·console.error 보존·비-Error 거부값). 기계게이트 4/4(tsc0/lint0err/vitest 232->238/build0). impl 3cd7d04. codex 위험#5(성공 경로 metadata 전체 저장면 확대)는 후속 WI 등록 예정. 검증 대기."
+  "lastVerifiedCommit": "91079d1",
+  "note": "✅ WI-024-fix(assets metadata.error 정보 노출 차단, CWE-209) develop 머지 완료(2026-06-22, PR#26 merge 91079d1, impl 3cd7d04). 비동기 에셋 생성 실패 시 raw error.message가 GeneratedAsset.metadata.error에 저장되고 WI-019 PUBLIC_METADATA_KEYS('error' 포함)를 거쳐 GET /api/assets/[id] 응답으로 도달하던 정보 노출(WI-023 evaluator 발굴·동일 클래스). 설계 codex consult 1R 수렴 C안(A+B): B 단독은 기존 DB 행이 이미 raw 보유라 불완전→A로 기존·신규 응답 계층 차단 필수. (A) PUBLIC_METADATA_KEYS에서 error 제거. (B) generate/batch .catch가 raw는 console.error 서버로그만·DB엔 generic GENERATION_FAILURE_MESSAGE(constants.ts·배럴) 저장. 백필 scripts/backfill-failed-asset-error.mjs(dry-run 기본·멱등·prod=사용자 게이트). 회귀 테스트 +6. 기계게이트 4/4(tsc0/lint0err/vitest 232->238/build0). 듀얼 블라인드 1R: codex PASS 0 issues · evaluator WARNING 9.85(P0/P1 0, fixNow 0, P3x3 defer, 변이검증 3종). .pass fingerprint empty e3b0c442. 머지 후 develop tsc0/vitest238 재확인. === 직전: WI-023-fix PR#25 b788009 / WI-022-fix PR#24 5469f99 / WI-021-fix PR#23 13c3b55. READY 큐 비어 있음. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-025(parsePageNumber offset 상한)/WI-026(저장 metadata public/internal 분리, codex consult 위험#5). WI-019/021/022/023/024 develop만 반영 — main 미승격(승격은 사용자 승인 게이트). === 남은 사용자 게이트(비코드): WI-024 백필 --apply prod 실행·V1 폐기·WI-005 SOCKET_INTERNAL_*·V2 AUTH_SECRET rotation·WI-013 prod EXPLAIN."
 }
