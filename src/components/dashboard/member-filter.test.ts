@@ -77,6 +77,29 @@ describe("filterMembers — 검색어", () => {
   it("일치 없음 → 빈 배열", () => {
     expect(filterMembers(ALL, "zzz-nomatch", "ALL")).toEqual([]);
   });
+
+  it("표시명 우선순위(user.name) — 하위 후보(nickname/displayName)는 검색 비매칭", () => {
+    // user.name 존재 → 표시명='AlphaUser', 하위 후보는 검색 대상 아님 (|| 체인 순서 변이 검출)
+    const m = member({
+      id: "prio",
+      displayName: "OmegaDisplay",
+      guestSession: { id: "g2", nickname: "BetaGuest" },
+      user: { id: "u3", name: "AlphaUser", email: "alpha@x.com", image: null },
+    });
+    expect(ids(filterMembers([m], "alphauser", "ALL"))).toEqual(["prio"]);
+    expect(filterMembers([m], "omegadisplay", "ALL")).toEqual([]);
+    expect(filterMembers([m], "betaguest", "ALL")).toEqual([]);
+  });
+
+  it("표시명 우선순위(guestSession) — user 없으면 nickname, displayName 비매칭", () => {
+    const m = member({
+      id: "prio2",
+      displayName: "DispLose",
+      guestSession: { id: "g3", nickname: "NickWin" },
+    });
+    expect(ids(filterMembers([m], "nickwin", "ALL"))).toEqual(["prio2"]);
+    expect(filterMembers([m], "displose", "ALL")).toEqual([]);
+  });
 });
 
 describe("filterMembers — 역할 필터", () => {

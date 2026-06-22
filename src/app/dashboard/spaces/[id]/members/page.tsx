@@ -90,7 +90,10 @@ export default function MembersPage() {
         {isLoading ? (
           <div className="text-ink-muted text-sm py-4">Loading...</div>
         ) : members.length === 0 ? (
-          <div className="text-ink-muted text-sm py-4">멤버가 없습니다.</div>
+          // 로드 실패 시엔 빈 상태 대신 위의 error 메시지만 노출(실패 ≠ 빈 목록)
+          error ? null : (
+            <div className="text-ink-muted text-sm py-4">멤버가 없습니다.</div>
+          )
         ) : visibleMembers.length === 0 ? (
           <div className="text-ink-muted text-sm py-4">검색 결과가 없습니다.</div>
         ) : (
