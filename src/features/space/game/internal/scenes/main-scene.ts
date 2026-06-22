@@ -161,6 +161,11 @@ export class MainScene extends Phaser.Scene {
 
   /** 에셋 생성 완료 → Phaser 런타임 텍스처 로드 */
   private onAssetGenerated = (payload: unknown) => {
+    // 씬 종료(SHUTDOWN/DESTROY) 중이면 로더를 건드리지 않는다. ASSET_GENERATED가
+    // shutdown 도중 비동기로 발화하면 비활성 씬에서 load.start()가 로더 상태를
+    // 손상시킬 수 있음 (BootScene과 동일한 scene-active 가드).
+    if (!this.scene.isActive(SCENE_KEYS.MAIN)) return;
+
     const data = payload as AssetGeneratedPayload;
     const filePath = data.metadata?.filePath as string | undefined;
     if (!filePath) return;
