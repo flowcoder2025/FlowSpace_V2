@@ -1,0 +1,42 @@
+{
+  "wi": "WI-023-fix",
+  "schemaVersion": 1,
+  "commit": "d352c45",
+  "target": "develop (PR 예정)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": {
+      "verdict": "PASS",
+      "issueCount": 0,
+      "rounds": 1,
+      "convergence": "r1 PASS 0 issues. 블라인드 스키마 강제(-o 권위, turn.failed/error 이벤트 0). 누출 잔존·비-500 회귀·변환 정확성·헬퍼 설계·테스트 품질 전 관점 무결 판정."
+    },
+    "evaluator": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.85,
+      "scores": { "completeness": 9.8, "consistency": 9.9, "specificity": 10.0, "actionability": 9.7 },
+      "issueCount": 2,
+      "runs": 1,
+      "note": "독립 채점(codex 산출물 미열람). 잔존 누출 0 확인(rg 'details: error instanceof Error' 0건, 레포 전체 details:error는 헬퍼 docstring 주석 1건뿐). 37 catch/26 라우트 전수 검토: 메시지 verbatim·code 미추가·응답 키집합 정확히 {error}·드롭 키 없음(develop 원본 catch는 전부 error+details만). 제외 3라우트(socket/token·livekit/webhook·livekit/token) 원래부터 {error}+console.error라 누출 클래스 무속·올바른 제외. metadata.error 미변경 정당(500 아님·DB 저장). 회귀 부재(.details 소비처 0·app.md#4 정합). 변이검증 실증: details 누출 복원→4파일 6테스트 FAIL(헬퍼1+라우트3), 원복 diff0(false-pass 아님). 게이트 실측 tsc0/vitest232. P3x2 전부 defer."
+    }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "500 catch 블록 details:error.message 정보 노출(CWE-209) 일괄 제거 WI(WI-022 듀얼검증 defer P3에서 발굴, 실측 결과 assets 단독 아닌 26파일 37곳 전역 표면 확인→codex consult 일괄 권고). 듀얼 블라인드 1R 수렴: codex PASS 0 issues · evaluator WARNING 9.85(P0/P1 0, P3x2 전부 defer). 차단 이슈(P0/P1/P2·fixNow) 0. 중앙 헬퍼 internalErrorResponse로 원본 에러를 서버 로그(console.error)에만, 클라엔 generic {error} 500만 반환(details 환경 무관 영구 미반환). 26 라우트 37 catch 일괄 치환(기존 메시지 verbatim·code 미추가·키집합 {error} 유지), DB metadata.error(500 아님) 미변경. 양 검증자 독립으로 누출 잔존 0·비-500 무회귀·변환 정확성 확정 + evaluator 변이검증(6테스트 FAIL/원복 diff0) 실증. 기계게이트 4/4(tsc0/lint0err[선재 LiveKit 경고1·WI무관]/vitest 227→232[+5]/build0). offset 상한(parsePageNumber)은 codex consult대로 분리(별 WI). -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "초기 구현(헬퍼+26파일 일괄+테스트)에 대한 듀얼 블라인드. 차단 결함 0.",
+      "codex": "PASS (0 issues)",
+      "evaluator": "WARNING 9.85 (P0/P1 0, P3x2 defer, 변이검증 6테스트 FAIL 실증)"
+    }
+  ],
+  "resolvedThisWI": [
+    "WI-022 evaluator defer P3(assets/route.ts:124 500 폴백 details:error.message 정보 노출) 해소 — 단 실측 결과 assets 단독 아닌 26파일 37곳 전역이라 일괄 해소.",
+    "전 API 라우트(26파일) 500 catch의 CWE-209 정보 노출 클래스 완전 제거(중앙 헬퍼 internalErrorResponse).",
+    "디버깅 정보 보존: 기존 26 라우트 catch는 서버 로깅이 없어 details 제거 시 디버깅 정보 소실 위험 → 헬퍼가 console.error로 서버 로그 보존."
+  ],
+  "deferred": [
+    "P3 (evaluator) src/app/api/assets/[id]/route.ts:GET + assets/generate:101/batch:94 — 비-500 잔존 경로: 비동기 생성 실패 raw error.message가 GeneratedAsset.metadata.error에 저장되고 WI-019 PUBLIC_METADATA_KEYS('error' 포함)로 GET /api/assets/[id] 응답에 도달. 동일 CWE-209 표면이나 본 WI 수용기준(500 catch) 밖·owner-gated로 표면 좁음·선재 WI-019 allowlist 결정 영역. → 후속 WI-024 권고(metadata.error를 allowlist 제외 또는 저장 시 generic 정규화).",
+    "P3 (evaluator) src/lib/api-error.ts:28 — console.error 직접 사용(구조화 로거 부재). 기존 25 라우트 전부 동일 패턴이라 결함 아님·정합. 프로젝트 전반 로깅 표준 도입 시 일괄 전환."
+  ]
+}
