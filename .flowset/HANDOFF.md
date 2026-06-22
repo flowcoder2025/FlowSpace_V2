@@ -10,15 +10,17 @@
 - **prod DB**: `prisma migrate deploy` 적용 — WI-013 `Space_status_updatedAt_id_idx` 생성+구 `Space_status_idx` 제거(**Space 7행라 즉시·무락, CONCURRENTLY 불필요**), WI-016 `isShared` no-op(IF NOT EXISTS, prod 컬럼·인덱스 기존재). `_prisma_migrations` 3건 SoT 정합.
 - **사전검증 전수 실측**: 기계게이트(tsc0/vitest165/build0) · OCI esbuild 번들+metafile COPY 완전성 · **🔴AUTH_SECRET 해소**(라이브 OCI `socket-v2.144.24.72.143.nip.io`가 로컬 `.env` AUTH_SECRET[44자]로 서명한 JWT 검증 성공 → prod OCI=44자≥32 확정; live 웹 HTTP200 → Vercel==OCI transitive) · WI-016 prod 컬럼 존재 prod DB 직접확인 · codex consult 1R + 적대검증 워크플로우 19에이전트(승격차단 코드결함 0). 산출물: `.flowset/promotion-readiness.md` + `.flowset/promotion-approval.json` + `eval-results/PROMOTION-consult*`.
 
-## ⚠️ 다음 세션 우선 — OCI 소켓 신코드 수동 배포 (사용자 전용, SSH 필요)
-승격으로 **Vercel·DB는 신코드 반영됐으나 OCI 소켓은 구코드 가동 중**:
-- **`deploy-socket.yml` 자동배포는 과거 전부 실패**(2026-03/04/06 전수) — `OCI_SSH_PRIVATE_KEY` 시크릿 미설정 = `"can't connect without a private SSH key"`. **선재 조건, 승격이 깬 게 아님.** OCI는 그동안 수동 SSH 배포돼 옴.
-- **현재 라이브 무중단**: 구 OCI 컨테이너 가동(소켓 HTTP200), 신 Vercel 코드와 호환(AUTH_SECRET 불변·WI-012 protocol 순수리팩터·enforce는 미구현 엔드포인트라 graceful degrade).
-- **사용자 작업**: OCI(144.24.72.143) SSH → `cd ~/flowspace-v2 && git pull origin main && docker compose -f docker-compose.prod.yml up --build -d` 로 신 server/** 코드 배포. **OR** repo Secrets에 `OCI_SSH_PRIVATE_KEY` 등록 후 `gh workflow run deploy-socket.yml` 재실행. 배포해야 **WI-005 실시간 제재(ban/kick/mute/role 즉시추방)** 활성.
-- **함께 설정**: OCI `.env` `SOCKET_INTERNAL_SECRET`(AUTH_SECRET과 다른 값) + Vercel `SOCKET_INTERNAL_URL`(`https://socket-v2.144.24.72.143.nip.io`)·`SOCKET_INTERNAL_SECRET`(OCI와 동일). 미설정=실시간 제재만 degrade(DB 반영·재접속 차단 보존, 크래시 아님).
-- **선택**: WI-013 prod EXPLAIN(cursor seek 효율, codex 지목) — Space 7행이라 현재는 무의미, 데이터 증가 후.
+## ✅ OCI 소켓 배포도 완료 (2026-06-22, 사용자 "ssh키 있잖아" 지시)
+- 키 `~/.ssh/flowspace-oci`로 OCI(`ubuntu@144.24.72.143`) SSH 접속 → `git pull origin main`(06cf9c5→50d9af0 FF) + 빌드 + 재배포.
+- **신 소켓 컨테이너 `Up (healthy)` 포트 3002** — 로그 정상(Server running·CORS·**실사용자 접속·룸 입장** [Socket] Connected/[Room] 조용현 joined). 로컬 3002=200, 외부 nip.io=200. **신 코드 AUTH_SECRET 검증이 라이브 Vercel 토큰과 end-to-end 작동 실증.**
+- **⚠️ OCI 배포 인프라 함정(다음 배포 시 주의)**: (1) `deploy-socket.yml` 자동배포는 `OCI_SSH_PRIVATE_KEY` repo Secret **미설정**이라 과거 전수 실패 → 수동 배포만 가능(키는 로컬 `~/.ssh/flowspace-oci`에 있음). (2) OCI는 **docker-compose v1(1.29.2)** 만 설치(yml의 `docker compose -f` v2 명령 미존재) + **v1 recreate 버그** `KeyError: 'ContainerConfig'`(신 Docker 엔진 비호환). **우회 배포 절차**: `docker-compose -f docker-compose.prod.yml build socket` → `docker-compose -f docker-compose.prod.yml rm -f -s socket` → `docker-compose -f docker-compose.prod.yml up -d --no-build socket`(구 컨테이너 제거 후 fresh up = recreate 경로 회피). 롤백 이미지 `flowspace-v2_socket:rollback-pre-promo`(4759e28a3e68) 보존.
 
-(이전 핸드오프의 승격 게이트는 위로 해소됨. 백로그 WI-017~019는 READY 아님.)
+## ⚠️ 남은 선택 작업 (사용자 — 필수 아님)
+- **WI-005 실시간 제재 활성화**: 현재 OCI `.env`에 `SOCKET_INTERNAL_SECRET` **미설정** → enforce 503 graceful degrade(제재는 DB 반영+재접속 차단으로 동작, 즉시추방만 미작동). 활성하려면: OCI `.env`에 `SOCKET_INTERNAL_SECRET=<강한값>` + Vercel에 `SOCKET_INTERNAL_SECRET=<동일값>`·`SOCKET_INTERNAL_URL=https://socket-v2.144.24.72.143.nip.io` 설정(Vercel env는 사용자 권한 필요 — 내 vercel 계정 `kryou2922-4113`은 team env 쓰기 권한 없음) 후 OCI 컨테이너 재시작.
+- **OCI 배포 자동화 복구(선택)**: repo Secrets `OCI_SSH_PRIVATE_KEY` 등록 + `deploy-socket.yml`을 docker-compose **v1 + rm/up 우회**로 수정(또는 OCI에 compose v2 설치).
+- **WI-013 prod EXPLAIN**: Space 7행이라 현재 무의미, 데이터 증가 후.
+
+(승격 게이트 전부 해소. 백로그 WI-017~019는 READY 아님. READY 큐 비어 있음.)
 - 그 외: 신규 WI는 사용자 요구·실사용·실측에서 발굴. 백로그 WI-017(소켓토큰 폴백)/018(prod env fail-fast)/019(assets GET 응답 정형화)는 READY 아님. 시작 전 `.flowset/HANDOFF.md`+`.flowset/fix_plan.md` 읽기.
 - **진행 방식(사용자 확정 2026-06-21)**: 모든 WI는 develop 정상 플로우 — 분기 → 기계게이트(tsc/lint/vitest/build) → 듀얼검증(codex CLI + evaluator-agent) → `.pass` → **develop PR 머지**. 경계/prod 영향 WI는 구현 전 codex consult(process 02). 라이브 반영은 develop→main **승격**(process 07; 승인 + 작성자 `flowcoder25@gmail.com`).
 
