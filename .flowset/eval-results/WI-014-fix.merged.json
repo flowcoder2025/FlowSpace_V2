@@ -1,0 +1,93 @@
+{
+  "wi": "WI-014-fix",
+  "schemaVersion": 1,
+  "commit": "45b67ae",
+  "target": "develop (PR 예정)",
+  "rounds": 2,
+  "reviewers": {
+    "codex": {
+      "verdict": "PASS",
+      "issueCount": 0,
+      "rounds": 2,
+      "convergence": "r1 FAIL(P1 fixNow: GET /api/spaces/[id]/admin/members가 raw SpaceMember 반환 → member-table onRefresh GET로 PATCH 정형화 무력화 + P3 defer: POST create include) → r2 PASS 0 issues(GET include→select·POST create include→select로 해소)."
+    },
+    "evaluator": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.79,
+      "scores": { "completeness": 9.8, "consistency": 9.9, "specificity": 9.6, "actionability": 9.8 },
+      "issueCount": 2,
+      "runs": 2,
+      "note": "r1 WARNING 9.72(P3x3) → r2 WARNING 9.79(P3x2 defer). r2 잔여: #1 route.test.ts POST가 create select arg 미단언(심층방어 변이공백 — 응답 exact-key-set 단언이 실제 누출차단은 커버) · #2 assets/[id] GET raw row(동일 클래스, owner/superAdmin 게이트, WI-014 범위 밖). 소비처 합집합(member-table+media-management) 무파손·테스트 변이검증 가능 독립 실증. 기계게이트 tsc0/lint0/vitest 157·157/build0 재실행."
+    }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "보안/정보위생 응답 정형화 WI. 양 검증자 2R 수렴: codex r1 FAIL(P1 fixNow) → r2 PASS 0 issues · evaluator r1 WARNING 9.72 → r2 WARNING 9.79(P3x2, 둘 다 defer/fixNow:false). 차단 이슈(P0/P1/P2·fixNow) 0. r1 codex P1(GET admin/members가 PATCH 정형화를 onRefresh GET로 무력화)은 두 검증자 모두 코드로 타당 확인 → r2가 동일 리소스 GET을 include→select로 정형화해 해소(restricted*·guestSessionId·spaceId·updatedAt 차단, userId는 media-management 사용분 보존=user.id와 동등·신규누출 아님). POST create도 include→select(불변식 #2). 4개 응답 모두 소비처가 본문 미사용(create-space-form·space-settings-form·member-table는 res.ok만, [id]/members PATCH는 호출처 부재) → 무회귀 독립 실증. PATCH/GET select arg exact-key-set 단언 회귀 테스트(변이검증 가능). 기계게이트 4/4(tsc0/lint0/vitest 157·157/next build0). -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "PATCH 응답 정형화는 됐으나 동일 리소스 GET admin/members가 raw row 반환 → onRefresh로 민감필드 클라 도달. POST create include 약점.",
+      "codex": "FAIL (P1 fixNow GET raw + P3 defer create include)",
+      "evaluator": "WARNING 9.72 (P3x3 defer)",
+      "status": "RESOLVED(r2 45b67ae) — GET include→select + POST create include→select."
+    },
+    {
+      "round": 2,
+      "issue": "GET admin/members select가 restricted* 차단 + 소비처(member-table·media-management) 합집합 보존 확인. 잔여 P3는 범위 밖/심층방어 공백.",
+      "codex": "PASS (0 issues)",
+      "evaluator": "WARNING 9.79 (P3x2 defer)",
+      "status": "CONVERGED — 차단 이슈 0."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P1",
+      "source": ["codex"],
+      "round": 1,
+      "location": "src/app/api/spaces/[id]/admin/members/route.ts:32 (GET)",
+      "description": "GET admin/members가 include로 raw SpaceMember(restrictedBy/restrictedReason/restrictedUntil/userId/guestSessionId) 반환. member-table이 PATCH 후 이 GET을 재요청(onRefresh)하므로 PATCH 응답 정형화가 무력화 — 민감필드가 결국 클라 도달.",
+      "assessment": "두 검증자 모두 코드로 타당 확인(member-table.tsx:48 onRefresh → page loadMembers GET). 같은 리소스·활성 소비 경로라 fixNow 정당.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true,
+      "status": "RESOLVED(45b67ae) — GET findMany를 select allowlist(id/role/restriction/displayName/userId/createdAt/user{...}/guestSession{...})로 전환. restricted*·guestSessionId·spaceId·updatedAt 미반환. GET 회귀 테스트 추가."
+    },
+    {
+      "severity": "P3",
+      "source": ["codex", "evaluator"],
+      "round": 1,
+      "location": "src/app/api/spaces/route.ts:133 (POST create)",
+      "description": "POST create가 include로 전체 Space 행(accessSecret/inviteCode 포함) materialize 후 수동 직렬화. 응답 누출은 없으나 불변식 #2(필요 필드만) 약점.",
+      "assessment": "관찰된 클라 노출 아님(응답은 손수 조립). 그러나 include→select가 심층방어·불변식 정합.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": false,
+      "status": "RESOLVED(45b67ae) — create를 select{id,name,template}로 전환."
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "round": 2,
+      "location": "src/app/api/spaces/route.test.ts (POST)",
+      "description": "POST 테스트가 create의 select 인자를 단언하지 않음 — create를 include로 되돌리는 변이는 미검출(응답은 라우트가 손수 조립해 동일).",
+      "assessment": "실제 보안 보장(응답 누출 차단)은 응답 exact-key-set 단언으로 커버됨. 심층방어 변이공백일 뿐.",
+      "defer": true,
+      "deferRationale": "응답 키집합 단언이 실제 누출을 차단. create select는 fetch 최적화/불변식 정합이라 변이 미검출이 보안에 영향 없음.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "round": 2,
+      "location": "src/app/api/assets/[id]/route.ts:38 (GET)",
+      "description": "GET이 raw GeneratedAsset 전체 행 반환(동일 누출 클래스). owner/superAdmin 게이트 + 본인 소유 메타만, 크로스테넌트 시크릿 없음.",
+      "assessment": "WI-014(스페이스 API 응답 정형화) 명시 범위 밖. 별 도메인(assets). 후속 WI 후보로 기록.",
+      "defer": true,
+      "deferRationale": "별 도메인·owner-gated·시크릿 부재. WI-014 범위는 spaces API 응답. 후속 WI(자산 응답 정형화)로 분리.",
+      "fixNow": false
+    }
+  ],
+  "followUps": [
+    "assets/[id] GET raw GeneratedAsset 응답 정형화 (동일 클래스, 별 도메인) — 신규 WI 후보.",
+    "POST create select arg 단언 추가 (심층방어 테스트 보강) — 선택."
+  ]
+}

@@ -1,12 +1,12 @@
 {
-  "activeWI": null,
-  "lastWI": "WI-013-perf",
-  "type": "perf",
-  "status": "MERGED",
+  "activeWI": "WI-014-fix",
+  "lastWI": "WI-014-fix",
+  "type": "fix",
+  "status": "VERIFIED_PR_PENDING",
   "integrationBranch": "develop",
-  "branch": "develop",
+  "branch": "fix/WI-014-fix-response-allowlist",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "f8f4ede",
-  "note": "WI-013-perf develop 머지 완료 — PR#14, merge f8f4ede(impl 5a45b6d/r2 eca0ff2). GET /api/spaces 핫 쿼리용 Space 복합 인덱스 @@index([status, updatedAt(Desc), id(Desc)])(기존 단일 status 인덱스 대체) + 마이그레이션 20260622120000_space_hot_query_index. 설계 codex consult D1~D5. 듀얼검증 codex PASS·evaluator 9.78 + .pass(c206e20b). **큐 전부 소진** — WI-001~013 develop 반영 완료, P3 부채 0. **미해결 승인 항목: (1) WI-013 prod 마이그레이션 적용 + 프로덕션 EXPLAIN(cursor seek 효율) — 사용자 승인 게이트. (2) develop→main 승격(WI-001~013 라이브 반영) — 사용자 승인 필요(process 07), WI-012-1 OCI 소켓 재배포 포함. 라이브=구버전 main+WI-007만.** WI-005 운영: OCI .env SOCKET_INTERNAL_SECRET + Vercel SOCKET_INTERNAL_URL/SECRET 필요. 다음: 사용자 승인 대기 또는 신규 WI 발굴."
+  "lastVerifiedCommit": "45b67ae",
+  "note": "WI-014-fix API 응답 민감필드 allowlist 정형화 — 2026-06-22 승격前 통합감사(codex consult + 9축 멀티에이전트 감사 + 적대검증) 발굴. POST/api/spaces·PATCH/api/spaces/[id]·PATCH+GET/api/spaces/[id]/(admin/)members가 전체 Prisma 객체/inviteCode 반환하던 것을 select allowlist로 정형화(GET 경로 원칙 정합). 기계게이트 4/4(tsc0/lint0/vitest 157·157/build0). 듀얼검증 2R 수렴: codex r1 FAIL(P1 fixNow GET admin/members raw→onRefresh로 PATCH 정형화 무력화) → r2 PASS 0 issues · evaluator r1 9.72 → r2 WARNING 9.79(P3×2 defer: POST create select arg 미단언·assets/[id] GET raw[→WI-019]). .pass fingerprint 2ac6070e. impl e5397fc/r2 45b67ae. **develop PR 대기.** 다음 ACTIVE: WI-015-fix(Phaser 잔여 생명주기). 승인 게이트(WI-013 prod 적용/develop→main 승격)는 사용자 결정 대기."
 }
