@@ -1,0 +1,17 @@
+확인한 파일 기준으로는 이 건은 “이미 prod에 직접 반영된 DB hotfix를 migration history에 역기록하는” 케이스입니다. Prisma 공식 문서도 이 흐름에서는 prod에 이미 적용된 변경은 새 migration 파일을 커밋하고, 해당 prod DB에서는 `migrate deploy`로 재실행하지 말고 `migrate resolve --applied`로 기록하라고 설명합니다. 따라서 정석성만 보면 **B**가 맞습니다.
+
+다만 A도 Prisma 자체와 충돌하는 형태는 아닙니다. Prisma migration은 SQL 파일을 직접 커스터마이즈할 수 있고, `migrate deploy`는 pending migration SQL을 실행할 뿐 drift/schema 비교나 shadow DB를 쓰지 않습니다. PostgreSQL도 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`와 `CREATE INDEX IF NOT EXISTS`를 지원합니다. 문제는 A가 “이미 존재한다”만 확인하고 “정의가 정확히 같다”는 보장을 하지 않는다는 점입니다. 특히 PostgreSQL 문서상 `CREATE INDEX IF NOT EXISTS`는 같은 이름의 relation이 있으면 에러를 내지 않지만 기존 인덱스가 의도한 인덱스와 같다는 보장은 없습니다. 그래서 prod 상태가 정말 `isShared BOOLEAN NOT NULL DEFAULT false`와 `GeneratedAsset(isShared,status,type)` 인덱스까지 정확히 맞는 것이 검증된 전제라면 A는 실무적으로 안전한 단순화이고, Prisma식 이력 정합의 원칙은 B입니다.
+
+timestamp는 **WI-013 이후 timestamp**가 낫습니다. Prisma 문서는 migration을 lexicographic order로 적용한다고 하고, migration history는 append-only로 보는 게 안전합니다. 실제 DB 변경 시점이 2026-03이어도 “migration 파일이 추가되는 이력”은 지금 생기는 것이고, 이미 `20260622120000_space_hot_query_index`가 추적 중입니다. 과거 timestamp를 끼워 넣으면 아직 WI-013이 prod 미적용인 현재 prod에는 당장 큰 차이가 없을 수 있지만, 다른 환경에서 WI-013만 이미 기록된 경우 “더 오래된 pending migration”을 새로 만든 꼴이 됩니다. 이 위험을 만들 이유가 없습니다. 두 변경이 독립이면 순서는 WI-013 뒤여도 end-state에는 영향 없습니다.
+
+오프라인 검증은 `--from-schema ...isShared 제거본 --to-schema prisma/schema.prisma --script` 방식이 적절합니다. Prisma CLI 문서상 `migrate diff`는 schema datamodel끼리 diff해서 SQL script를 출력할 수 있습니다. 다만 이것은 “델타 SQL이 의도한 두 항목뿐인가”를 검증하는 것이지, shadow DB 없이 `0_init + WI-013 + 신규 migration` 전체 replay end-state를 증명하는 검증은 아닙니다. 전체 replay 검증은 별도 throwaway PostgreSQL 또는 shadow-capable dev DB가 있어야 합니다. 현재 read-only sandbox에서는 Prisma CLI도 Temp mkdir `EPERM`으로 실패해서 `validate`/`diff` 실행 확인은 못 했습니다.
+
+`migration_lock.toml`은 이번에 `git add -f`로 추가하는 쪽이 맞습니다. 공식 문서는 `prisma/migrations` 전체와 `migration_lock.toml`을 source control에 커밋해야 한다고 명시하고, 이 파일은 provider 변경 감지용입니다. 현재 로컬 파일 내용은 `provider = "postgresql"`이고 [schema.prisma](C:/Team-jane/FlowSpace/prisma/schema.prisma:11)의 datasource provider도 `postgresql`이라 정합합니다. 부작용은 “provider를 바꾸면 감지된다”는 의도된 효과와, 현 `.gitignore` 때문에 계속 force-add가 필요하다는 운영상 불편 정도입니다.
+
+prod 적용은 별도 승인 게이트로 분리하는 게 맞습니다. [package.json](C:/Team-jane/FlowSpace/package.json:7)상 build는 `prisma generate && next build`뿐이고 자동 `migrate deploy`가 없습니다. B를 택하면 prod에서는 WI-013 적용 전에 신규 isShared migration을 `migrate resolve --applied <migration>`로 먼저 기록해야 일반 `ADD COLUMN` 재실행 실패를 피합니다. A를 택하면 승인 시 `migrate deploy` 한 번으로 prod/fresh 양쪽을 통과시키는 운영 단순성이 생깁니다.
+
+공식 근거: Prisma migration history SoT와 lock 커밋 권장, `migrate deploy`가 shadow/drift 검사를 하지 않는 점, hotfix 후 `migrate resolve --applied` 절차는 Prisma docs 기준입니다. PostgreSQL의 `IF NOT EXISTS` 동작과 한계도 공식 문서 기준입니다.
+
+권장안 1줄: **정석은 B, 운영 단순성과 prod 재실행 안전성을 더 중시하면 A를 쓰되 prod의 컬럼/인덱스 정의를 사전 SQL로 정확히 검증하고 `migration_lock.toml`도 함께 force-add.**
+
+내가 놓친 위험 1가지: prod에 `isShared` 컬럼은 있어도 복합 인덱스가 없거나 이름/정의가 다르면, B의 `resolve --applied`는 성능 drift를 영구히 숨깁니다.

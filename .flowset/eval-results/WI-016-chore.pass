@@ -1,0 +1,16 @@
+WI=WI-016-chore
+commit=3e8705b
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+fingerprintScope=소스(.ts/.tsx/.prisma) 변경 0건 — schema.prisma는 이미 isShared 보유(무변경), 이 WI는 마이그레이션 .sql + migration_lock.toml만 추가(Stop 게이트 fingerprint 범위 외라 empty-hash). Stop 게이트는 changed=0으로 통과.
+codex=.flowset/eval-results/WI-016-chore.codex.json
+evaluator=.flowset/eval-results/WI-016-chore.eval.json
+merged=.flowset/eval-results/WI-016-chore.merged.json
+gates=tsc,lint,vitest,build,prisma-validate
+gatesEvidence=tsc 0 / lint 0(npm run lint, 선재 LiveKit 경고 1·WI 무관) / vitest 165·165 / next build 0 / prisma validate OK + migrate diff(제거본↔schema 델타=isShared 컬럼+인덱스 2건, 양방향)
+codexVerdict=WARNING(P3×1, codex 샌드박스 EPERM 환경문제·파일결함 아님·오케스트레이터 게이트로 충족)
+evaluatorVerdict=WARNING 9.83(P3×2 defer)
+gateDecision=PASS
+designConsult=codex 1R (IF NOT EXISTS 채택·timestamp WI-013 이후·lock force-add·prod 승인게이트)
+prodGate=prod 적용(migrate deploy 멱등 또는 인덱스 확인 후 resolve --applied)은 WI-013 prod 적용과 함께 사용자 승인 게이트(미실행). 적용 전 \d "GeneratedAsset" 확인 권장.
+target=develop (PR 예정)
+createdAt=2026-06-22T16:07:18+09:00

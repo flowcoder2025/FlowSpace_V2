@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-015-fix",
-  "lastWI": "WI-015-fix",
-  "type": "fix",
+  "activeWI": "WI-016-chore",
+  "lastWI": "WI-016-chore",
+  "type": "chore",
   "status": "VERIFIED_PR_PENDING",
   "integrationBranch": "develop",
-  "branch": "fix/WI-015-fix-phaser-lifecycle",
+  "branch": "chore/WI-016-chore-migration-baseline",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "33cdbb0",
-  "note": "WI-015-fix Phaser tween 생명주기 누수 정리 — 2026-06-22 승격前 통합감사 phaser-lifecycle 축 2건이 듀얼검증 3R에서 동일 클래스 5곳으로 확장. Phaser는 GameObject.destroy 시 tween 자동제거 안 함 → destroy서 killTweensOf 필요. RemotePlayerSprite(this/sprite/nameText)·LocalPlayer(this/jumpState/sprite, 실호출자)·InteractiveObject(indicator repeat:-1 무한)·MainScene onAssetGenerated scene-active 가드. game/ tweens.add 3파일 전수 커버. 기계게이트 4/4(tsc0/lint0/vitest 165·165/build0). 듀얼검증 3R 수렴: codex r1 FAIL→r2 FAIL→r3 PASS 0 issues · evaluator 9.46→9.75→9.78. .pass 64feec04. impl 57475c7/r2 fe302d3/r3 33cdbb0. **develop PR 대기.** 다음 ACTIVE: WI-016-chore(isShared 마이그레이션 베이스라인). 승인 게이트(WI-013 prod/develop→main 승격) 사용자 대기."
+  "lastVerifiedCommit": "3e8705b",
+  "note": "WI-016-chore GeneratedAsset.isShared 마이그레이션 베이스라인 정합 — schema.prisma 무변경(이미 isShared 보유), 마이그레이션 .sql + lock만 추가(소스 무변경). 신규 20260622130000_generated_asset_is_shared(ADD COLUMN/CREATE INDEX IF NOT EXISTS) + migration_lock.toml force-add. 설계 codex consult 1R(IF NOT EXISTS 자가치유·timestamp WI-013 이후·lock 추가·prod 승인게이트). 기계게이트 5/5(tsc0/lint0/vitest 165·165/build0/prisma validate OK). 듀얼검증 1R 수렴: codex WARNING(P3 env-only) · evaluator WARNING 9.83(P3×2 defer) + .pass(empty fingerprint, 소스 무변경). impl 3e8705b. **develop PR 대기.** **사용자 선택 신규결함 3건(WI-014/015/016) 전부 처리 완료. READY 큐 비어 있음(WI-017~019 BACKLOG).** 미해결 = 사용자 승인 게이트: WI-013+016 prod 적용(prod \\d 확인 권장) / develop→main 승격."
 }
