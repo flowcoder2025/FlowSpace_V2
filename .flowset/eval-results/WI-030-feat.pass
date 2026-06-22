@@ -1,0 +1,13 @@
+WI=WI-030-feat
+commit=c7176f9
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-030-feat.codex.json
+evaluator=.flowset/eval-results/WI-030-feat.eval.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:333pass,build:0
+codexVerdict=PASS
+evaluatorVerdict=WARNING:9.85
+blockingIssues=0
+deferredP3=3
+note=evaluator는 f2135ef(r2) 채점 — r3는 parseInstant 달력검증 additive 강화(codex r3 PASS)
+createdAt=2026-06-23T02:00:00Z
