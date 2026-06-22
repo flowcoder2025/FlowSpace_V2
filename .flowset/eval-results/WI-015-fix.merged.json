@@ -1,0 +1,108 @@
+{
+  "wi": "WI-015-fix",
+  "schemaVersion": 1,
+  "commit": "33cdbb0",
+  "target": "develop (PR 예정)",
+  "rounds": 3,
+  "reviewers": {
+    "codex": {
+      "verdict": "PASS",
+      "issueCount": 0,
+      "rounds": 3,
+      "convergence": "r1 FAIL(P2×2 fixNow: RemotePlayerSprite moveTo tween 미정리 + LocalPlayer 동일 클래스) → r2 FAIL(P2 fixNow: InteractiveObject 무한 indicator tween 미정리) → r3 PASS 0 issues. 매 라운드 동일 클래스의 새 인스턴스를 적출하며 수렴."
+    },
+    "evaluator": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.78,
+      "scores": { "completeness": 9.8, "consistency": 9.8, "specificity": 9.9, "actionability": 9.6 },
+      "issueCount": 2,
+      "runs": 3,
+      "note": "r1 9.46(P2 LocalPlayer 미수정 지목) → r2 9.75(P2 interactive-object 지목) → r3 9.78(P3×2 defer). game/ tweens.add 전수 grep으로 3파일 외 동일 클래스 부재 확정, 변이검증 실증(killTweensOf 대상 제거 시 FAIL). 잔여 P3: LiveKitMediaContext.tsx:578 선재 lint 경고(WI 무관·develop 베이스 재현)·interactive-object glowTween killTweensOf(graphics) 심층방어 공백(실누수 없음)."
+    }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "Phaser tween 생명주기 누수 정리 WI. 양 검증자 3R 수렴: codex r1 FAIL→r2 FAIL→r3 PASS 0 issues · evaluator 9.46→9.75→9.78(최종 P3×2 defer). 차단 이슈(P0/P1/P2·fixNow) 0. **두 검증자가 매 라운드 동일 결함 클래스(Phaser는 GameObject destroy 시 tween 자동제거 안 함 → destroy서 killTweensOf 필요)의 새 인스턴스를 독립 수렴 적출** → 감사 2건(RemotePlayerSprite jump·MainScene 가드)에서 LocalPlayer(실 프로덕션 호출자)·RemotePlayerSprite moveTo·InteractiveObject 무한 indicator tween까지 포괄 해소. game/ 전체 tweens.add 3파일 전수 커버 확인(동일 클래스 소진). 기계게이트 4/4(tsc0/lint0 --max-warnings 0/vitest 165·165/build0). 변이검증 양측 실증. -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "RemotePlayerSprite jump tween + MainScene 가드만 수정. moveTo tween 미정리 + LocalPlayer 동일 클래스 미수정.",
+      "codex": "FAIL (P2×2 fixNow)",
+      "evaluator": "WARNING 9.46 (P2 LocalPlayer + P3×2)",
+      "status": "RESOLVED(r2 fe302d3) — killTweensOf 포괄 정리로 통일 + LocalPlayer.destroy 수정."
+    },
+    {
+      "round": 2,
+      "issue": "InteractiveObject showIndicator 무한 indicator tween(repeat:-1)이 destroy서 미정리(object-manager 직접 destroy 경로).",
+      "codex": "FAIL (P2 fixNow)",
+      "evaluator": "WARNING 9.75 (P2 interactive-object defer)",
+      "status": "RESOLVED(r3 33cdbb0) — InteractiveObject.destroy에 killTweensOf(indicator)."
+    },
+    {
+      "round": 3,
+      "issue": "game/ 전체 tween 생성처 전수 점검 — 3파일 외 동일 클래스 부재 확정.",
+      "codex": "PASS (0 issues)",
+      "evaluator": "WARNING 9.78 (P3×2 defer)",
+      "status": "CONVERGED — 차단 이슈 0."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P2",
+      "source": ["codex", "evaluator"],
+      "round": 1,
+      "location": "src/features/space/game/internal/player/local-player.ts:228 (destroy)",
+      "description": "LocalPlayer(실 프로덕션 점프/이동 호출자)가 startStep(targets:this)·jump 궤적(targets:jumpState)·스케일(targets:sprite) tween을 destroy서 미정리 → 파괴 후 stale tween이 sprite를 만지거나 this/jumpState를 잡아두는 누수. 감사가 놓친 동일 클래스 고영향 인스턴스.",
+      "assessment": "두 검증자 r1 독립 수렴. RemotePlayerSprite.jump는 원격 미구동(dead-code)이라 실 누수는 LocalPlayer 쪽 → defer 아닌 즉시 수정.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true,
+      "status": "RESOLVED(fe302d3) — LocalPlayer.destroy에 killTweensOf(this/jumpState/sprite)."
+    },
+    {
+      "severity": "P2",
+      "source": ["codex"],
+      "round": 1,
+      "location": "src/features/space/game/internal/remote/remote-player-sprite.ts:178 (destroy)",
+      "description": "moveTo tween(sprite/nameText targets)이 destroy서 미정리. Phaser는 GameObject destroy 시 tween 자동제거 안 함 → nameText y tween onComplete가 파괴된 sprite.anims 접근 가능.",
+      "assessment": "초기 가정('GameObject targets는 자동정리') 오류를 codex가 교정. 개별 ref 추적 대신 killTweensOf로 전 target 포괄 정리가 정답.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true,
+      "status": "RESOLVED(fe302d3) — killTweensOf(this/sprite/nameText)."
+    },
+    {
+      "severity": "P2",
+      "source": ["codex", "evaluator"],
+      "round": 2,
+      "location": "src/features/space/game/internal/objects/interactive-object.ts:81 (destroy)",
+      "description": "showIndicator()의 indicator tween(repeat:-1 무한)이 destroy서 미정리. object-manager가 setNearby(false)/hideIndicator 없이 obj.destroy() 직접 호출(onMapLoaded/onObjectMoved/onObjectDeleted) → 무한 tween이 파괴된 indicator 영구 갱신.",
+      "assessment": "두 검증자 r2 독립 수렴(codex fixNow·evaluator defer). 무한 tween이고 WI-015가 바로 이 클래스 정리 WI라 defer 아닌 즉시 수정.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": true,
+      "status": "RESOLVED(33cdbb0) — killTweensOf(indicator) + glowTween.destroy 보존."
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "round": 3,
+      "location": "src/components/LiveKitMediaContext.tsx:578",
+      "description": "선재 lint warning(unused eslint-disable). develop 베이스 체크아웃에서 동일 재현 — WI-015 무관.",
+      "assessment": "WI-015 diff에 미포함. 이전 WI 원장도 '기존 LiveKit 경고 1'로 추적. lint errors 0.",
+      "defer": true,
+      "deferRationale": "WI-015 무관 선재 경고. 별도 chore WI 후보.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "round": 3,
+      "location": "src/features/space/game/internal/objects/interactive-object.ts:82",
+      "description": "glowTween은 graphics 대상이나 destroy서 killTweensOf(graphics) 미호출(glowTween.destroy() ref 정리에만 의존).",
+      "assessment": "graphics tween은 startGlow 1곳·ref 정리라 실누수 없음. 심층방어 공백일 뿐(결함 아님).",
+      "defer": true,
+      "deferRationale": "glowTween ref가 신뢰성 있게 정리. killTweensOf(graphics)는 belt-and-suspenders일 뿐 실누수 없음.",
+      "fixNow": false
+    }
+  ]
+}
