@@ -1,0 +1,35 @@
+독립 검토 결론: 계획은 방향은 맞지만, **“도메인 이동 직후 V2가 아직 옛 env로 서빙되는 창”**과 **“V1 삭제를 너무 빨리 하는 것”**이 가장 위험합니다. 특히 `NEXT_PUBLIC_SOCKET_URL`은 Next.js에서 빌드 시점에 클라이언트 번들에 고정됩니다. Next.js 공식 문서도 `NEXT_PUBLIC_` 값은 빌드 후 변경에 반응하지 않는다고 설명합니다. Auth.js v5는 `AUTH_URL`이 대부분 불필요하고 요청 헤더로 host를 추론하지만, 명시 env가 있는 상태에서는 컷오버 창을 보수적으로 봐야 합니다. 참고: [Auth.js Deployment](https://authjs.dev/getting-started/deployment), [Next.js env docs](https://nextjs.org/docs/app/guides/environment-variables).
+
+**A. 시퀀싱/무중단**
+반대: 지금 순서 그대로는 위험합니다. `space.flow-coder.com`을 V2에 붙인 뒤 재배포 전까지 V2가 `AUTH_URL=https://flowspace-v2.vercel.app`, `NEXT_PUBLIC_SOCKET_URL=nip.io`로 동작할 수 있습니다. 최악은 로그인 시작은 `space`에서 했는데 OAuth callback/cookie/CSRF 기대값이 `flowspace-v2.vercel.app`로 엇갈려 로그인 루프나 callback 실패가 나는 경우입니다.
+
+권장 순서: 먼저 V2 Production env를 `space` 기준으로 바꾸고 새 Production deployment를 만든 뒤, 그 deployment가 준비된 상태에서 도메인을 이동하세요. 즉 “env 변경 → 재배포 완료 확인 → 도메인 제거/추가”가 더 안전합니다. 도메인 이동 후에는 이미 새 번들이 떠 있어야 합니다. `AUTH_URL`을 도메인 이동 전에 바꾸면 `flowspace-v2.vercel.app` 로그인은 깨질 수 있다고 가정해야 합니다. 특히 Google callback이 `space`로 유도되면 아직 V1이 받거나 Vercel 라우팅이 다른 프로젝트로 가서 실패합니다.
+
+**B. NextAuth v5 세션/쿠키**
+합의: `AUTH_SECRET`이 그대로면 JWT 암복호화 자체는 유지됩니다. 반대: 그렇다고 기존 사용자가 로그인 유지된다고 보면 안 됩니다. 브라우저 쿠키는 `flowspace-v2.vercel.app`과 `space.flow-coder.com` 사이에 공유되지 않습니다. 도메인 변경 후 사용자는 사실상 재로그인이 필요하다고 봐야 합니다.
+
+`trustHost`는 Vercel이면 Auth.js가 자동 추론한다고 문서에 나옵니다. 다만 Cloudflare orange proxy가 앞에 있으면 `Host`/`X-Forwarded-Host`가 예상과 다르게 들어오는지 확인해야 합니다. `__Host-` 쿠키는 host-only라 도메인 이동 간 공유되지 않고, `__Secure-` 쿠키는 HTTPS 전제라 Cloudflare SSL 모드/리다이렉트가 꼬이면 CSRF/state 쿠키가 안 맞을 수 있습니다. 로그인 검증은 “기존 쿠키 유지”가 아니라 “새 도메인에서 fresh login 성공”을 기준으로 잡아야 합니다.
+
+**C. Vercel 도메인 이동**
+합의: 같은 Vercel 팀 내 프로젝트 간 이동은 DNS CNAME을 꼭 바꾸지 않아도 될 가능성이 큽니다. `cname.vercel-dns.com`/Vercel edge는 보통 도메인 소유 프로젝트 매핑으로 라우팅합니다. 그래서 핵심은 DNS target보다 **Vercel 내부에서 `space.flow-coder.com`이 정확히 V2 프로젝트에 붙었는지**입니다.
+
+위험: Cloudflare Proxied는 Vercel이 권장하지 않습니다. Vercel은 Cloudflare 같은 외부 reverse proxy가 트래픽 가시성, 보안 기능, 캐시 신뢰성을 떨어뜨린다고 명시합니다. 컷오버 순간 도메인 검증/인증서 발급이 흔들리면 orange cloud를 잠시 DNS only로 낮추는 절차를 준비하세요. 참고: [Vercel Cloudflare KB](https://vercel.com/kb/guide/cloudflare-with-vercel), [Vercel domain docs](https://vercel.com/docs/domains/working-with-domains/add-a-domain).
+
+**D. V1 폐기 안전성**
+강하게 반대: 검증 직후 V1 Vercel과 Supabase를 바로 삭제하지 마세요. DB ref 분리는 좋은 근거지만 폐기 안전 근거로는 부족합니다. 최소 7~14일 “quarantine”을 두고 V1 프로젝트는 도메인만 제거한 채 비활성 보관하는 편이 안전합니다.
+
+삭제 전 확인할 공유 자원: Supabase Storage 객체, Auth 사용자/Account 테이블 마이그레이션 여부, Google OAuth 클라이언트 재사용 여부, `AUTH_SECRET`/JWT 서명키 공유, webhook/cron/callback URL, Vercel env, GitHub deploy hook, Cloudflare rules/cache/page rules, LiveKit/socket DNS, 외부 결제·메일·로그 수집 endpoint. Supabase 문서는 프로젝트 삭제 시 관련 데이터와 백업까지 영구 삭제된다고 명시합니다. Storage 객체는 DB backup에 포함되지 않는다는 점도 함정입니다. 참고: [Supabase backups](https://supabase.com/docs/guides/platform/backups).
+
+**E. 롤백**
+env 실패: V2 env를 이전 값으로 되돌리고 재배포. 단, `NEXT_PUBLIC_SOCKET_URL`은 재배포 없이는 안 돌아옵니다.
+
+재배포 실패: 기존 production deployment를 유지하거나 Vercel rollback으로 직전 deployment를 다시 promote. 도메인은 아직 이동하지 않은 상태여야 가장 안전합니다.
+
+도메인 이동 실패: V2에서 `space.flow-coder.com` 제거 후 V1 `flowspace`에 다시 추가하면 복귀 가능해야 합니다. 단, Vercel의 도메인 ownership/verification 대기, Cloudflare cache, SSL 재발급 지연 때문에 “즉시”를 보장하면 안 됩니다. V1 프로젝트 삭제 전이어야만 이 롤백이 현실적입니다.
+
+삭제 실패/삭제 후 장애: Vercel 프로젝트 삭제와 Supabase 프로젝트 삭제는 롤백 절차가 아니라 복구 요청/백업 복원 문제입니다. 그래서 삭제는 컷오버 검증 단계가 아니라 별도 폐기 작업으로 분리해야 합니다.
+
+**F. 놓친 위험 1가지**
+소켓 CORS와 Cloudflare cache/rules가 웹보다 더 먼저 깨질 수 있습니다. 코드상 소켓 서버는 `CORS_ORIGINS || AUTH_URL`을 origin allowlist로 씁니다. 지금 OCI에 `space`를 추가한 건 맞지만, 실제 브라우저 origin은 `https://space.flow-coder.com`이고 socket endpoint는 `https://space-socket.flow-coder.com`입니다. Cloudflare가 WebSocket upgrade, SSL Full Strict, origin cert, cache/page rule 중 하나라도 다르게 처리하면 로그인은 성공해도 메타버스 진입만 실패합니다.
+
+내 권고는 명확합니다: **도메인 이동 전에 V2 새 production deployment를 `space` 기준 env로 준비하고, V1 삭제는 컷오버 당일 하지 마세요.** V1은 도메인만 뺀 “롤백용 냉동 상태”로 며칠 보관하는 게 맞습니다.

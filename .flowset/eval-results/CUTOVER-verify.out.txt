@@ -1,0 +1,22 @@
+A. `vercel redeploy`만으로 “확실”하다고 보긴 이릅니다. Vercel은 env 변경 후 redeploy를 권장하고, redeploy 시 build cache 사용 여부를 고르게 합니다. `NEXT_PUBLIC_*`는 Next.js가 `next build` 때 브라우저 JS에 인라인하며, 빌드 후 값 변경에는 반응하지 않습니다. 즉 새 빌드가 새 env로 만들어졌는지는 번들 확인으로 증명해야 합니다.  
+
+확실히 하려면 V2에서 `vercel deploy --prod --force`로 소스 재배포하세요. Vercel CLI의 `--force`는 build cache 없이 새 배포를 만듭니다. `vercel redeploy` 문서에는 CLI용 no-cache 옵션이 보이지 않습니다. 
+
+인라인 확인은 코드 수정 없이 브라우저에서 합니다. 로그인 후 실제 `/space/[id]` 진입, DevTools Network에서 JS chunk 전체 검색으로 `space-socket.flow-coder.com` 존재, `nip.io`/옛 socket URL 부재 확인. 콘솔의 `[Socket] Connecting to:`가 `https://space-socket.flow-coder.com`인지도 확인하세요. 이 repo는 [socket-client.ts](/C:/Team-jane/FlowSpace/src/features/space/socket/internal/socket-client.ts:17)에서 직접 `process.env.NEXT_PUBLIC_SOCKET_URL`을 읽으므로 해당 chunk에 박힙니다.
+
+B. 컷오버 직후 주요 실패 지점은 셋입니다. 첫째, 기존 `space.flow-coder.com` 쿠키입니다. NextAuth/Auth.js JWT 세션이면 V1 쿠키가 V2에서도 같은 도메인·같은 secret으로 통과할 수 있고, V2 DB에는 없는 user id라서 “로그인된 것처럼 보이나 API/공간 진입 실패”가 납니다. 최종 e2e는 반드시 site data 삭제 또는 incognito로 해야 하고, 별도로 “기존 V1 세션 보유 브라우저”도 테스트해야 합니다.
+
+둘째, OAuth state/CSRF입니다. 컷오버 전 시작한 로그인 플로우의 state/pkce/callbackUrl 쿠키가 남아 있으면 callback에서 터질 수 있습니다. 새 incognito에서 시작한 Google 로그인만 최종 판정에 쓰세요.
+
+셋째, socket 검증은 polling handshake만으로 부족합니다. 브라우저에서 `wss://space-socket.flow-coder.com/socket.io/?EIO=4&transport=websocket...`가 실제 `101 Switching Protocols`로 붙는지 봐야 합니다. Cloudflare orange-cloud, Caddy upgrade forwarding, socket CORS origin, `/api/socket/token` 발급, socket 서버의 같은 `AUTH_SECRET`이 모두 맞아야 합니다.
+
+C. “검증 완료” 전 필수 e2e는 이 순서입니다. Incognito 또는 site data 삭제. `https://space.flow-coder.com` 접속. Google 로그인 시작부터 callback 완료까지 확인. `/api/auth/session` 200 및 user 확인. `flowspace-v2.vercel.app`로 튀는 redirect가 없어야 합니다. 공간 생성 또는 기존 공간 입장. `/api/socket/token` 200. Network에서 socket WebSocket `101`, 요청 origin `https://space.flow-coder.com`, host `space-socket.flow-coder.com` 확인. 콘솔 CORS/auth 에러 없음. 두 번째 브라우저로 같은 공간 입장 후 이동/채팅/접속자 동기화 확인. 새로고침 후 재입장 확인. 앱 범위라면 mic/cam/LiveKit도 한 번 켜야 합니다.
+
+D. V1 quarantine은 “도메인 제거”만으로는 충분 조건이 아닙니다. V1 alias는 여전히 살아 있고, Google OAuth client 공유, LiveKit/Stripe/Supabase webhook, cron, 외부 callback, deploy hook이 V1/V2 어느 쪽을 치는지 별도 감사해야 합니다. 특히 V1과 V2가 같은 `AUTH_SECRET`이면 과거 custom-domain JWT 쿠키가 V2에 수용될 수 있으니, 안정화 후 강제 로그아웃을 감수하고 V2 secret rotation도 검토 대상입니다.
+
+E. 즉시 롤백은 Vercel domain move API가 가장 깔끔합니다. 현재 소유자인 V2에서 V1 project id로 `POST /v1/projects/flowspace-v2/domains/space.flow-coder.com/move` body `{"projectId":"<V1_PROJECT_ID>","gitBranch":null}`를 호출합니다. Vercel은 project domain move endpoint를 제공합니다. ([docs.vercel.com](https://docs.vercel.com/docs/rest-api/reference/endpoints/projects/move-a-project-domain))  
+대안은 V2에서 domain DELETE 후 V1에 POST add domain입니다. DELETE/add endpoint도 문서화되어 있습니다. ([vercel.com](https://vercel.com/docs/rest-api/reference/endpoints/projects/remove-a-domain-from-a-project)) ([vercel.com](https://vercel.com/docs/rest-api/reference/endpoints/projects/add-a-domain-to-a-project))
+
+단, 프론트 도메인만 되돌리면 socket이 깨질 수 있습니다. `space-socket.flow-coder.com`을 V1 socket origin으로 되돌리거나, V1 production build가 바라보는 socket URL/CORS가 현재 구성과 맞는지 먼저 확인해야 합니다. 롤백 후 `space.flow-coder.com` title/V1 화면, Google login, WebSocket `101`, 공간 입장까지 확인해야 롤백 완료입니다.
+
+F. 놓친 위험 하나: LiveKit입니다. repo에 `/api/livekit/token`, `/api/livekit/webhook`가 있고 미디어 레이어가 있습니다. 도메인·env·webhook secret·callback URL이 V2 기준인지 검증하지 않으면 “공간/소켓은 정상인데 음성·영상만 실패”할 수 있습니다.
