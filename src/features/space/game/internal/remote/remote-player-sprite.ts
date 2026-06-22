@@ -176,6 +176,13 @@ export class RemotePlayerSprite {
 
   /** 리소스 정리 */
   destroy(): void {
+    // Phaser는 GameObject destroy 시 그 대상을 가리키는 tween을 자동 제거하지 않는다.
+    // jump tween은 this(일반 객체)를, moveTo tween은 sprite/nameText를 target으로 하므로
+    // 모두 명시적으로 제거한다 — 파괴 후 stale tween이 onComplete에서 파괴된 sprite.anims를
+    // 만지거나(crash) jumpOffsetY를 갱신하며 인스턴스를 잡아두는(leak) 것을 차단.
+    this.scene.tweens.killTweensOf(this);
+    this.scene.tweens.killTweensOf(this.sprite);
+    this.scene.tweens.killTweensOf(this.nameText);
     this.sprite.destroy();
     this.nameText.destroy();
   }

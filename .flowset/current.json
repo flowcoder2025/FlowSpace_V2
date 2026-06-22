@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-014-fix",
-  "lastWI": "WI-014-fix",
+  "activeWI": "WI-015-fix",
+  "lastWI": "WI-015-fix",
   "type": "fix",
   "status": "VERIFIED_PR_PENDING",
   "integrationBranch": "develop",
-  "branch": "fix/WI-014-fix-response-allowlist",
+  "branch": "fix/WI-015-fix-phaser-lifecycle",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "45b67ae",
-  "note": "WI-014-fix API 응답 민감필드 allowlist 정형화 — 2026-06-22 승격前 통합감사(codex consult + 9축 멀티에이전트 감사 + 적대검증) 발굴. POST/api/spaces·PATCH/api/spaces/[id]·PATCH+GET/api/spaces/[id]/(admin/)members가 전체 Prisma 객체/inviteCode 반환하던 것을 select allowlist로 정형화(GET 경로 원칙 정합). 기계게이트 4/4(tsc0/lint0/vitest 157·157/build0). 듀얼검증 2R 수렴: codex r1 FAIL(P1 fixNow GET admin/members raw→onRefresh로 PATCH 정형화 무력화) → r2 PASS 0 issues · evaluator r1 9.72 → r2 WARNING 9.79(P3×2 defer: POST create select arg 미단언·assets/[id] GET raw[→WI-019]). .pass fingerprint 2ac6070e. impl e5397fc/r2 45b67ae. **develop PR 대기.** 다음 ACTIVE: WI-015-fix(Phaser 잔여 생명주기). 승인 게이트(WI-013 prod 적용/develop→main 승격)는 사용자 결정 대기."
+  "lastVerifiedCommit": "33cdbb0",
+  "note": "WI-015-fix Phaser tween 생명주기 누수 정리 — 2026-06-22 승격前 통합감사 phaser-lifecycle 축 2건이 듀얼검증 3R에서 동일 클래스 5곳으로 확장. Phaser는 GameObject.destroy 시 tween 자동제거 안 함 → destroy서 killTweensOf 필요. RemotePlayerSprite(this/sprite/nameText)·LocalPlayer(this/jumpState/sprite, 실호출자)·InteractiveObject(indicator repeat:-1 무한)·MainScene onAssetGenerated scene-active 가드. game/ tweens.add 3파일 전수 커버. 기계게이트 4/4(tsc0/lint0/vitest 165·165/build0). 듀얼검증 3R 수렴: codex r1 FAIL→r2 FAIL→r3 PASS 0 issues · evaluator 9.46→9.75→9.78. .pass 64feec04. impl 57475c7/r2 fe302d3/r3 33cdbb0. **develop PR 대기.** 다음 ACTIVE: WI-016-chore(isShared 마이그레이션 베이스라인). 승인 게이트(WI-013 prod/develop→main 승격) 사용자 대기."
 }

@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.7,
+    "consistency": 9.8,
+    "specificity": 10,
+    "actionability": 9.5
+  },
+  "weightedTotal": 9.75,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P2",
+      "location": "src/features/space/game/internal/objects/interactive-object.ts:96-104,81-85",
+      "description": "WI-015와 동일 클래스(비-자동정리 tween 누수)가 InteractiveObject에 잔존. showIndicator()가 targets:this.indicator + repeat:-1 무한 tween을 생성하는데(96-103), destroy()(81-85)는 this.glowTween?.destroy()로 graphics tween만 정리하고 indicator tween은 killTweensOf하지 않는다. indicator tween은 hideIndicator()의 killTweensOf(this.indicator)(108)로만 정리되는데, object-manager.destroy()(65)·onMapLoaded 맵리로드(116) 경로는 setNearby(false) 없이 obj.destroy()를 직접 호출 → 플레이어가 오브젝트 근처(isNearby=true)일 때 씬 종료/맵리로드 시 indicator Text는 destroy되지만 그 repeat:-1 tween이 파괴된 Text.y를 영구히 갱신하며 잔존. WI-015가 검증·전제한 'Phaser는 GameObject destroy 시 그 대상 tween 자동제거 안 함'(node_modules/phaser GameObject.js destroy에 tween 참조 없음·Tween.js target.active 미확인 확인)이 그대로 적용됨. 06-issue-taxonomy 기준 '비치명 리소스 누수'=P2.",
+      "recommendation": "InteractiveObject.destroy()에 this.scene.tweens.killTweensOf(this.indicator) 추가(또는 destroy 첫줄에서 hideIndicator()의 kill 로직 재사용). RemotePlayerSprite/LocalPlayer와 동일 패턴.",
+      "defer": true,
+      "deferRationale": "WI-015 명시 범위(RemotePlayerSprite + MainScene 가드, r2에서 LocalPlayer 추가)에 InteractiveObject는 미포함된 별개 객체다. 트리거 빈도가 플레이어 tween보다 낮고(오브젝트 근접 중 teardown 한정), 파괴된 Text.y write는 crash 아닌 양성 누수라 비치명. 게이트 차단 없이 후속 WI(동일 패턴 일괄 적용)로 흡수 권장. fixNow=false.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/game/internal/player/local-player.test.ts:47",
+      "description": "신규 테스트의 tweens.add 스텁 파라미터 '_config'가 미사용이라 next lint 경고 1건 발생('_config is defined but never used'). 빌드/게이트는 통과(경고만)하나 lint 0-warning 위생에서 신규 도입된 경고다.",
+      "recommendation": "스텁을 (config: Record<string,unknown>) 미사용 시 () => ({}) 형태로 단순화하거나 eslint-disable-next-line @typescript-eslint/no-unused-vars 명시. remote-player-sprite.test.ts는 config를 실제 사용하므로 LocalPlayer 측만 해당.",
+      "defer": true,
+      "deferRationale": "테스트 전용 lint 경고(에러 아님)로 기계게이트(lint exit 0)·동작 무영향. P3 위생 부채라 KI 등록 후속 정리로 충분.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/game/internal/player/local-player.test.ts:70-96; src/features/space/game/internal/remote/remote-player-sprite.test.ts:82-114",
+      "description": "두 테스트 모두 destroy()의 killTweensOf 대상 집합만 단언하고 tween onComplete 완료경로(LocalPlayer jump 3중 중첩 onComplete의 isJumping=false·setScale, startStep onComplete의 isStepping=false·emitMovement; RemotePlayerSprite moveTo nameText onComplete의 isMoving=false)는 변이검증하지 않는다. tweens.add 스텁이 config만 기록하고 onComplete를 실행하지 않으므로 완료경로 회귀는 미커버. WI-015 핵심(누수 차단)은 6/6 변이 전부 검출(독립 실증)되므로 결함 아닌 커버리지 공백.",
+      "recommendation": "후속 테스트 WI에서 스텁 tweens.add가 onComplete를 즉시/스케줄 호출하도록 강화해 완료경로 상태전이를 변이검증. WI-015 수용기준 외.",
+      "defer": true,
+      "deferRationale": "WI-015 수용기준은 destroy 시 stale tween 차단이며 해당 변이검증은 6종 전부 통과(독립 실증). onComplete 경로는 동작 무변경·본 WI 변경 대상 아님이라 커버리지 부채로 KI 등록.",
+      "fixNow": false
+    }
+  ]
+}

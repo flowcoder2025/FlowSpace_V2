@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.0,
+    "consistency": 9.7,
+    "specificity": 9.8,
+    "actionability": 9.5
+  },
+  "weightedTotal": 9.46,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P2",
+      "location": "src/features/space/game/internal/player/local-player.ts:262, :170, :228-232",
+      "description": "WI-015가 고친 것과 '동일 결함 클래스'의 더 큰 인스턴스가 LocalPlayer에 그대로 남음. startStep()은 `targets: this`(LocalPlayer 인스턴스, GameObject 아님)로 logicalX/logicalY를 tween하고, jump()는 `targets: this.jumpState`(plain object)로 offsetY를 tween한다. 그런데 LocalPlayer.destroy()(L228-232)는 sprite/nameText/shadow GameObject만 destroy하고 `killTweensOf(this)`/`killTweensOf(this.jumpState)`를 호출하지 않는다. RemotePlayerSprite.jump()와 달리 LocalPlayer는 런타임 활성 — main-scene.ts:99에서 점프 입력마다 jump(), 이동마다 startStep()이 실제 발화한다. 즉 씬 teardown 중 진행 중이던 이동/점프 tween이 파괴된 인스턴스의 logicalX/jumpState를 계속 갱신하며 인스턴스를 잡아두는, WI-015가 막은 누수와 정확히 같은 패턴이 '실제 도달 가능한' 경로로 잔존한다. game/ 전수 grep(`targets: this`/`targets: this.<state>`) 결과 비-GameObject 타겟 tween은 remote jump(WI-015 수정), local startStep, local jumpState 3곳뿐이며 LocalPlayer 2건만 미수정.",
+      "recommendation": "LocalPlayer.destroy()에 `this.scene.tweens.killTweensOf(this)` + `this.scene.tweens.killTweensOf(this.jumpState)`를 sprite.destroy() 전에 추가(WI-015 RemotePlayerSprite와 동일 패턴). 후속 WI로 분리.",
+      "defer": true,
+      "deferRationale": "WI-015의 명시 수용 범위(fix_plan: RemotePlayerSprite.jump tween + MainScene asset 가드 2건)에는 LocalPlayer가 포함되지 않음. 명명된 두 항목은 모두 구현·검증 완료라 게이트 통과를 막지 않으나, 동일 audit 축(phaser-lifecycle)·동일 모듈(game/)·더 높은 런타임 도달성이라 별도 후속 WI(예: WI-020-fix LocalPlayer tween 누수)로 즉시 큐잉해야 한다.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/game/internal/remote/remote-player-sprite.ts:117 (caller absence)",
+      "description": "RemotePlayerSprite.jump()은 프로덕션 호출자가 전혀 없다. 전 src grep `.jump(` 결과 호출처는 main-scene.ts:99의 `this.localPlayer.jump()`(로컬 전용)와 remote-player-sprite.test.ts뿐. PLAYER_JUMPED 이벤트는 local-player.ts:196이 emit하지만 RemotePlayerManager 등 어떤 핸들러도 이를 구독해 `remotePlayer.jump()`를 구동하지 않는다. 따라서 WI-015 항목①(원격 jump tween 누수)이 막는 누수는 현재 도달 불가능한 dead-code 경로 — 수정은 정확하고 선제적이나, WI 서술('원격 플레이어 파괴 후 stale tween 누수')은 현시점 런타임 영향을 다소 과대표현한다(원격 점프 와이어링이 추가되기 전까지 누수 발생 불가).",
+      "recommendation": "수정 자체는 유지(향후 원격 점프 동기화 도입 시 안전). 다만 잔여 검증 신뢰도를 위해 항목①의 성격을 '교정'이 아닌 '예방'으로 기록. 원격 점프 동기화(REMOTE PLAYER_JUMPED 구독→jump())가 별도 백로그면 그때 본 정리 경로가 실효화됨.",
+      "defer": true,
+      "deferRationale": "구현 정확성·무해성에는 영향 없고(remove()+killTweensOf 중복은 완료/중도 양쪽 안전), 게이트 통과 무관. 서술 정확성/우선순위 판단용 메타 노트.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/game/internal/remote/remote-player-sprite.test.ts:48-54, 121-132",
+      "description": "테스트 scene 스텁의 tweens.add는 onComplete를 절대 호출하지 않는 fake tween을 반환한다. 따라서 onComplete 정상 종료 경로(this.jumpTween = undefined 후 destroy가 `if(this.jumpTween)` false 분기 → killTweensOf만 수행)가 테스트로 한 번도 구동되지 않는다. destroy의 jumpTween!=undefined(중도 종료) 분기만 직접 검증됨. 완료 경로 안전성은 killTweensOf(this) backstop으로 보장되고 test3가 'jump 없이 destroy'로 killTweensOf 호출을 잡아 간접 커버하나, onComplete→destroy 시퀀스의 명시 변이검증은 공백.",
+      "recommendation": "fake tween에 onComplete를 동기 호출하는 헬퍼(예: 스텁이 config.onComplete?.()를 즉시 실행하는 모드)를 추가해 '완료 후 destroy 시 remove 미호출+killTweensOf만' 경로를 명시 단언하면 매트릭스 완성. 테스트 전용 강화라 후속.",
+      "defer": true,
+      "deferRationale": "완료 경로의 정리는 killTweensOf(this) backstop이 이미 보장하고 test3가 그 호출을 검증하므로 실제 안전성 공백은 없음. 매트릭스 완전성 차원의 strict improvement.",
+      "fixNow": false
+    }
+  ]
+}
