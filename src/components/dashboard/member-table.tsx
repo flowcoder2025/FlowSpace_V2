@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-interface Member {
+export interface Member {
   id: string;
   role: "OWNER" | "STAFF" | "PARTICIPANT";
   restriction: "NONE" | "MUTED" | "BANNED";
@@ -11,6 +11,9 @@ interface Member {
   guestSession?: { id: string; nickname: string } | null;
   createdAt: string;
 }
+
+/** 멤버 검색 가능한 역할 필터 값 ("ALL" = 전체) */
+export type MemberRoleFilter = "ALL" | "OWNER" | "STAFF" | "PARTICIPANT";
 
 interface MemberTableProps {
   spaceId: string;

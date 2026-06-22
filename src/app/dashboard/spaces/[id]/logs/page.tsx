@@ -22,6 +22,7 @@ export default function LogsPage() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadLogs = useCallback(
     async (nextCursor?: string | null) => {
@@ -42,8 +43,9 @@ export default function LogsPage() {
         }
         setCursor(data.nextCursor);
         setHasMore(!!data.nextCursor);
-      } catch {
-        // ignore
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "로그를 불러오지 못했습니다.");
       } finally {
         setIsLoading(false);
       }
@@ -72,6 +74,8 @@ export default function LogsPage() {
           ))}
         </select>
       </div>
+
+      {error && <div className="text-red-600 text-sm">{error}</div>}
 
       <div className="bg-white rounded-lg border border-line p-5">
         <EventLogTable

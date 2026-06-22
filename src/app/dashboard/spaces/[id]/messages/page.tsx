@@ -20,6 +20,7 @@ export default function MessagesPage() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadMessages = useCallback(
     async (nextCursor?: string | null) => {
@@ -29,7 +30,7 @@ export default function MessagesPage() {
         if (nextCursor) qs.set("cursor", nextCursor);
 
         const res = await fetch(`/api/spaces/${spaceId}/admin/messages?${qs}`);
-        if (!res.ok) throw new Error("Failed");
+        if (!res.ok) throw new Error("Failed to load messages");
         const data = await res.json();
 
         if (nextCursor) {
@@ -39,8 +40,11 @@ export default function MessagesPage() {
         }
         setCursor(data.nextCursor);
         setHasMore(!!data.nextCursor);
-      } catch {
-        // ignore
+        setError(null);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "메시지를 불러오지 못했습니다."
+        );
       } finally {
         setIsLoading(false);
       }
@@ -55,6 +59,7 @@ export default function MessagesPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-ink">Messages</h1>
+      {error && <div className="text-red-600 text-sm">{error}</div>}
       <div className="bg-white rounded-lg border border-line p-5">
         <MessageModeration
           spaceId={spaceId}
