@@ -1,0 +1,12 @@
+WI=WI-024-fix
+commit=3cd7d04
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-024-fix.codex.json
+evaluator=.flowset/eval-results/WI-024-fix.eval.json
+merged=.flowset/eval-results/WI-024-fix.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:238pass,build:0
+codexVerdict=PASS
+evaluatorVerdict=WARNING:9.85
+blockingIssues=0
+createdAt=2026-06-22T14:22:24Z
