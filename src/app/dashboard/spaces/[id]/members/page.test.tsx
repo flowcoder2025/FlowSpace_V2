@@ -72,10 +72,12 @@ describe("MembersPage", () => {
     await screen.findByText("멤버가 없습니다.");
   });
 
-  it("fetch 실패 시 에러 메시지 표시(WI-029 — 기존 미처리 보강)", async () => {
+  it("fetch 실패 시 에러 표시 + 빈 상태는 억제(실패 ≠ 빈 목록)", async () => {
     render(<MembersPage />);
     d.resolve({ ok: false, json: async () => ({}) });
     await screen.findByText("Failed to load members");
+    // 로드 실패 시 "멤버가 없습니다." 빈 상태가 함께 뜨면 안 됨
+    expect(screen.queryByText("멤버가 없습니다.")).toBeNull();
   });
 
   it("검색어 입력 시 행 필터링", async () => {
