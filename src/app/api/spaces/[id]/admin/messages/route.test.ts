@@ -124,3 +124,84 @@ describe("GET /api/spaces/[id]/admin/messages — cursor(헬퍼 통일, WI-012-2
     expect(mockPrisma.chatMessage.findMany).toHaveBeenCalled();
   });
 });
+
+describe("GET /api/spaces/[id]/admin/messages — 고급 필터(WI-030)", () => {
+  it("필터 미지정 → where는 { spaceId }만 (무회귀)", async () => {
+    mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+    await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/messages`), ctx);
+    const args = mockPrisma.chatMessage.findMany.mock.calls[0][0];
+    expect(args.where).toEqual({ spaceId: SPACE_ID });
+  });
+
+  it("type 유효 → where.type 적용", async () => {
+    mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+    await GET(
+      buildGetRequest(`/api/spaces/${SPACE_ID}/admin/messages`, { type: "WHISPER" }),
+      ctx
+    );
+    const args = mockPrisma.chatMessage.findMany.mock.calls[0][0];
+    expect(args.where.type).toBe("WHISPER");
+  });
+
+  it("type 소문자 → 대문자 정규화 후 적용", async () => {
+    mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+    await GET(
+      buildGetRequest(`/api/spaces/${SPACE_ID}/admin/messages`, { type: "whisper" }),
+      ctx
+    );
+    expect(mockPrisma.chatMessage.findMany.mock.calls[0][0].where.type).toBe("WHISPER");
+  });
+
+  it("type 무효 → 400 INVALID_FILTER, prisma 미호출", async () => {
+    const res = await GET(
+      buildGetRequest(`/api/spaces/${SPACE_ID}/admin/messages`, { type: "BOGUS" }),
+      ctx
+    );
+    expect(res.status).toBe(400);
+    const body = await readJson<{ code: string }>(res);
+    expect(body.code).toBe("INVALID_FILTER");
+    expect(mockPrisma.chatMessage.findMany).not.toHaveBeenCalled();
+  });
+
+  it("날짜 범위 → where.createdAt { gte, lt }", async () => {
+    mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+    const start = "2026-06-23T00:00:00.000Z";
+    const end = "2026-06-24T00:00:00.000Z";
+    await GET(
+      buildGetRequest(`/api/spaces/${SPACE_ID}/admin/messages`, {
+        startDate: start,
+        endDate: end,
+      }),
+      ctx
+    );
+    const where = mockPrisma.chatMessage.findMany.mock.calls[0][0].where;
+    expect(where.createdAt.gte.toISOString()).toBe(start);
+    expect(where.createdAt.lt.toISOString()).toBe(end);
+  });
+
+  it("start >= end → 400, prisma 미호출", async () => {
+    const res = await GET(
+      buildGetRequest(`/api/spaces/${SPACE_ID}/admin/messages`, {
+        startDate: "2026-06-24T00:00:00.000Z",
+        endDate: "2026-06-23T00:00:00.000Z",
+      }),
+      ctx
+    );
+    expect(res.status).toBe(400);
+    expect(mockPrisma.chatMessage.findMany).not.toHaveBeenCalled();
+  });
+
+  it("필터 + cursor 공존 → where와 cursor 모두 전달(권한 밖 노출 불가)", async () => {
+    mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+    await GET(
+      buildGetRequest(`/api/spaces/${SPACE_ID}/admin/messages`, {
+        type: "MESSAGE",
+        cursor: "msg-5",
+      }),
+      ctx
+    );
+    const args = mockPrisma.chatMessage.findMany.mock.calls[0][0];
+    expect(args.where).toEqual({ spaceId: SPACE_ID, type: "MESSAGE" });
+    expect(args.cursor).toEqual({ id: "msg-5" });
+  });
+});

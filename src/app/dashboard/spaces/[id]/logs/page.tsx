@@ -3,8 +3,24 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { EventLogTable } from "@/components/dashboard/event-log-table";
+import {
+  localDateToStartInstant,
+  localDateToEndInstant,
+} from "@/components/dashboard/date-range";
 
-const EVENT_TYPES = ["", "ENTER", "EXIT", "CHAT", "INTERACTION", "ADMIN_ACTION"] as const;
+// 표시용 이벤트 타입 옵션(서버는 SpaceEventType enum으로 검증 — SSOT). "" = 전체.
+const EVENT_TYPES = [
+  "",
+  "ENTER",
+  "EXIT",
+  "INTERACTION",
+  "CHAT",
+  "ADMIN_ACTION",
+  "VIDEO_START",
+  "VIDEO_END",
+  "SCREEN_SHARE_START",
+  "SCREEN_SHARE_END",
+] as const;
 
 interface LogEntry {
   id: string;
@@ -19,6 +35,8 @@ export default function LogsPage() {
   const spaceId = params.id;
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filter, setFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +49,10 @@ export default function LogsPage() {
         const qs = new URLSearchParams();
         if (filter) qs.set("eventType", filter);
         if (nextCursor) qs.set("cursor", nextCursor);
+        const startInstant = localDateToStartInstant(startDate);
+        const endInstant = localDateToEndInstant(endDate);
+        if (startInstant) qs.set("startDate", startInstant);
+        if (endInstant) qs.set("endDate", endInstant);
 
         const res = await fetch(`/api/spaces/${spaceId}/admin/logs?${qs}`);
         if (!res.ok) throw new Error("Failed to load logs");
@@ -50,7 +72,7 @@ export default function LogsPage() {
         setIsLoading(false);
       }
     },
-    [spaceId, filter]
+    [spaceId, filter, startDate, endDate]
   );
 
   useEffect(() => {
@@ -59,20 +81,38 @@ export default function LogsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-ink">Event Logs</h1>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="text-sm border border-line rounded px-3 py-1.5"
-        >
-          <option value="">All Events</option>
-          {EVENT_TYPES.filter(Boolean).map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="이벤트 타입 필터"
+            className="text-sm border border-line rounded px-3 py-1.5"
+          >
+            <option value="">All Events</option>
+            {EVENT_TYPES.filter(Boolean).map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            aria-label="시작 날짜"
+            className="text-sm border border-line rounded px-3 py-1.5"
+          />
+          <span className="text-ink-muted text-sm">~</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            aria-label="종료 날짜"
+            className="text-sm border border-line rounded px-3 py-1.5"
+          />
+        </div>
       </div>
 
       {error && <div className="text-red-600 text-sm">{error}</div>}
