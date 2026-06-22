@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.7,
+    "consistency": 9.9,
+    "specificity": 10,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.78,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/assets/route.ts:47",
+      "description": "동일 클래스 선재 누출 — 목록 라우트 GET /api/assets 의 findMany select 가 `prompt: true` 를 포함해 응답으로 생성 프롬프트(민감 필드)를 반환한다. 특히 `shared=true` 분기(where.isShared=true)는 타인 공유 자산까지 조회하므로 타인 자산의 prompt 노출 표면이 상세 라우트보다 넓다. WI-019가 차단한 것과 정확히 동일 클래스(prompt/workflow/comfyuiJobId 정보위생)지만 변경 파일에 없고(상세 [id] 한정 스코프), WI-014→WI-019 분리 선례(별 라우트는 후속 WI)와 동일 패턴이라 이번 산출물 결함 아님. 코드 증거: route.ts:38-53 select 에 prompt 명시, route.ts:22-28 shared 분기.",
+      "recommendation": "후속 WI(예: assets 목록 응답 allowlist)로 GET /api/assets select 의 prompt 제거 + shared 경로 정보위생 정형화. 가능하면 toPublicGeneratedAsset 와 동일 PUBLIC_METADATA_KEYS allowlist 재사용으로 DRY.",
+      "defer": true,
+      "deferRationale": "변경 파일 밖 선재 누출(이번 diff가 도입하지 않음). WI-019 스코프는 GET /api/assets/[id] 상세로 명시 한정. WI-014의 evaluator가 assets/[id] GET 을 '별 도메인·범위 밖→WI-019'로 분리한 선례와 일관. 게이트 차단 사유 아님.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/assets/internal/public-asset.ts:18-31",
+      "description": "PUBLIC_METADATA_KEYS 공개키 동기화 드리프트 잠재. allowlist 방식이라 GeneratedAssetMetadata(types.ts:74) 에 새 민감 키가 추가돼도 자동 차단(deny-by-default = 올바른 방향, 보안상 안전). 반대로 새 공개 키(예: 향후 새 렌더링 메타)가 추가되면 수동으로 allowlist 갱신 필요 — 갱신 누락 시 기능 결손(누출 아님). 현재 metadata 저장 키(processor.ts:234 / batch.ts:79) 대비 공개키 누락 없음을 확인했으므로 즉시 결함 아님.",
+      "recommendation": "GeneratedAssetMetadata 변경 시 PUBLIC_METADATA_KEYS 동기화를 PR 체크리스트화하거나, 민감키 상수(SENSITIVE = prompt/workflow/comfyuiJobId)를 별도 선언해 타입 레벨로 누락 방지.",
+      "defer": true,
+      "deferRationale": "현재 allowlist 가 저장 키 대비 정확하고(공개키 전수 보존·민감키 전수 차단 코드 확인), allowlist 자체가 미래 신규 민감키를 deny-by-default 로 안전 처리. 강화는 개선 영역.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/assets/internal/public-asset.ts:50-62",
+      "description": "타입 문서화 공백(누출 아님). route 의 select 는 userId 를 권한판정용으로 fetch하지만 GeneratedAssetForPublic 인터페이스에는 userId 가 선언돼 있지 않다. route 가 객체 리터럴이 아닌 변수를 넘기므로 TS 구조적 타이핑상 통과하고 tsc 0 으로 무문제이나, '권한판정용 fetch 후 응답 미포함'이라는 핵심 설계 의도가 헬퍼 입력 타입에 드러나지 않는다(주석으로만 표현). 변이검증(userId 누출)에서 테스트가 정확 키집합 단언으로 즉시 검출함을 실증했으므로 런타임 보호는 충분.",
+      "recommendation": "GeneratedAssetForPublic 에 `userId?: string` 을 선택 필드로 명시하고 'fetch only for ownership gate, never in response' 주석으로 의도 고정(현재 주석은 route.ts 에만 존재).",
+      "defer": true,
+      "deferRationale": "tsc 0 통과·런타임 무영향·테스트가 누출 변이를 정확 키집합 단언으로 검출. 가독성/의도명시 개선에 불과.",
+      "fixNow": false
+    }
+  ]
+}

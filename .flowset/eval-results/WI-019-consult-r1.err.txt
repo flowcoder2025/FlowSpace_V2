@@ -1,0 +1,1621 @@
+OpenAI Codex v0.141.0
+--------
+workdir: C:\Team-jane\FlowSpace
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019eef0a-ca40-78b3-bbaf-85bf907eaed1
+--------
+user
+# 설계 협의 — 다음 WI 우선순위 + WI-019 응답 allowlist 설계
+
+FlowSpace = Next.js 15 풀스택 + Phaser 메타버스. 너는 Claude(메인)의 **독립 설계 파트너**다. 산문으로 답하라(스키마 없음). read-only.
+
+## 현재 상태 (실측)
+- WI-001~016 + WI-020 전부 완료·develop→main 승격·라이브 반영. V1→V2 도메인 컷오버 e2e 검증 완료(사용자 정상확인).
+- READY 큐 비어 있음. BACKLOG 3건(승격前 통합감사 발굴):
+  - **WI-017 (improve)** 소켓 토큰 폴백: `src/features/space/socket/internal/socket-client.ts:40` — `const res = await fetch("/api/socket/token"); if (!res.ok) throw new Error("Failed to get socket token");` retry/offline fallback 없이 즉시 throw. AUTH_SECRET 오설정 시 메타버스 진입 전면 실패. UX 방어심화(승격 차단 아님).
+  - **WI-018 (feat)** prod env fail-fast: `dispatchEnforcement`/소켓 서버가 prod env(`SOCKET_INTERNAL_*`) 미설정 시 조용히 degrade. startup 검증으로 fail-fast(운영 안전망). 현재 graceful degrade라 차단 아님.
+  - **WI-019 (fix)** assets GET 응답 정형화: `src/app/api/assets/[id]/route.ts:38`이 raw GeneratedAsset 전체 행(+user) 반환. WI-014(spaces 응답 allowlist)와 동일 클래스·별 도메인. owner/superAdmin 게이트 + 본인 소유 메타만이라 저위험. WI-014 evaluator P3 defer 흡수.
+
+## 질문 1 — 우선순위
+라이브/승격 완료 상태에서 WI-017/018/019 중 무엇을 먼저 처리해야 하나? 내 잠정안은 **WI-019 먼저**(가장 구체적·저위험·WI-014 패턴 확립·REST 계약 변경이라 어차피 consult 필요·prior defer 흡수)다. 동의/반대와 근거.
+
+## 질문 2 — WI-019 설계 (REST 응답 계약 변경)
+`GET /api/assets/[id]`는 현재 `prisma.generatedAsset.findUnique({ where:{id}, include:{ user:{select:{id,name}} } })` 결과 `asset` 전체를 그대로 JSON 반환.
+
+**GeneratedAsset 스칼라**: id, userId, type, name, prompt(@db.Text), workflow, status, metadata(Json?), filePath, thumbnailPath, fileSize, comfyuiJobId, isShared, createdAt, updatedAt + user{id,name}.
+
+**실제 소비처 2곳(앱 내부) + 1(dev 스크립트)이 쓰는 필드 (grep 실측)**:
+- `src/features/assets/internal/game-loader.ts`(loadAssetToPhaser): `id`, `type`, `filePath`, `name`, `metadata`
+- `src/features/space/avatar/internal/sprite-generator.ts`(loadCustomAvatarTexture): `filePath`, `metadata`(metadata.frameWidth/frameHeight)
+- `scripts/test-chibi-generation.ts`(dev 폴링): `status` 추정
+
+내 잠정 allowlist 안: **반환** `{ id, userId, type, name, status, metadata, filePath, thumbnailPath, fileSize, isShared, createdAt, updatedAt, user:{id,name} }` / **제외** `prompt`(생성 프롬프트), `workflow`(내부 워크플로우명), `comfyuiJobId`(내부 인프라 job ID).
+
+- WI-014가 spaces에서 쓴 패턴은 `findUnique`의 `include`→`select`로 교체 + 응답 객체를 명시 키로 구성. 동일 적용이 맞나?
+- 제외 3필드(prompt/workflow/comfyuiJobId)가 맞나, 아니면 더 줄이거나(예: status 폴링 외 소비처 없으면 더 타이트) 더 보존해야 하나? `prompt`는 본인 소유라 노출해도 무방하다는 반론도 가능 — 판단.
+- `metadata`(Json?)를 통째 반환하는 게 안전한가? 파이프라인 내부 데이터가 섞일 위험은? (소비처는 frameWidth/frameHeight/name/filePath만 읽음)
+- 회귀 위험: 두 소비처 타입이 `{ filePath?, metadata? }`/`{id,type,filePath,name,metadata}`로 좁게 선언돼 있어 필드 추가/제거에 둔감. 그래도 빠뜨리면 안 되는 게 있나?
+
+## 질문 3
+**내가 놓칠 위험 1가지**를 반드시 지적하라(우선순위·설계 어느 쪽이든).
+
+codex
+관련 경로와 소비처를 빠르게 확인해서, 주어진 실측과 실제 코드의 결이 맞는지 본 뒤 설계 의견을 정리하겠습니다. read-only 범위에서만 봅니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/app/api/assets/[id]/route.ts -Raw' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/features/assets/internal/game-loader.ts -Raw' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path scripts/test-chibi-generation.ts -Raw' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/features/space/avatar/internal/sprite-generator.ts -Raw' in C:\Team-jane\FlowSpace
+ succeeded in 235ms:
+import { eventBridge, GameEvents } from "@/features/space/game";
+
+interface AssetMetadata {
+  id: string;
+  type: string;
+  filePath: string;
+  name: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * DB?愳劀 ?愳厠 氅旐??办澊??臁绊殞 ??Phaser texture 搿滊摐毳??勴暅 ?措菠??氚滍枆
+ */
+export async function loadAssetToPhaser(assetId: string): Promise<void> {
+  try {
+    const res = await fetch(`/api/assets/${assetId}`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch asset: ${res.statusText}`);
+    }
+
+    const asset: AssetMetadata = await res.json();
+
+    if (!asset.filePath) {
+      throw new Error("Asset has no file path");
+    }
+
+    // EventBridge搿?ASSET_GENERATED ?措菠??氚滍枆 ??Phaser?愳劀 ?橃嫚
+    eventBridge.emit(GameEvents.ASSET_GENERATED, {
+      assetId: asset.id,
+      type: asset.type,
+      metadata: {
+        filePath: asset.filePath,
+        name: asset.name,
+        ...(asset.metadata || {}),
+      },
+    });
+  } catch (error) {
+    eventBridge.emit(GameEvents.ASSET_GENERATION_FAILED, {
+      error: error instanceof Error ? error.message : "Unknown error",
+      params: { assetId },
+    });
+  }
+}
+
+/**
+ * ?煬 ?愳厠??Phaser??搿滊摐
+ */
+export async function loadAssetsToPhaser(assetIds: string[]): Promise<void> {
+  await Promise.allSettled(assetIds.map(loadAssetToPhaser));
+}
+
+
+ succeeded in 217ms:
+/**
+ * ì¹˜ë¹„ ìºë¦­???ì„± E2E ?ŒìŠ¤?? *
+ * ComfyUI ?œë²„ê°€ ?¤í–‰ ì¤‘ì´?´ì•¼ ??
+ * ëª¨ë¸ 3ê°??¤ì¹˜ ?„ìš”: Animagine XL 3.1, ChibiStyleXL LoRA, OpenPoseXL2 ControlNet
+ *
+ * Usage:
+ *   npx tsx scripts/test-chibi-generation.ts
+ */
+import { config } from "dotenv";
+config();
+
+async function main() {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+  // 1. ë¡œê·¸??  console.log("1. ë¡œê·¸??..");
+  const loginRes = await fetch(`${baseUrl}/api/auth/callback/credentials`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: "test@example.com",
+      password: "test1234",
+    }),
+    redirect: "manual",
+  });
+
+  const cookies = loginRes.headers.getSetCookie?.() || [];
+  const cookieHeader = cookies.join("; ");
+
+  if (!cookieHeader) {
+    console.error("ë¡œê·¸???¤íŒ¨: ì¿ í‚¤ë¥?ë°›ì? ëª»í•¨");
+    process.exit(1);
+  }
+  console.log("  ??ë¡œê·¸???±ê³µ");
+
+  // 2. ì¹˜ë¹„ ìºë¦­???ì„± ?”ì²­
+  console.log("2. ì¹˜ë¹„ ìºë¦­???ì„± ?”ì²­...");
+  const genRes = await fetch(`${baseUrl}/api/assets/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: cookieHeader,
+    },
+    body: JSON.stringify({
+      type: "character",
+      name: "chibi_test",
+      prompt: "cute knight with silver armor and blue cape",
+      useChibiStyle: true,
+      useControlNet: true,
+      seed: 42,
+    }),
+  });
+
+  const genData = await genRes.json();
+  console.log(`  Status: ${genRes.status}`);
+  console.log(`  Response:`, JSON.stringify(genData, null, 2));
+
+  if (genRes.status !== 202) {
+    console.error("?ì„± ?”ì²­ ?¤íŒ¨");
+    process.exit(1);
+  }
+
+  const assetId = genData.id;
+  console.log(`  ???ì„± ?œìž‘ (id: ${assetId})`);
+
+  // 3. ?´ë§?¼ë¡œ ?„ë£Œ ?€ê¸?  console.log("3. ?ì„± ?„ë£Œ ?€ê¸?(ìµœë? 10ë¶?...");
+  const startTime = Date.now();
+  const maxWait = 10 * 60 * 1000;
+
+  while (Date.now() - startTime < maxWait) {
+    const statusRes = await fetch(`${baseUrl}/api/assets/${assetId}`, {
+      headers: { Cookie: cookieHeader },
+    });
+
+    if (statusRes.ok) {
+      const asset = await statusRes.json();
+      console.log(`  Status: ${asset.status}`);
+
+      if (asset.status === "COMPLETED") {
+        console.log(`  ???ì„± ?„ë£Œ!`);
+        console.log(`  filePath: ${asset.filePath}`);
+        console.log(`  ì²˜ë¦¬ ?œê°„: ${((Date.now() - startTime) / 1000).toFixed(1)}ì´?);
+
+        if (asset.filePath) {
+          console.log("\n4. ?¤í”„?¼ì´?¸ì‹œ??ë¶„ì„ ?¤í–‰:");
+          console.log(
+            `   npx tsx scripts/analyze-spritesheet.ts public${asset.filePath} 8 4`
+          );
+        }
+        return;
+      }
+
+      if (asset.status === "FAILED") {
+        console.error(`  ???ì„± ?¤íŒ¨:`, asset.metadata?.error);
+        process.exit(1);
+      }
+    }
+
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+
+  console.error("?€?„ì•„?? 10ë¶?ì´ˆê³¼");
+  process.exit(1);
+}
+
+main().catch((err) => {
+  console.error("Error:", err);
+  process.exit(1);
+});
+
+
+ succeeded in 219ms:
+/**
+ * Sprite Generator - Canvas API ?„ë¡œ?œì???ìºë¦­???ì„±
+ *
+ * 4x4 ê·¸ë¦¬??(32x48 per frame = 128x192 ì´??¬ê¸°)
+ * ?? down, left, right, up
+ * ?? 4?„ë ˆ??ê±·ê¸° ? ë‹ˆë©”ì´?? */
+
+import { PLAYER_WIDTH, PLAYER_HEIGHT, SPRITE_COLS, SPRITE_ROWS } from "@/constants/game-constants";
+import type { AvatarConfig, ClassicAvatarConfig } from "./avatar-types";
+import { getTextureKey, DEFAULT_PARTS_AVATAR } from "./avatar-config";
+import { generatePartsSprite } from "./parts/parts-compositor";
+import { eventBridge, GameEvents } from "@/features/space/game";
+
+const SHEET_WIDTH = PLAYER_WIDTH * SPRITE_COLS;
+const SHEET_HEIGHT = PLAYER_HEIGHT * SPRITE_ROWS;
+
+/** Classic/Parts ?œë¡œ?´ì˜ ?´ë? ?´ìƒ??(32x48 ì¢Œí‘œ ? ì?) */
+const DRAW_WIDTH = 32;
+const DRAW_HEIGHT = 48;
+
+/** ?„ìž¬ ë¡œë”© ì¤‘ì¸ custom ?ìŠ¤ì²???(ì¤‘ë³µ ë¡œë“œ ë°©ì?) */
+const loadingCustomKeys = new Set<string>();
+
+/** ê±·ê¸° ? ë‹ˆë©”ì´???¤í”„??(?„ë ˆ?„ë³„ ?¸ë¡œ ?´ë™) */
+const WALK_OFFSETS = [0, -1, 0, -1];
+
+interface DrawContext {
+  ctx: CanvasRenderingContext2D;
+  x: number;
+  y: number;
+  config: ClassicAvatarConfig;
+  direction: number; // 0=down, 1=left, 2=right, 3=up
+  frame: number; // 0-3
+}
+
+/** ?¨ì¼ ?„ë ˆ??ê·¸ë¦¬ê¸?(32x48 ?´ìƒ?? */
+function drawCharacterFrame(dc: DrawContext): void {
+  const { ctx, x, y, config, direction, frame } = dc;
+  const yOff = WALK_OFFSETS[frame];
+
+  // ê±·ê¸° ?„ë ˆ?„ë³„ ?¤ë¦¬ ?„ì¹˜
+  const isStep = frame === 1 || frame === 3;
+  const legOffset = isStep ? (frame === 1 ? -1 : 1) : 0;
+
+  // Body (ë°”ì? ?ì—­)
+  ctx.fillStyle = config.pantsColor;
+  ctx.fillRect(x + 8, y + 30 + yOff, 16, 14);
+
+  // Legs
+  ctx.fillStyle = config.pantsColor;
+  ctx.fillRect(x + 8 + legOffset, y + 38 + yOff, 7, 10);
+  ctx.fillRect(x + 17 - legOffset, y + 38 + yOff, 7, 10);
+
+  // Shoes
+  ctx.fillStyle = "#2a2a2a";
+  ctx.fillRect(x + 8 + legOffset, y + 45 + yOff, 7, 3);
+  ctx.fillRect(x + 17 - legOffset, y + 45 + yOff, 7, 3);
+
+  // Torso (?”ì¸ )
+  ctx.fillStyle = config.shirtColor;
+  ctx.fillRect(x + 7, y + 18 + yOff, 18, 14);
+
+  // Arms
+  if (direction === 1) {
+    // left - ?¤ë¥¸?”ë§Œ ë³´ìž„
+    ctx.fillRect(x + 23, y + 19 + yOff, 5, 11);
+  } else if (direction === 2) {
+    // right - ?¼íŒ”ë§?ë³´ìž„
+    ctx.fillRect(x + 4, y + 19 + yOff, 5, 11);
+  } else {
+    // front/back - ?‘íŒ”
+    ctx.fillRect(x + 3, y + 19 + yOff, 5, 11);
+    ctx.fillRect(x + 24, y + 19 + yOff, 5, 11);
+  }
+
+  // Head
+  ctx.fillStyle = config.skinColor;
+  ctx.fillRect(x + 8, y + 3 + yOff, 16, 16);
+
+  // Hair
+  ctx.fillStyle = config.hairColor;
+  if (direction === 0) {
+    // down (front) - ?´ë§ˆ+ì¸¡ë©´
+    ctx.fillRect(x + 7, y + 1 + yOff, 18, 6);
+    ctx.fillRect(x + 7, y + 5 + yOff, 3, 6);
+    ctx.fillRect(x + 22, y + 5 + yOff, 3, 6);
+  } else if (direction === 3) {
+    // up (back) - ?„ì²´ ë¨¸ë¦¬ì¹´ë½
+    ctx.fillRect(x + 7, y + 1 + yOff, 18, 14);
+  } else {
+    // side
+    ctx.fillRect(x + 7, y + 1 + yOff, 18, 6);
+    if (direction === 1) {
+      ctx.fillRect(x + 20, y + 5 + yOff, 5, 8);
+    } else {
+      ctx.fillRect(x + 7, y + 5 + yOff, 5, 8);
+    }
+  }
+
+  // Eyes (front/side only)
+  if (direction === 0) {
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(x + 11, y + 10 + yOff, 3, 3);
+    ctx.fillRect(x + 18, y + 10 + yOff, 3, 3);
+  } else if (direction === 1) {
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(x + 11, y + 10 + yOff, 3, 3);
+  } else if (direction === 2) {
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(x + 18, y + 10 + yOff, 3, 3);
+  }
+}
+
+/**
+ * Classic ?„ë°”?€ ?¤í”„?¼ì´?¸ì‹œ?¸ë? Phaser???±ë¡
+ *
+ * @returns textureKey
+ */
+export function generateAvatarSprite(
+  scene: Phaser.Scene,
+  config: ClassicAvatarConfig
+): string {
+  const key = getTextureKey(config);
+
+  if (scene.textures.exists(key)) return key;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = SHEET_WIDTH;
+  canvas.height = SHEET_HEIGHT;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return key;
+  ctx.imageSmoothingEnabled = false;
+
+  // 32x48 ?„ì‹œ ìº”ë²„?¤ì— ê·¸ë¦° ??96x128ë¡??¤ì??¼ì—…
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = DRAW_WIDTH;
+  tempCanvas.height = DRAW_HEIGHT;
+  const tempCtx = tempCanvas.getContext("2d");
+  if (!tempCtx) return key;
+
+  // 4??ë°©í–¥) x 4???„ë ˆ??
+  for (let dir = 0; dir < SPRITE_ROWS; dir++) {
+    for (let frame = 0; frame < SPRITE_COLS; frame++) {
+      tempCtx.clearRect(0, 0, DRAW_WIDTH, DRAW_HEIGHT);
+      drawCharacterFrame({
+        ctx: tempCtx,
+        x: 0,
+        y: 0,
+        config,
+        direction: dir,
+        frame,
+      });
+      ctx.drawImage(
+        tempCanvas,
+        0, 0, DRAW_WIDTH, DRAW_HEIGHT,
+        frame * PLAYER_WIDTH, dir * PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT,
+      );
+    }
+  }
+
+  // Phaser's addSpriteSheet accepts canvas at runtime despite TS types
+  scene.textures.addSpriteSheet(
+    key,
+    canvas as unknown as HTMLImageElement,
+    { frameWidth: PLAYER_WIDTH, frameHeight: PLAYER_HEIGHT }
+  );
+
+  return key;
+}
+
+/**
+ * ?µí•© ?„ë°”?€ ?¤í”„?¼ì´???ì„± (classic/parts/custom ëª¨ë‘ ì²˜ë¦¬)
+ *
+ * @returns textureKey
+ */
+export function generateAvatarSpriteFromConfig(
+  scene: Phaser.Scene,
+  config: AvatarConfig,
+): string {
+  if (config.type === "parts") {
+    return generatePartsSprite(scene, config);
+  }
+  if (config.type === "classic") {
+    return generateAvatarSprite(scene, config);
+  }
+  if (config.type === "chibi") {
+    // preload?ì„œ ?´ë? ë¡œë“œ????ì¦‰ì‹œ ë°˜í™˜
+    const key = getTextureKey(config);
+    if (scene.textures.exists(key)) {
+      return key;
+    }
+    // preload ?„ë½ ??fallback
+    return generatePartsSprite(scene, DEFAULT_PARTS_AVATAR);
+  }
+  // custom ???ìŠ¤ì²˜ê? ?´ë? ?±ë¡?˜ì–´ ?ˆìœ¼ë©?ë°”ë¡œ ë°˜í™˜
+  if (scene.textures.exists(config.textureKey)) {
+    return config.textureKey;
+  }
+  // ?ìŠ¤ì²?ë¯¸ë“±ë¡???ë¹„ë™ê¸?ë¡œë“œ ?œìž‘, ê¸°ë³¸ ?„ë°”?€ë¥?fallback?¼ë¡œ ë°˜í™˜
+  loadCustomAvatarTexture(scene, config.textureKey);
+  return generatePartsSprite(scene, DEFAULT_PARTS_AVATAR);
+}
+
+/**
+ * Custom ?„ë°”?€ ?ìŠ¤ì²˜ë? ë¹„ë™ê¸°ë¡œ ë¡œë“œ?˜ì—¬ Phaser???±ë¡
+ *
+ * ?ë³¸ ?ì…‹(128x128 ?„ë ˆ?? 8????ê²Œìž„ ?„ë°”?€(32x48 ?„ë ˆ?? 4x4 grid)ë¡?ë³€?? */
+function loadCustomAvatarTexture(scene: Phaser.Scene, textureKey: string): void {
+  if (loadingCustomKeys.has(textureKey)) return;
+  loadingCustomKeys.add(textureKey);
+
+  // textureKey ?•íƒœ: "character_{assetId}"
+  const assetId = textureKey.replace("character_", "");
+
+  fetch(`/api/assets/${assetId}`)
+    .then((res) => {
+      if (!res.ok) throw new Error("Asset not found");
+      return res.json();
+    })
+    .then((asset: { filePath?: string; metadata?: Record<string, unknown> }) => {
+      if (!asset.filePath) throw new Error("No file path");
+      return loadImageAsCanvas(asset.filePath).then((srcCanvas) => ({
+        srcCanvas,
+        metadata: asset.metadata,
+      }));
+    })
+    .then(({ srcCanvas, metadata }) => {
+      const srcFrameW = (metadata?.frameWidth as number) || 128;
+      const srcFrameH = (metadata?.frameHeight as number) || 128;
+      const srcCols = Math.floor(srcCanvas.width / srcFrameW);
+
+      // ?ë³¸?ì„œ 4ë°©í–¥ x 4?„ë ˆ??ì¶”ì¶œ ??32x48ë¡?ë¦¬ì‚¬?´ì¦ˆ
+      const destCanvas = document.createElement("canvas");
+      destCanvas.width = SHEET_WIDTH;   // 128
+      destCanvas.height = SHEET_HEIGHT; // 192
+      const ctx = destCanvas.getContext("2d");
+      if (!ctx) return;
+
+      // ë°©í–¥ ë§¤í•‘: down(row0), left(row1), right(row2), up(row3)
+      for (let dir = 0; dir < SPRITE_ROWS; dir++) {
+        for (let frame = 0; frame < SPRITE_COLS; frame++) {
+          const srcIdx = dir * srcCols + frame;
+          const srcRow = Math.floor(srcIdx / srcCols);
+          const srcCol = srcIdx % srcCols;
+
+          ctx.drawImage(
+            srcCanvas,
+            srcCol * srcFrameW, srcRow * srcFrameH, srcFrameW, srcFrameH,
+            frame * PLAYER_WIDTH, dir * PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT,
+          );
+        }
+      }
+
+      // Phaser ?ìŠ¤ì²??±ë¡
+      if (!scene.textures.exists(textureKey)) {
+        scene.textures.addSpriteSheet(
+          textureKey,
+          destCanvas as unknown as HTMLImageElement,
+          { frameWidth: PLAYER_WIDTH, frameHeight: PLAYER_HEIGHT },
+        );
+      }
+
+      // EventBridgeë¡??„ë°”?€ ?…ë°?´íŠ¸ ?¬íŠ¸ë¦¬ê±°
+      eventBridge.emit(GameEvents.PLAYER_AVATAR_UPDATED, {
+        avatar: `custom:${textureKey}`,
+      });
+    })
+    .catch(() => {})
+    .finally(() => {
+      loadingCustomKeys.delete(textureKey);
+    });
+}
+
+/** ?´ë?ì§€ URL??Canvasë¡?ë¡œë“œ */
+function loadImageAsCanvas(url: string): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context unavailable"));
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas);
+    };
+    img.onerror = () => reject(new Error("Image load failed"));
+    img.src = url;
+  });
+}
+
+
+2026-06-22T11:15:30.861575Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.3 seconds
+Output:
+Get-Content : 매개 변수 이름 'Raw'과(와) 일치하는 매개 변수를 찾을 수 없습니다.
+위치 줄:2 문자:52
++ Get-Content -Path src/app/api/assets/[id]/route.ts -Raw
++                                                    ~~~~
+    + CategoryInfo          : InvalidArgument: (:) [Get-Content], ParameterBindingException
+    + FullyQualifiedErrorId : NamedParameterNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+ exited 1 in 271ms:
+Get-Content : 매개 변수 이름 'Raw'과(와) 일치하는 매개 변수를 찾을 수 없습니다.
+위치 줄:2 문자:52
++ Get-Content -Path src/app/api/assets/[id]/route.ts -Raw
++                                                    ~~~~
+    + CategoryInfo          : InvalidArgument: (:) [Get-Content], ParameterBindingException
+    + FullyQualifiedErrorId : NamedParameterNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+codex
+소비처는 제시된 범위와 대체로 일치합니다. 라우트 파일은 PowerShell의 `[]` 경로 해석 때문에 다시 literal path로 열어보고, WI-014에서 정착한 응답 구성 방식도 같이 확인하겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'src/app/api/assets/[id]/route.ts' | Out-String" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"GeneratedAsset|/api/assets|findUnique\\(|select:|include:\" src/app src/features scripts -g \"*.ts\" -g \"*.tsx\"" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"allowlist|spaces|user:\\s*\\{\\s*select|findUnique\" src/app/api -g \"route.ts\"" in C:\Team-jane\FlowSpace
+ succeeded in 208ms:
+src/app/api\guest\route.ts:29:    const space = await prisma.space.findUnique({
+src/app/api\guest\route.ts:43:        { error: "Guest access not allowed for private spaces" },
+src/app/api\auth\register\route.ts:30:    const existing = await prisma.user.findUnique({ where: { email } });
+src/app/api\spaces\route.ts:8: * GET /api/spaces - 내 공간 목록 (슈퍼어드민의 "전체"는 모든 ACTIVE 스페이스).
+src/app/api\spaces\route.ts:10: * 응답: `{ spaces, nextCursor, hasMore }` (기존 `spaces` 필드 유지 = 하위호환).
+src/app/api\spaces\route.ts:78:    return NextResponse.json({ spaces: result, nextCursor, hasMore });
+src/app/api\spaces\route.ts:82:        error: "Failed to fetch spaces",
+src/app/api\spaces\route.ts:90:/** POST /api/spaces - 공간 생성 */
+src/app/api\spaces\route.ts:101:        { error: "Only superAdmin can create spaces", code: "SUPER_ADMIN_REQUIRED" },
+src/app/api\spaces\route.ts:122:    const template = await prisma.template.findUnique({
+src/app/api\spaces\route.ts:159:    // 응답 allowlist — inviteCode 등 민감/내부 필드 미반환(GET 목록·상세 정책과 정합).
+src/app/api\spaces\route.ts:160:    // 클라이언트(create-space-form)는 본문을 쓰지 않고 /my-spaces로 이동만 한다.
+src/app/api\assets\[id]\route.ts:20:    const asset = await prisma.generatedAsset.findUnique({
+src/app/api\assets\[id]\route.ts:59:    const asset = await prisma.generatedAsset.findUnique({
+src/app/api\livekit\token\route.ts:197:          .findUnique({
+src/app/api\users\me\route.ts:13:  const user = await prisma.user.findUnique({
+src/app/api\spaces\join\[inviteCode]\route.ts:9:/** GET /api/spaces/join/[inviteCode] - 초대 코드로 공간 정보 조회 */
+src/app/api\spaces\join\[inviteCode]\route.ts:14:    const space = await prisma.space.findUnique({
+src/app/api\spaces\join\[inviteCode]\route.ts:47:/** POST /api/spaces/join/[inviteCode] - 초대 코드로 참여 */
+src/app/api\spaces\join\[inviteCode]\route.ts:58:    const space = await prisma.space.findUnique({
+src/app/api\spaces\join\[inviteCode]\route.ts:75:    const existing = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\route.ts:9:/** GET /api/spaces/[id] - 공간 상세 */
+src/app/api\spaces\[id]\route.ts:18:    // select allowlist — accessSecret/inviteCode/ownerId 등 비공개 필드 미반환.
+src/app/api\spaces\[id]\route.ts:20:    const space = await prisma.space.findUnique({
+src/app/api\spaces\[id]\route.ts:84:/** PATCH /api/spaces/[id] - 공간 수정 (OWNER only) */
+src/app/api\spaces\[id]\route.ts:93:    const space = await prisma.space.findUnique({ where: { id } });
+src/app/api\spaces\[id]\route.ts:123:    // 응답 allowlist — accessSecret/inviteCode/ownerId/mapData 등 비공개 필드 미반환
+src/app/api\spaces\[id]\route.ts:124:    // (GET /api/spaces/[id] 상세 응답과 동일한 select 정책).
+src/app/api\spaces\[id]\route.ts:154:/** DELETE /api/spaces/[id] - 공간 삭제 (soft delete, OWNER only) */
+src/app/api\spaces\[id]\route.ts:163:    const space = await prisma.space.findUnique({ where: { id } });
+src/app/api\spaces\[id]\members\route.ts:15:/** GET /api/spaces/[id]/members - 멤버 목록 */
+src/app/api\spaces\[id]\members\route.ts:28:      const myMember = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\members\route.ts:41:        user: { select: { id: true, name: true, image: true } },
+src/app/api\spaces\[id]\members\route.ts:69:/** POST /api/spaces/[id]/members - 공간 참여 */
+src/app/api\spaces\[id]\members\route.ts:80:    const space = await prisma.space.findUnique({ where: { id } });
+src/app/api\spaces\[id]\members\route.ts:103:    const existing = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\members\route.ts:144:/** PATCH /api/spaces/[id]/members - 멤버 역할/제한 변경 (OWNER/STAFF only) */
+src/app/api\spaces\[id]\members\route.ts:169:    const myMember = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\members\route.ts:178:    // enum allowlist 검증 (임의 값 주입 차단)
+src/app/api\spaces\[id]\members\route.ts:187:    const target = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\members\route.ts:221:    // 응답 allowlist — restrictedBy/restrictedReason/restrictedUntil 등 관리 메타와
+src/app/api\spaces\[id]\map\route.ts:9:/** GET /api/spaces/[id]/map - 맵 데이터 + 오브젝트 일괄 조회 */
+src/app/api\spaces\[id]\map\route.ts:20:    const spaceAccess = await prisma.space.findUnique({
+src/app/api\spaces\[id]\map\route.ts:28:      const member = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\map\route.ts:37:    const space = await prisma.space.findUnique({
+src/app/api\spaces\[id]\messages\route.ts:6:/** GET /api/spaces/[id]/messages - 채팅 히스토리 (cursor 페이지네이션) */
+src/app/api\spaces\[id]\admin\analytics\route.ts:23:    const self = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\logs\route.ts:18:    const self = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\logs\route.ts:43:        user: { select: { name: true, email: true } },
+src/app/api\spaces\[id]\admin\announce\route.ts:18:    const self = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\announce\route.ts:36:    const user = await prisma.user.findUnique({
+src/app/api\spaces\[id]\map\objects\route.ts:10:/** POST /api/spaces/[id]/map/objects - 오브젝트 배치 (OWNER/STAFF only) */
+src/app/api\spaces\[id]\admin\media\route.ts:19:    const member = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\media\route.ts:68:    const member = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\media\route.ts:91:    const targetMember = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\members\route.ts:21:    const self = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\members\route.ts:32:    // 응답 allowlist — restrictedBy/restrictedReason/restrictedUntil 관리 메타와
+src/app/api\spaces\[id]\admin\members\route.ts:45:        user: { select: { id: true, name: true, email: true, image: true } },
+src/app/api\spaces\[id]\admin\members\route.ts:70:    const self = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\members\route.ts:93:    const target = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\members\route.ts:95:      include: { user: { select: { name: true } } },
+src/app/api\spaces\[id]\admin\members\route.ts:125:        // enum allowlist (임의 값 주입 차단)
+src/app/api\spaces\[id]\admin\members\route.ts:187:    // 응답 allowlist — restrictedBy 등 관리 메타·식별자 미반환(member-table는 본문 미사용).
+src/app/api\spaces\[id]\map\tiles\route.ts:9:/** PUT /api/spaces/[id]/map/tiles - 타일 레이어 전체 저장 (OWNER/STAFF only) */
+src/app/api\spaces\[id]\admin\messages\route.ts:19:    const self = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\stats\route.ts:19:    const member = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\stats\route.ts:45:          user: { select: { name: true, email: true } },
+src/app/api\spaces\[id]\map\objects\[objectId]\route.ts:9:/** PATCH /api/spaces/[id]/map/objects/[objectId] - 오브젝트 수정 (OWNER/STAFF only) */
+src/app/api\spaces\[id]\map\objects\[objectId]\route.ts:98:/** DELETE /api/spaces/[id]/map/objects/[objectId] - 오브젝트 삭제 (OWNER/STAFF only) */
+src/app/api\spaces\[id]\admin\media\[grantId]\route.ts:19:    const member = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\messages\[messageId]\route.ts:18:    const self = await prisma.spaceMember.findUnique({
+src/app/api\spaces\[id]\admin\messages\[messageId]\route.ts:29:    const message = await prisma.chatMessage.findUnique({
+src/app/api\spaces\[id]\map\objects\[objectId]\link\route.ts:9:/** POST /api/spaces/[id]/map/objects/[objectId]/link - 포탈 쌍 연결 (OWNER/STAFF only) */
+
+ succeeded in 213ms:
+scripts\test-chibi-generation.ts:39:  const genRes = await fetch(`${baseUrl}/api/assets/generate`, {
+scripts\test-chibi-generation.ts:73:    const statusRes = await fetch(`${baseUrl}/api/assets/${assetId}`, {
+src/features\assets\index.ts:6:export { resolveGeneratedAssetPath } from "./internal/safe-path";
+src/features\assets\index.ts:36:  GeneratedAssetMetadata,
+src/app\space\[id]\page.tsx:20:  const space = await prisma.space.findUnique({
+src/app\space\[id]\page.tsx:22:    select: {
+src/app\space\[id]\page.tsx:29:      template: { select: { key: true, name: true } },
+src/app\space\[id]\page.tsx:30:      _count: { select: { members: true } },
+src/app\space\[id]\page.tsx:39:  const user = await prisma.user.findUnique({
+src/app\space\[id]\page.tsx:41:    select: { id: true, name: true, image: true, avatarConfig: true },
+src/app\space\[id]\page.tsx:52:    const existingMember = await prisma.spaceMember.findUnique({
+src/app\space\[id]\page.tsx:54:      select: { id: true },
+src/features\space\avatar\internal\sprite-generator.ts:218:  fetch(`/api/assets/${assetId}`)
+src/features\assets\internal\game-loader.ts:16:    const res = await fetch(`/api/assets/${assetId}`);
+src/features\assets\internal\processor.ts:36:import type { CreateAssetParams, GeneratedAssetMetadata } from "./types";
+src/features\assets\internal\processor.ts:41:): Promise<GeneratedAssetMetadata> {
+src/features\assets\internal\processor.ts:234:  const metadata: GeneratedAssetMetadata = {
+src/features\assets\internal\processor.ts:275:): Promise<GeneratedAssetMetadata> {
+src/app\api\auth\register\route.ts:30:    const existing = await prisma.user.findUnique({ where: { email } });
+src/app\api\auth\register\route.ts:46:      select: {
+src/app\dashboard\spaces\[id]\layout.tsx:14:  const space = await prisma.space.findUnique({
+src/app\dashboard\spaces\[id]\layout.tsx:16:    select: { name: true },
+src/features\assets\internal\safe-path.test.ts:3:import { resolveGeneratedAssetPath } from "./safe-path";
+src/features\assets\internal\safe-path.test.ts:12:describe("resolveGeneratedAssetPath", () => {
+src/features\assets\internal\safe-path.test.ts:15:      const result = resolveGeneratedAssetPath("/assets/generated/characters/foo.png");
+src/features\assets\internal\safe-path.test.ts:20:      const result = resolveGeneratedAssetPath("assets/generated/tilesets/x.png");
+src/features\assets\internal\safe-path.test.ts:25:      const result = resolveGeneratedAssetPath("/assets/generated/thumbnails/thumb_abc.png");
+src/features\assets\internal\safe-path.test.ts:30:      const result = resolveGeneratedAssetPath("/assets/generated/c02_spritesheet_96x128.png");
+src/features\assets\internal\safe-path.test.ts:35:      const result = resolveGeneratedAssetPath("/assets/generated/characters/../objects/y.png");
+src/features\assets\internal\safe-path.test.ts:57:      expect(resolveGeneratedAssetPath(input)).toBeNull();
+src/features\assets\internal\safe-path.test.ts:62:        resolveGeneratedAssetPath("/assets/generated/x.png\0/../../etc/passwd")
+src/app\api\assets\route.ts:5:/** GET /api/assets - 에셋 목록 (필터링) */
+src/app\api\assets\route.ts:43:        select: {
+src/features\assets\internal\safe-path.ts:4: * 생성 에셋(GeneratedAsset)의 파일시스템 루트.
+src/features\assets\internal\safe-path.ts:28:export function resolveGeneratedAssetPath(publicPath: string): string | null {
+src/app\api\workflows\route.ts:27:      select: {
+src/app\api\assets\[id]\route.ts:5:import { resolveGeneratedAssetPath } from "@/features/assets";
+src/app\api\assets\[id]\route.ts:11:/** GET /api/assets/[id] - 에셋 상세 + 상태 */
+src/app\api\assets\[id]\route.ts:20:    const asset = await prisma.generatedAsset.findUnique({
+src/app\api\assets\[id]\route.ts:22:      include: {
+src/app\api\assets\[id]\route.ts:24:          select: { id: true, name: true },
+src/app\api\assets\[id]\route.ts:50:/** DELETE /api/assets/[id] - 에셋 삭제 */
+src/app\api\assets\[id]\route.ts:59:    const asset = await prisma.generatedAsset.findUnique({
+src/app\api\assets\[id]\route.ts:73:      const safePath = resolveGeneratedAssetPath(asset.filePath);
+src/app\api\assets\[id]\route.ts:83:      const safeThumb = resolveGeneratedAssetPath(asset.thumbnailPath);
+src/features\assets\internal\types.ts:74:export interface GeneratedAssetMetadata {
+src/app\api\assets\generate\route.ts:14:/** POST /api/assets/generate - 에셋 생성 작업 시작 */
+src/app\dashboard\spaces\[id]\settings\page.tsx:13:  const space = await prisma.space.findUnique({
+src/app\dashboard\spaces\[id]\settings\page.tsx:15:    select: {
+src/app\api\assets\batch\route.ts:16:/** POST /api/assets/batch - 배치 에셋 생성 */
+src/app\api\assets\batch\route.ts:119:/** GET /api/assets/batch?batchId=xxx - 배치 상태 조회 */
+src/app\api\assets\batch\route.ts:140:      select: {
+src/app\api\users\me\route.ts:13:  const user = await prisma.user.findUnique({
+src/app\api\users\me\route.ts:15:    select: {
+src/app\api\users\me\route.ts:79:    select: {
+src/app\api\spaces\route.ts:47:      include: {
+src/app\api\spaces\route.ts:48:        template: { select: { key: true, name: true } },
+src/app\api\spaces\route.ts:49:        _count: { select: { members: true } },
+src/app\api\spaces\route.ts:52:          select: { role: true },
+src/app\api\spaces\route.ts:122:    const template = await prisma.template.findUnique({
+src/app\api\spaces\route.ts:152:      select: {
+src/app\api\spaces\route.ts:155:        template: { select: { key: true, name: true } },
+src/app\api\guest\route.ts:29:    const space = await prisma.space.findUnique({
+src/app\api\guest\route.ts:31:      select: { id: true, status: true, accessType: true, accessSecret: true },
+src/app\api\spaces\[id]\route.ts:20:    const space = await prisma.space.findUnique({
+src/app\api\spaces\[id]\route.ts:22:      select: {
+src/app\api\spaces\[id]\route.ts:34:        template: { select: { key: true, name: true, assetsPath: true } },
+src/app\api\spaces\[id]\route.ts:35:        owner: { select: { name: true, image: true } },
+src/app\api\spaces\[id]\route.ts:36:        _count: { select: { members: true, chatMessages: true } },
+src/app\api\spaces\[id]\route.ts:39:          select: { role: true },
+src/app\api\spaces\[id]\route.ts:93:    const space = await prisma.space.findUnique({ where: { id } });
+src/app\api\spaces\[id]\route.ts:128:      select: {
+src/app\api\spaces\[id]\route.ts:163:    const space = await prisma.space.findUnique({ where: { id } });
+src/app\api\spaces\[id]\route.test.ts:101:      select: Record<string, boolean>;
+src/app\api\spaces\[id]\route.test.ts:127:      select: Record<string, boolean>;
+src/features\space\game\internal\asset-loader.ts:122:export async function fetchGeneratedAssets(): Promise<LoadableAsset[]> {
+src/features\space\game\internal\asset-loader.ts:124:    const response = await fetch("/api/assets?status=completed&limit=100");
+src/app\api\livekit\token\route.ts:164:          select: { id: true },
+src/app\api\livekit\token\route.ts:168:          select: { id: true },
+src/app\api\livekit\token\route.ts:197:          .findUnique({
+src/app\api\livekit\token\route.ts:199:            select: {
+src/features\space\game\index.ts:42:  fetchGeneratedAssets,
+src/app\api\spaces\join\[inviteCode]\route.ts:14:    const space = await prisma.space.findUnique({
+src/app\api\spaces\join\[inviteCode]\route.ts:16:      select: {
+src/app\api\spaces\join\[inviteCode]\route.ts:22:        template: { select: { key: true, name: true } },
+src/app\api\spaces\join\[inviteCode]\route.ts:23:        _count: { select: { members: true } },
+src/app\api\spaces\join\[inviteCode]\route.ts:58:    const space = await prisma.space.findUnique({
+src/app\api\spaces\join\[inviteCode]\route.ts:75:    const existing = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\messages\route.ts:60:      select: {
+src/app\api\spaces\[id]\members\route.ts:28:      const myMember = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\members\route.ts:30:        select: { id: true },
+src/app\api\spaces\[id]\members\route.ts:39:      include: {
+src/app\api\spaces\[id]\members\route.ts:41:        user: { select: { id: true, name: true, image: true } },
+src/app\api\spaces\[id]\members\route.ts:42:        guestSession: { select: { nickname: true, avatar: true } },
+src/app\api\spaces\[id]\members\route.ts:80:    const space = await prisma.space.findUnique({ where: { id } });
+src/app\api\spaces\[id]\members\route.ts:103:    const existing = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\members\route.ts:169:    const myMember = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\members\route.ts:187:    const target = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\members\route.ts:189:      select: { id: true, spaceId: true, role: true },
+src/app\api\spaces\[id]\members\route.ts:226:      select: { id: true, role: true, restriction: true },
+src/app\api\spaces\[id]\members\route.test.ts:57:      select: Record<string, boolean>;
+src/app\api\spaces\[id]\map\route.ts:20:    const spaceAccess = await prisma.space.findUnique({
+src/app\api\spaces\[id]\map\route.ts:22:      select: { id: true, accessType: true },
+src/app\api\spaces\[id]\map\route.ts:28:      const member = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\map\route.ts:30:        select: { id: true },
+src/app\api\spaces\[id]\map\route.ts:37:    const space = await prisma.space.findUnique({
+src/app\api\spaces\[id]\map\route.ts:39:      select: {
+src/app\api\spaces\[id]\map\route.ts:44:          select: {
+src/features\space\game\internal\scenes\boot-scene.ts:9:import { fetchGeneratedAssets, loadAssetsInScene } from "../asset-loader";
+src/features\space\game\internal\scenes\boot-scene.ts:70:    fetchGeneratedAssets().then((assets) => {
+src/app\api\spaces\[id]\map\tiles\route.ts:26:      select: { role: true },
+src/app\api\spaces\[id]\map\tiles\route.ts:45:      select: { id: true },
+src/app\api\spaces\[id]\admin\announce\route.ts:18:    const self = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\announce\route.ts:20:      select: { role: true },
+src/app\api\spaces\[id]\admin\announce\route.ts:36:    const user = await prisma.user.findUnique({
+src/app\api\spaces\[id]\admin\announce\route.ts:38:      select: { name: true, email: true },
+src/app\api\spaces\[id]\admin\logs\route.ts:18:    const self = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\logs\route.ts:20:      select: { role: true },
+src/app\api\spaces\[id]\admin\logs\route.ts:42:      include: {
+src/app\api\spaces\[id]\admin\logs\route.ts:43:        user: { select: { name: true, email: true } },
+src/app\api\spaces\[id]\map\objects\route.ts:27:      select: { role: true },
+src/app\api\spaces\[id]\map\objects\route.ts:68:      select: {
+src/app\api\spaces\[id]\admin\stats\route.ts:19:    const member = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\stats\route.ts:21:      select: { role: true },
+src/app\api\spaces\[id]\admin\stats\route.ts:44:        include: {
+src/app\api\spaces\[id]\admin\stats\route.ts:45:          user: { select: { name: true, email: true } },
+src/app\api\spaces\[id]\admin\analytics\route.ts:23:    const self = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\analytics\route.ts:25:      select: { role: true },
+src/app\api\spaces\[id]\map\objects\[objectId]\route.ts:26:      select: { role: true },
+src/app\api\spaces\[id]\map\objects\[objectId]\route.ts:36:      select: { id: true },
+src/app\api\spaces\[id]\map\objects\[objectId]\route.ts:70:      select: {
+src/app\api\spaces\[id]\map\objects\[objectId]\route.ts:115:      select: { role: true },
+src/app\api\spaces\[id]\map\objects\[objectId]\route.ts:124:      select: { id: true },
+src/app\api\spaces\[id]\admin\members\route.ts:21:    const self = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\members\route.ts:23:      select: { role: true },
+src/app\api\spaces\[id]\admin\members\route.ts:38:      select: {
+src/app\api\spaces\[id]\admin\members\route.ts:45:        user: { select: { id: true, name: true, email: true, image: true } },
+src/app\api\spaces\[id]\admin\members\route.ts:46:        guestSession: { select: { id: true, nickname: true } },
+src/app\api\spaces\[id]\admin\members\route.ts:70:    const self = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\members\route.ts:72:      select: { role: true },
+src/app\api\spaces\[id]\admin\members\route.ts:93:    const target = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\members\route.ts:95:      include: { user: { select: { name: true } } },
+src/app\api\spaces\[id]\admin\members\route.ts:191:      select: { id: true, role: true, restriction: true },
+src/app\api\spaces\[id]\admin\members\route.test.ts:53:      select: Record<string, unknown>;
+src/app\api\spaces\[id]\admin\members\route.test.ts:69:    expect(arg.select.user).toEqual({ select: { id: true, name: true, email: true, image: true } });
+src/app\api\spaces\[id]\admin\members\route.test.ts:120:      select: Record<string, boolean>;
+src/app\api\spaces\[id]\admin\messages\route.ts:19:    const self = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\messages\route.ts:21:      select: { role: true },
+src/app\api\spaces\[id]\admin\media\route.ts:19:    const member = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\media\route.ts:21:      select: { role: true },
+src/app\api\spaces\[id]\admin\media\route.ts:40:      select: { id: true, name: true, email: true },
+src/app\api\spaces\[id]\admin\media\route.ts:68:    const member = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\media\route.ts:70:      select: { role: true },
+src/app\api\spaces\[id]\admin\media\route.ts:91:    const targetMember = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\media\[grantId]\route.ts:19:    const member = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\media\[grantId]\route.ts:21:      select: { role: true },
+src/app\api\spaces\[id]\admin\messages\[messageId]\route.ts:18:    const self = await prisma.spaceMember.findUnique({
+src/app\api\spaces\[id]\admin\messages\[messageId]\route.ts:20:      select: { role: true },
+src/app\api\spaces\[id]\admin\messages\[messageId]\route.ts:29:    const message = await prisma.chatMessage.findUnique({
+src/app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:26:      select: { role: true },
+src/app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:53:        select: { id: true, objectType: true, linkedObjectId: true },
+src/app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:57:        select: { id: true, objectType: true, linkedObjectId: true },
+
+ succeeded in 275ms:
+import { NextResponse } from "next/server";
+import { unlink } from "fs/promises";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { resolveGeneratedAssetPath } from "@/features/assets";
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+/** GET /api/assets/[id] - ?ì…‹ ?ì„¸ + ?íƒœ */
+export async function GET(_request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const asset = await prisma.generatedAsset.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    if (!asset) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    // ?Œìœ ê¶?ê²€ì¦?(ë³¸ì¸ ?ëŠ” superAdminë§??‘ê·¼ ê°€??
+    if (asset.userId !== session.user.id && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    return NextResponse.json(asset);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to fetch asset",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/** DELETE /api/assets/[id] - ?ì…‹ ?? œ */
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const asset = await prisma.generatedAsset.findUnique({
+      where: { id },
+    });
+
+    if (asset && asset.userId !== session.user.id && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (!asset) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    // ?Œì¼ ?œìŠ¤?œì—???¤ì œ ?Œì¼ ?? œ (path traversal ë°©ì–´: generated ë£¨íŠ¸ ë°?ê²½ë¡œ??unlink ?¤í‚µ)
+    if (asset.filePath) {
+      const safePath = resolveGeneratedAssetPath(asset.filePath);
+      if (safePath) {
+        await unlink(safePath).catch(() => {});
+      } else {
+        console.warn(
+          `[assets/DELETE] filePathê°€ generated ê²½ê³„ë¥?ë²—ì–´??unlink ?¤í‚µ: assetId=${asset.id}`
+        );
+      }
+    }
+    if (asset.thumbnailPath) {
+      const safeThumb = resolveGeneratedAssetPath(asset.thumbnailPath);
+      if (safeThumb) {
+        await unlink(safeThumb).catch(() => {});
+      } else {
+        console.warn(
+          `[assets/DELETE] thumbnailPathê°€ generated ê²½ê³„ë¥?ë²—ì–´??unlink ?¤í‚µ: assetId=${asset.id}`
+        );
+      }
+    }
+
+    await prisma.generatedAsset.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ message: "Asset deleted" });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to delete asset",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+
+codex
+`GET /api/assets/[id]`는 실제로 전체 row를 그대로 반환하고 있고, `GET /api/assets` 목록은 이미 `select`를 쓰는 구조입니다. 목록 계약까지 비교해서 상세 응답을 어디에 맞출지 확인하겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/app/api/assets/route.ts | Out-String' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"metadata\\s*[:=]|frameWidth|frameHeight|error|seed|workflow|comfyuiJobId|filePath|thumbnailPath\" src/features src/app/api/assets scripts -g \"*.ts\" -g \"*.tsx\"" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/features/assets/internal/types.ts | Out-String' in C:\Team-jane\FlowSpace
+ succeeded in 271ms:
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+/** GET /api/assets - ?愳厠 氇╇ (?勴劙毵? */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const type = searchParams.get("type");
+    const status = searchParams.get("status");
+    const shared = searchParams.get("shared");
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "20", 10);
+
+    const where: Record<string, unknown> = {};
+
+    if (shared === "true") {
+      // 瓿奠毄 ?愳厠 臁绊殞 (?勲皵?€ ?犿儩 ??
+      where.isShared = true;
+    } else {
+      // 氤胳澑 ?愳厠毵?臁绊殞 (IDOR 氚╈?)
+      where.userId = session.user.id;
+    }
+
+    if (type) {
+      where.type = type.toUpperCase();
+    }
+    if (status) {
+      where.status = status.toUpperCase();
+    }
+
+    const [assets, total] = await Promise.all([
+      prisma.generatedAsset.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          type: true,
+          name: true,
+          prompt: true,
+          status: true,
+          filePath: true,
+          thumbnailPath: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.generatedAsset.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      assets,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to fetch assets",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+
+ succeeded in 202ms:
+scripts\test-chibi-generation.ts:32:    console.error("로그인 실패: 쿠키를 받지 못함");
+scripts\test-chibi-generation.ts:51:      seed: 42,
+scripts\test-chibi-generation.ts:60:    console.error("생성 요청 실패");
+scripts\test-chibi-generation.ts:83:        console.log(`  filePath: ${asset.filePath}`);
+scripts\test-chibi-generation.ts:86:        if (asset.filePath) {
+scripts\test-chibi-generation.ts:89:            `   npx tsx scripts/analyze-spritesheet.ts public${asset.filePath} 8 4`
+scripts\test-chibi-generation.ts:96:        console.error(`  ✗ 생성 실패:`, asset.metadata?.error);
+scripts\test-chibi-generation.ts:104:  console.error("타임아웃: 10분 초과");
+scripts\test-chibi-generation.ts:109:  console.error("Error:", err);
+scripts\test-character-gen.ts:8:const WORKFLOW_PATH = join(process.cwd(), "comfyui-workflows/character-sprite.json");
+scripts\test-character-gen.ts:11:async function generate(name: string, prompt: string, seed: number) {
+scripts\test-character-gen.ts:12:  console.log(`\n--- Generating: ${name} (seed: ${seed}) ---`);
+scripts\test-character-gen.ts:15:  const { _meta, ...workflow } = JSON.parse(raw);
+scripts\test-character-gen.ts:18:  (workflow["6"] as any).inputs.text = prompt;
+scripts\test-character-gen.ts:19:  (workflow["3"] as any).inputs.seed = seed;
+scripts\test-character-gen.ts:25:    body: JSON.stringify({ prompt: workflow }),
+scripts\test-character-gen.ts:43:      if (entry?.status.status_str === "error") {
+scripts\test-character-gen.ts:99:main().catch(err => { console.error("\n실패:", err); process.exit(1); });
+scripts\quick-chibi-test.ts:26:      seed: 42,
+scripts\quick-chibi-test.ts:32:    console.log(`filePath: ${result.filePath}`);
+scripts\quick-chibi-test.ts:36:    console.log(`seed: ${result.seed}`);
+scripts\quick-chibi-test.ts:38:    const publicPath = `public${result.filePath}`;
+scripts\quick-chibi-test.ts:43:    console.error(`\n=== 실패 (${elapsed}초) ===`);
+scripts\quick-chibi-test.ts:44:    console.error(err instanceof Error ? err.message : err);
+scripts\quick-chibi-test.ts:45:    console.error(err instanceof Error ? err.stack : "");
+scripts\generate-pose-skeletons.ts:7: * 출력: comfyui-workflows/poses/pose_{direction}_{index}.png
+scripts\generate-pose-skeletons.ts:18:const OUT_DIR = join(process.cwd(), "comfyui-workflows", "poses");
+scripts\generate-pose-skeletons.ts:244:  console.error("Failed:", err);
+scripts\debug-postprocess-only.ts:36:    frameWidth: 128, frameHeight: 128, columns: 8, rows: 4,
+scripts\debug-postprocess-only.ts:44:    frameWidth: 128, frameHeight: 128, columns: 8, rows: 4,
+scripts\debug-postprocess-only.ts:54:main().catch(console.error);
+scripts\debug-character-pipeline.ts:27:    "../src/features/assets/internal/workflow-loader"
+scripts\debug-character-pipeline.ts:37:  const { meta, workflow } = await loadWorkflowTemplate("character");
+scripts\debug-character-pipeline.ts:43:  const injected = injectWorkflowParams(workflow, meta, {
+scripts\debug-character-pipeline.ts:46:    seed: 42,
+scripts\debug-character-pipeline.ts:57:    { type: "character", prompt, name: "debug_test", seed: 42 },
+scripts\debug-character-pipeline.ts:62:    console.error("ComfyUI 생성 실패:", result.error);
+scripts\debug-character-pipeline.ts:88:    frameWidth: 128,
+scripts\debug-character-pipeline.ts:89:    frameHeight: 128,
+scripts\debug-character-pipeline.ts:100:    frameWidth: 128,
+scripts\debug-character-pipeline.ts:101:    frameHeight: 128,
+scripts\debug-character-pipeline.ts:118:main().catch(console.error);
+scripts\analyze-spritesheet.ts:31:  frameWidth: number;
+scripts\analyze-spritesheet.ts:32:  frameHeight: number;
+scripts\analyze-spritesheet.ts:196:    frameWidth: frameW,
+scripts\analyze-spritesheet.ts:197:    frameHeight: frameH,
+scripts\analyze-spritesheet.ts:223:  console.log(`Sheet: ${r.sheetWidth}x${r.sheetHeight}, Frame: ${r.frameWidth}x${r.frameHeight}, Grid: ${r.cols}x${r.rows}`);
+scripts\analyze-spritesheet.ts:264:  console.error("Usage: npx tsx scripts/analyze-spritesheet.ts <image-path> [cols=8] [rows=4]");
+scripts\analyze-spritesheet.ts:268:const filePath = args[0];
+scripts\analyze-spritesheet.ts:272:analyze(filePath, cols, rows)
+scripts\analyze-spritesheet.ts:275:    console.error("Analysis failed:", err);
+src/app/api/assets\[id]\route.ts:16:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+src/app/api/assets\[id]\route.ts:30:      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+src/app/api/assets\[id]\route.ts:35:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+src/app/api/assets\[id]\route.ts:39:  } catch (error) {
+src/app/api/assets\[id]\route.ts:42:        error: "Failed to fetch asset",
+src/app/api/assets\[id]\route.ts:43:        details: error instanceof Error ? error.message : undefined,
+src/app/api/assets\[id]\route.ts:55:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+src/app/api/assets\[id]\route.ts:64:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+src/app/api/assets\[id]\route.ts:68:      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+src/app/api/assets\[id]\route.ts:72:    if (asset.filePath) {
+src/app/api/assets\[id]\route.ts:73:      const safePath = resolveGeneratedAssetPath(asset.filePath);
+src/app/api/assets\[id]\route.ts:78:          `[assets/DELETE] filePath가 generated 경계를 벗어나 unlink 스킵: assetId=${asset.id}`
+src/app/api/assets\[id]\route.ts:82:    if (asset.thumbnailPath) {
+src/app/api/assets\[id]\route.ts:83:      const safeThumb = resolveGeneratedAssetPath(asset.thumbnailPath);
+src/app/api/assets\[id]\route.ts:88:          `[assets/DELETE] thumbnailPath가 generated 경계를 벗어나 unlink 스킵: assetId=${asset.id}`
+src/app/api/assets\[id]\route.ts:98:  } catch (error) {
+src/app/api/assets\[id]\route.ts:101:        error: "Failed to delete asset",
+src/app/api/assets\[id]\route.ts:102:        details: error instanceof Error ? error.message : undefined,
+src/app/api/assets\route.ts:10:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+src/app/api/assets\route.ts:49:          filePath: true,
+src/app/api/assets\route.ts:50:          thumbnailPath: true,
+src/app/api/assets\route.ts:67:  } catch (error) {
+src/app/api/assets\route.ts:70:        error: "Failed to fetch assets",
+src/app/api/assets\route.ts:71:        details: error instanceof Error ? error.message : undefined,
+src/app/api/assets\generate\route.ts:19:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+src/app/api/assets\generate\route.ts:27:        { error: "type, name, prompt are required" },
+src/app/api/assets\generate\route.ts:34:        { error: "type must be one of: character, tileset, object, map" },
+src/app/api/assets\generate\route.ts:48:        workflow: body.workflow || `${body.type}-default`,
+src/app/api/assets\generate\route.ts:58:      workflow: body.workflow,
+src/app/api/assets\generate\route.ts:59:      seed: body.seed,
+src/app/api/assets\generate\route.ts:86:            filePath: metadata.filePath,
+src/app/api/assets\generate\route.ts:87:            thumbnailPath: metadata.thumbnailPath,
+src/app/api/assets\generate\route.ts:89:            comfyuiJobId: metadata.comfyuiJobId,
+src/app/api/assets\generate\route.ts:90:            metadata: JSON.parse(JSON.stringify(metadata)),
+src/app/api/assets\generate\route.ts:94:      .catch(async (error) => {
+src/app/api/assets\generate\route.ts:99:            metadata: {
+src/app/api/assets\generate\route.ts:100:              error:
+src/app/api/assets\generate\route.ts:101:                error instanceof Error ? error.message : "Unknown error",
+src/app/api/assets\generate\route.ts:115:  } catch (error) {
+src/app/api/assets\generate\route.ts:118:        error: "Failed to start asset generation",
+src/app/api/assets\generate\route.ts:119:        details: error instanceof Error ? error.message : undefined,
+src/app/api/assets\batch\route.ts:21:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+src/app/api/assets\batch\route.ts:27:      return NextResponse.json({ error: "items array required" }, { status: 400 });
+src/app/api/assets\batch\route.ts:32:        { error: `Maximum ${MAX_BATCH_SIZE} items per batch` },
+src/app/api/assets\batch\route.ts:52:          workflow: item.workflow || `${item.type}-default`,
+src/app/api/assets\batch\route.ts:54:          metadata: { batchId },
+src/app/api/assets\batch\route.ts:65:        workflow: item.workflow,
+src/app/api/assets\batch\route.ts:66:        seed: item.seed,
+src/app/api/assets\batch\route.ts:75:              filePath: metadata.filePath,
+src/app/api/assets\batch\route.ts:76:              thumbnailPath: metadata.thumbnailPath,
+src/app/api/assets\batch\route.ts:78:              comfyuiJobId: metadata.comfyuiJobId,
+src/app/api/assets\batch\route.ts:79:              metadata: {
+src/app/api/assets\batch\route.ts:86:        .catch(async (error) => {
+src/app/api/assets\batch\route.ts:91:              metadata: {
+src/app/api/assets\batch\route.ts:93:                error: error instanceof Error ? error.message : "Unknown error",
+src/app/api/assets\batch\route.ts:108:  } catch (error) {
+src/app/api/assets\batch\route.ts:111:        error: "Failed to start batch generation",
+src/app/api/assets\batch\route.ts:112:        details: error instanceof Error ? error.message : undefined,
+src/app/api/assets\batch\route.ts:124:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+src/app/api/assets\batch\route.ts:129:      return NextResponse.json({ error: "batchId required" }, { status: 400 });
+src/app/api/assets\batch\route.ts:135:        metadata: {
+src/app/api/assets\batch\route.ts:145:        thumbnailPath: true,
+src/app/api/assets\batch\route.ts:162:  } catch (error) {
+src/app/api/assets\batch\route.ts:165:        error: "Failed to fetch batch status",
+src/app/api/assets\batch\route.ts:166:        details: error instanceof Error ? error.message : undefined,
+src/features\assets\index.ts:4:export { loadWorkflowTemplate, injectWorkflowParams } from "./internal/workflow-loader";
+src/features\space\bridge\internal\use-socket-bridge.ts:36:  onMessageFailed?: (data: { tempId: string; error: string }) => void;
+src/features\space\socket\internal\use-socket.ts:112:  onMessageFailed?: (data: { tempId: string; error: string }) => void;
+src/features\space\socket\internal\use-socket.ts:275:        sock.on("connect_error", (err) => {
+src/features\space\socket\internal\use-socket.ts:276:          console.error("[Socket] Connect error:", err.message);
+src/features\space\socket\internal\use-socket.ts:295:        sock.io.on("reconnect_error", (err) => {
+src/features\space\socket\internal\use-socket.ts:296:          console.error("[Socket] Reconnect error:", err.message);
+src/features\space\socket\internal\use-socket.ts:300:          console.error("[Socket] Reconnect failed after all attempts");
+src/features\space\socket\internal\use-socket.ts:305:        sock.on("space:error", (data) => {
+src/features\space\socket\internal\use-socket.ts:306:          console.error("[Socket] space:error:", data.code, data.message);
+src/features\space\socket\internal\use-socket.ts:416:        sock.on("chat:error", (data) => {
+src/features\space\socket\internal\use-socket.ts:419:        sock.on("whisper:error", (data) => {
+src/features\space\socket\internal\use-socket.ts:422:        sock.on("party:error", (data) => {
+src/features\space\socket\internal\use-socket.ts:425:        sock.on("admin:error", (data) => {
+src/features\space\socket\internal\use-socket.ts:459:        sock.on("media:error", (data) => {
+src/features\space\socket\internal\use-socket.ts:463:        sock.on("error", ({ message }) => {
+src/features\space\socket\internal\use-socket.ts:464:          console.error("[Socket] Error:", message);
+src/features\space\socket\internal\use-socket.ts:471:        console.error("[Socket] Connection failed:", err);
+src/features\space\socket\internal\use-socket.ts:524:        console.error("[Socket] sendChat failed: socket not connected", { hasSocket: !!sock, connected: sock?.connected });
+src/features\space\protocol\internal\socket-events.ts:131:  "chat:messageFailed": (data: { tempId: string; error: string }) => void;
+src/features\space\protocol\internal\socket-events.ts:252:  "space:error": (data: { code: string; message: string }) => void;
+src/features\space\protocol\internal\socket-events.ts:253:  "chat:error": (data: { code: string; message: string }) => void;
+src/features\space\protocol\internal\socket-events.ts:254:  "whisper:error": (data: { code: string; message: string }) => void;
+src/features\space\protocol\internal\socket-events.ts:255:  "party:error": (data: { code: string; message: string }) => void;
+src/features\space\protocol\internal\socket-events.ts:256:  "admin:error": (data: { code: string; message: string }) => void;
+src/features\space\protocol\internal\socket-events.ts:257:  "media:error": (data: { code: string; message: string }) => void;
+src/features\space\protocol\internal\socket-events.ts:261:  "whisper:messageFailed": (data: { tempId: string; error: string }) => void;
+src/features\space\protocol\internal\socket-events.ts:263:  error: (data: { message: string }) => void;
+src/features\space\enforce\internal\dispatch.ts:29: * SOCKET_INTERNAL_URL/SECRET 미설정 시: 프로덕션은 loud error 로그 후 미반영,
+src/features\space\enforce\internal\dispatch.ts:38:      console.error(
+src/features\space\enforce\internal\dispatch.ts:64:      console.error(`[enforce] socket 서버 응답 ${res.status}`);
+src/features\space\enforce\internal\dispatch.ts:70:    console.error("[enforce] socket 서버 호출 실패:", err instanceof Error ? err.message : err);
+src/features\assets\internal\constants.ts:120:  "nsfw, lowres, (bad), text, error, fewer, extra, missing, worst quality, jpeg artifacts, low quality, watermark, unfinished, displeasing, oldest, early, chromatic aberration, signature, extra digits, artistic error, username, scan, abstract, realistic, photorealistic, 3d render, deformed, ugly, extra limbs, missing limbs, fused limbs, multiple characters, multiple views";
+src/features\assets\internal\constants.ts:131:  frameWidth: 1024,
+src/features\assets\internal\constants.ts:132:  frameHeight: 1024,
+src/features\assets\internal\game-loader.ts:6:  filePath: string;
+src/features\assets\internal\game-loader.ts:23:    if (!asset.filePath) {
+src/features\assets\internal\game-loader.ts:31:      metadata: {
+src/features\assets\internal\game-loader.ts:32:        filePath: asset.filePath,
+src/features\assets\internal\game-loader.ts:37:  } catch (error) {
+src/features\assets\internal\game-loader.ts:39:      error: error instanceof Error ? error.message : "Unknown error",
+src/features\space\hooks\internal\useScreenRecorder.test.ts:15:// stop()은 onstop을 자동 발화하지 않는다 — 테스트가 onstop/onerror를 수동 트리거해
+src/features\space\hooks\internal\useScreenRecorder.test.ts:16:// 'error 시 onstop 미발화'(WI-006)를 결정적으로 재현하기 위함.
+src/features\space\hooks\internal\useScreenRecorder.test.ts:28:  onerror: Handler = null;
+src/features\space\hooks\internal\useScreenRecorder.test.ts:101:describe("useScreenRecorder — onerror 경로 (WI-006)", () => {
+src/features\space\hooks\internal\useScreenRecorder.test.ts:102:  it("stopRecording 대기 중 onerror가 발생하면 Promise를 settle한다 (영구 pending 차단)", async () => {
+src/features\space\hooks\internal\useScreenRecorder.test.ts:115:    // stopRecording() 호출 — onstop은 발화시키지 않는다 (error 경로 모사)
+src/features\space\hooks\internal\useScreenRecorder.test.ts:124:    // onstop/onerror 모두 미발화 → 아직 pending
+src/features\space\hooks\internal\useScreenRecorder.test.ts:128:    // 'error' 이벤트 발화
+src/features\space\hooks\internal\useScreenRecorder.test.ts:130:      recorder.onerror?.();
+src/features\space\hooks\internal\useScreenRecorder.test.ts:140:    expect(result.current.error).toBe("녹화 중 오류가 발생했습니다");
+src/features\space\hooks\internal\useScreenRecorder.test.ts:143:  it("녹화 중 onerror는 idle로 정리하고, 이후 stopRecording은 즉시 resolve한다", async () => {
+src/features\space\hooks\internal\useScreenRecorder.test.ts:155:      recorder.onerror?.();
+src/features\space\hooks\internal\useScreenRecorder.test.ts:172:  it("onerror 후 늦게 도착한 onstop은 중복 처리되지 않는다 (onstop=null)", async () => {
+src/features\space\hooks\internal\useScreenRecorder.test.ts:187:      recorder.onerror?.();
+src/features\space\hooks\internal\useScreenRecorder.test.ts:247:    // onstop/onerror 모두 미발화 → 아직 pending
+src/features\space\hooks\internal\useScreenRecorder.test.ts:361:  // 4경로(unmount/onerror/start/stop) 모두 .catch로 통일됨을 process 리스너로 검출.
+src/features\assets\internal\pose-manager.ts:6:const POSES_DIR = join(process.cwd(), "comfyui-workflows", "poses");
+src/features\space\avatar\internal\sprite-generator.ts:167:    { frameWidth: PLAYER_WIDTH, frameHeight: PLAYER_HEIGHT }
+src/features\space\avatar\internal\sprite-generator.ts:223:    .then((asset: { filePath?: string; metadata?: Record<string, unknown> }) => {
+src/features\space\avatar\internal\sprite-generator.ts:224:      if (!asset.filePath) throw new Error("No file path");
+src/features\space\avatar\internal\sprite-generator.ts:225:      return loadImageAsCanvas(asset.filePath).then((srcCanvas) => ({
+src/features\space\avatar\internal\sprite-generator.ts:227:        metadata: asset.metadata,
+src/features\space\avatar\internal\sprite-generator.ts:231:      const srcFrameW = (metadata?.frameWidth as number) || 128;
+src/features\space\avatar\internal\sprite-generator.ts:232:      const srcFrameH = (metadata?.frameHeight as number) || 128;
+src/features\space\avatar\internal\sprite-generator.ts:262:          { frameWidth: PLAYER_WIDTH, frameHeight: PLAYER_HEIGHT },
+src/features\space\avatar\internal\sprite-generator.ts:291:    img.onerror = () => reject(new Error("Image load failed"));
+src/features\assets\internal\post-processor.ts:23:  const metadata = await image.metadata();
+src/features\assets\internal\post-processor.ts:185:  frameWidth: number;
+src/features\assets\internal\post-processor.ts:186:  frameHeight: number;
+src/features\assets\internal\post-processor.ts:217:  const { frameWidth, frameHeight, columns, rows } = options;
+src/features\assets\internal\post-processor.ts:221:  const expectedW = columns * frameWidth;
+src/features\assets\internal\post-processor.ts:222:  const expectedH = rows * frameHeight;
+src/features\assets\internal\post-processor.ts:225:  const metadata = await image.metadata();
+src/features\assets\internal\post-processor.ts:252:          c * frameWidth, r * frameHeight,
+src/features\assets\internal\post-processor.ts:253:          frameWidth, frameHeight,
+src/features\assets\internal\post-processor.ts:269:        copyFrame(pixels, out, width, ch, c * frameWidth, r * frameHeight, frameWidth, frameHeight);
+src/features\assets\internal\post-processor.ts:286:    const shiftX = Math.round(frameWidth / 2 - medCX);
+src/features\assets\internal\post-processor.ts:287:    const shiftY = Math.round((frameHeight - 1 - bottomPadding) - medBot);
+src/features\assets\internal\post-processor.ts:290:      const frameX = c * frameWidth;
+src/features\assets\internal\post-processor.ts:291:      const frameY = r * frameHeight;
+src/features\assets\internal\post-processor.ts:294:        copyFrame(pixels, out, width, ch, frameX, frameY, frameWidth, frameHeight);
+src/features\assets\internal\post-processor.ts:298:      for (let ly = 0; ly < frameHeight; ly++) {
+src/features\assets\internal\post-processor.ts:299:        for (let lx = 0; lx < frameWidth; lx++) {
+src/features\assets\internal\post-processor.ts:309:          if (dstLX < 0 || dstLX >= frameWidth || dstLY < 0 || dstLY >= frameHeight) {
+src/features\assets\internal\post-processor.ts:844:  const metadata = await image.metadata();
+src/features\assets\internal\processor.ts:5:import { loadWorkflowTemplate, injectWorkflowParams } from "./workflow-loader";
+src/features\assets\internal\processor.ts:67:  const { meta, workflow } = await loadWorkflowTemplate(params.type, variant);
+src/features\assets\internal\processor.ts:74:  const workflowParams: Record<string, unknown> = {
+src/features\assets\internal\processor.ts:78:    seed: params.seed ?? Math.floor(Math.random() * 2147483647),
+src/features\assets\internal\processor.ts:90:      workflowParams.controlnet_model = params.controlNetModel;
+src/features\assets\internal\processor.ts:93:      workflowParams.controlnet_strength = params.controlNetStrength;
+src/features\assets\internal\processor.ts:96:      workflowParams.pose_image = params.poseImage;
+src/features\assets\internal\processor.ts:102:    workflowParams.sampler_name = CHARACTER_GENERATION_DEFAULTS.samplerName;
+src/features\assets\internal\processor.ts:103:    workflowParams.scheduler = CHARACTER_GENERATION_DEFAULTS.scheduler;
+src/features\assets\internal\processor.ts:105:      workflowParams.steps = CHARACTER_GENERATION_DEFAULTS.steps;
+src/features\assets\internal\processor.ts:106:      workflowParams.cfg = CHARACTER_GENERATION_DEFAULTS.cfgScale;
+src/features\assets\internal\processor.ts:110:  const injectedWorkflow = injectWorkflowParams(workflow, meta, workflowParams);
+src/features\assets\internal\processor.ts:122:        seed: params.seed,
+src/features\assets\internal\processor.ts:126:  } catch (error) {
+src/features\assets\internal\processor.ts:127:    const comfyError = ComfyUIError.fromError(error);
+src/features\assets\internal\processor.ts:128:    console.error(`[AssetProcessor] ComfyUI 에러 [${comfyError.type}]:`, comfyError.message);
+src/features\assets\internal\processor.ts:145:    console.error("[AssetProcessor] 생성 실패:", result.error);
+src/features\assets\internal\processor.ts:146:    throw new Error(result.error || "Asset generation failed: no images");
+src/features\assets\internal\processor.ts:171:    spec.frameWidth &&
+src/features\assets\internal\processor.ts:172:    spec.frameHeight &&
+src/features\assets\internal\processor.ts:178:        frameWidth: spec.frameWidth,
+src/features\assets\internal\processor.ts:179:        frameHeight: spec.frameHeight,
+src/features\assets\internal\processor.ts:189:  if (params.seamless && params.type === "tileset" && imageData.length > 0 && spec.frameWidth && spec.frameHeight && spec.columns && spec.rows) {
+src/features\assets\internal\processor.ts:193:        spec.frameWidth,
+src/features\assets\internal\processor.ts:194:        spec.frameHeight,
+src/features\assets\internal\processor.ts:206:  const filePath = join(storagePath, filename);
+src/features\assets\internal\processor.ts:208:  await mkdir(dirname(join(process.cwd(), "public", filePath)), { recursive: true });
+src/features\assets\internal\processor.ts:209:  await writeFile(join(process.cwd(), "public", filePath), imageData);
+src/features\assets\internal\processor.ts:228:    console.warn("Asset validation warnings:", validation.errors);
+src/features\assets\internal\processor.ts:234:  const metadata: GeneratedAssetMetadata = {
+src/features\assets\internal\processor.ts:239:    workflow: params.workflow || meta.name,
+src/features\assets\internal\processor.ts:242:    frameWidth: spec.frameWidth,
+src/features\assets\internal\processor.ts:243:    frameHeight: spec.frameHeight,
+src/features\assets\internal\processor.ts:246:    filePath: `/${filePath.replace(/\\/g, "/")}`,
+src/features\assets\internal\processor.ts:247:    thumbnailPath: `/${thumbPath.replace(/\\/g, "/")}`,
+src/features\assets\internal\processor.ts:250:    comfyuiJobId: result.promptId,
+src/features\assets\internal\processor.ts:251:    seed: params.seed,
+src/features\assets\internal\processor.ts:305:    const { meta: refMeta, workflow: refWorkflow } =
+src/features\assets\internal\processor.ts:309:      params.seed ?? Math.floor(Math.random() * 2147483647);
+src/features\assets\internal\processor.ts:314:      seed: baseSeedForRef,
+src/features\assets\internal\processor.ts:346:          seed: baseSeedForRef,
+src/features\assets\internal\processor.ts:350:    } catch (error) {
+src/features\assets\internal\processor.ts:351:      const comfyError = ComfyUIError.fromError(error);
+src/features\assets\internal\processor.ts:352:      console.error(
+src/features\assets\internal\processor.ts:363:        `치비 레퍼런스 프레임 생성 실패: ${refResult.error || "no images"}`
+src/features\assets\internal\processor.ts:407:  const workflowVariant = actualUseIPAdapter
+src/features\assets\internal\processor.ts:410:  const { meta, workflow } = await loadWorkflowTemplate(
+src/features\assets\internal\processor.ts:412:    workflowVariant
+src/features\assets\internal\processor.ts:421:    params.seed ?? Math.floor(Math.random() * 2147483647);
+src/features\assets\internal\processor.ts:425:    `[ChibiProcessor] Phase B: ${generateDirs.length}방향 기저 프레임 생성 (워크플로우: ${workflowVariant})`
+src/features\assets\internal\processor.ts:434:    const seed = baseSeed + dirIdx + 1;
+src/features\assets\internal\processor.ts:437:    const workflowParams: Record<string, unknown> = {
+src/features\assets\internal\processor.ts:440:      seed,
+src/features\assets\internal\processor.ts:453:      workflowParams.pose_image = getPoseImageRef(direction, 0);
+src/features\assets\internal\processor.ts:455:        workflowParams.controlnet_strength = 0;
+src/features\assets\internal\processor.ts:456:        workflowParams.controlnet_start = 0;
+src/features\assets\internal\processor.ts:457:        workflowParams.controlnet_end = 0;
+src/features\assets\internal\processor.ts:459:        workflowParams.controlnet_strength =
+src/features\assets\internal\processor.ts:461:        workflowParams.controlnet_start =
+src/features\assets\internal\processor.ts:463:        workflowParams.controlnet_end =
+src/features\assets\internal\processor.ts:470:      workflowParams.reference_image = uploadedRefPath;
+src/features\assets\internal\processor.ts:471:      workflowParams.ipadapter_weight =
+src/features\assets\internal\processor.ts:473:      workflowParams.ipadapter_start_at = IPADAPTER_DEFAULTS.startAt;
+src/features\assets\internal\processor.ts:474:      workflowParams.ipadapter_end_at = IPADAPTER_DEFAULTS.endAt;
+src/features\assets\internal\processor.ts:475:      workflowParams.ipadapter_weight_type = IPADAPTER_DEFAULTS.weightType;
+src/features\assets\internal\processor.ts:478:    const injected = injectWorkflowParams(workflow, meta, workflowParams);
+src/features\assets\internal\processor.ts:490:          seed,
+src/features\assets\internal\processor.ts:494:    } catch (error) {
+src/features\assets\internal\processor.ts:495:      const comfyError = ComfyUIError.fromError(error);
+src/features\assets\internal\processor.ts:496:      console.error(
+src/features\assets\internal\processor.ts:507:        `치비 ${direction} 프레임 생성 실패: ${result.error || "no images"}`
+src/features\assets\internal\processor.ts:610:  const filePath = join(storagePath, filename);
+src/features\assets\internal\processor.ts:612:  await mkdir(dirname(join(process.cwd(), "public", filePath)), {
+src/features\assets\internal\processor.ts:615:  await writeFile(join(process.cwd(), "public", filePath), imageData);
+src/features\assets\internal\processor.ts:634:    console.warn("[ChibiProcessor] 유효성 경고:", validation.errors);
+src/features\assets\internal\processor.ts:645:    workflow: `character-${workflowVariant}`,
+src/features\assets\internal\processor.ts:648:    frameWidth: SPRITE_FRAME_SIZE,
+src/features\assets\internal\processor.ts:649:    frameHeight: SPRITE_FRAME_SIZE,
+src/features\assets\internal\processor.ts:652:    filePath: `/${filePath.replace(/\\/g, "/")}`,
+src/features\assets\internal\processor.ts:653:    thumbnailPath: `/${thumbPath.replace(/\\/g, "/")}`,
+src/features\assets\internal\processor.ts:656:    seed: baseSeed,
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:706:    (error: unknown): MediaError => {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:707:      const errorMessage =
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:708:        error instanceof Error ? error.message : String(error);
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:711:        errorMessage.includes("Permission denied") ||
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:712:        errorMessage.includes("NotAllowedError")
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:720:        errorMessage.includes("NotFoundError") ||
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:721:        errorMessage.includes("not found")
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:728:      return { type: "unknown", message: errorMessage };
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:815:    } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:816:      console.error("[LiveKitMediaContext] Camera toggle error:", error);
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:817:      setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:868:      } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:869:        console.error(
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:870:          "[LiveKitMediaContext] Microphone toggle error:",
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:871:          error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:873:        setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:906:      } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:907:        const errorName =
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:908:          error instanceof Error ? error.name : "";
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:909:        const errorMessage =
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:910:          error instanceof Error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:911:            ? error.message
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:912:            : String(error);
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:915:          errorName === "NotAllowedError" ||
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:916:          errorMessage.includes("Permission denied") ||
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:917:          errorMessage.includes("cancelled") ||
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:918:          errorMessage.includes("canceled");
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:922:        console.error(
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:923:          "[LiveKitMediaContext] Screen share toggle error:",
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:924:          error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:926:        setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:963:      } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:964:        console.error(
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:965:          "[LiveKitMediaContext] setLocalMicrophoneMuted error:",
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:966:          error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:991:      } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:992:        console.error(
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:993:          "[LiveKitMediaContext] setLocalAudioGated error:",
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:994:          error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1072:      } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1073:        console.error(
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1074:          "[LiveKitMediaContext] replaceAudioTrackWithProcessed error:",
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1075:          error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1108:      } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1109:        console.error(
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1110:          "[LiveKitMediaContext] restartMicrophoneWithOptions error:",
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1111:          error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1113:        setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1134:      } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1135:        console.error(
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1136:          "[LiveKitMediaContext] Camera switch error:",
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1137:          error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1139:        setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1160:      } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1161:        console.error(
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1162:          "[LiveKitMediaContext] Microphone switch error:",
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1163:          error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1165:        setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1192:      } catch (error) {
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1193:        console.error(
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1194:          "[LiveKitMediaContext] Camera restart error:",
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1195:          error
+src/features\space\livekit\internal\LiveKitMediaContext.tsx:1197:        setMediaError(parseMediaError(error));
+src/features\space\hooks\internal\useScreenRecorder.ts:24:export type NotificationType = "info" | "success" | "error";
+src/features\space\hooks\internal\useScreenRecorder.ts:33:  onError?: (error: string) => void;
+src/features\space\hooks\internal\useScreenRecorder.ts:61:    console.error(
+src/features\space\hooks\internal\useScreenRecorder.ts:90:  | { status: "error"; message: string };
+src/features\space\hooks\internal\useScreenRecorder.ts:129:    return { status: "error", message: "파일 다운로드에 실패했습니다" };
+src/features\space\hooks\internal\useScreenRecorder.ts:145:  const [error, setError] = useState<string | null>(null);
+src/features\space\hooks\internal\useScreenRecorder.ts:188:        recorder.onerror = null;
+src/features\space\hooks\internal\useScreenRecorder.ts:264:          // unmount(L179)·onerror·stopRecording과 동일 .catch 정책 (WI-012-2 S4).
+src/features\space\hooks\internal\useScreenRecorder.ts:305:        recorder.onerror = () => {
+src/features\space\hooks\internal\useScreenRecorder.ts:306:          // 'error'는 복구 불가 — abort로 간주하고 정리한다.
+src/features\space\hooks\internal\useScreenRecorder.ts:319:          // 상태는 idle인데 ref가 errored recorder를 가리키는 불일치 해소
+src/features\space\hooks\internal\useScreenRecorder.ts:324:          // stopRecording 대기 중이면 settle — 'error' 시 onstop이 발화되지
+src/features\space\hooks\internal\useScreenRecorder.ts:326:          // onstop의 result.status==="error" 경로와 동일하게 resolve하며,
+src/features\space\hooks\internal\useScreenRecorder.ts:327:          // 오류는 error 상태/onError 콜백으로 호출자에 전달된다.
+src/features\space\hooks\internal\useScreenRecorder.ts:341:        console.error(
+src/features\space\hooks\internal\useScreenRecorder.ts:360:      // unmount(L179)·onerror·startRecording과 동일 .catch 정책 (WI-012-2 S4).
+src/features\space\hooks\internal\useScreenRecorder.ts:401:          case "error":
+src/features\space\hooks\internal\useScreenRecorder.ts:440:    error,
+src/features\space\livekit\internal\useLiveKitMedia.ts:158:    (error: unknown): MediaError => {
+src/features\space\livekit\internal\useLiveKitMedia.ts:159:      const errorMessage =
+src/features\space\livekit\internal\useLiveKitMedia.ts:160:        error instanceof Error ? error.message : String(error);
+src/features\space\livekit\internal\useLiveKitMedia.ts:162:        errorMessage.includes("Permission denied") ||
+src/features\space\livekit\internal\useLiveKitMedia.ts:163:        errorMessage.includes("NotAllowedError")
+src/features\space\livekit\internal\useLiveKitMedia.ts:171:        errorMessage.includes("NotFoundError") ||
+src/features\space\livekit\internal\useLiveKitMedia.ts:172:        errorMessage.includes("not found")
+src/features\space\livekit\internal\useLiveKitMedia.ts:179:      return { type: "unknown", message: errorMessage };
+src/features\space\livekit\internal\useLiveKitMedia.ts:201:    } catch (error) {
+src/features\space\livekit\internal\useLiveKitMedia.ts:202:      console.error("[useLiveKitMedia] Camera toggle error:", error);
+src/features\space\livekit\internal\useLiveKitMedia.ts:203:      setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\useLiveKitMedia.ts:226:      } catch (error) {
+src/features\space\livekit\internal\useLiveKitMedia.ts:227:        console.error(
+src/features\space\livekit\internal\useLiveKitMedia.ts:228:          "[useLiveKitMedia] Microphone toggle error:",
+src/features\space\livekit\internal\useLiveKitMedia.ts:229:          error
+src/features\space\livekit\internal\useLiveKitMedia.ts:231:        setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\useLiveKitMedia.ts:251:      } catch (error) {
+src/features\space\livekit\internal\useLiveKitMedia.ts:252:        const errorName =
+src/features\space\livekit\internal\useLiveKitMedia.ts:253:          error instanceof Error ? error.name : "";
+src/features\space\livekit\internal\useLiveKitMedia.ts:254:        const errorMessage =
+src/features\space\livekit\internal\useLiveKitMedia.ts:255:          error instanceof Error
+src/features\space\livekit\internal\useLiveKitMedia.ts:256:            ? error.message
+src/features\space\livekit\internal\useLiveKitMedia.ts:257:            : String(error);
+src/features\space\livekit\internal\useLiveKitMedia.ts:260:          errorName === "NotAllowedError" ||
+src/features\space\livekit\internal\useLiveKitMedia.ts:261:          errorMessage.includes("Permission denied") ||
+src/features\space\livekit\internal\useLiveKitMedia.ts:262:          errorMessage.includes("cancelled") ||
+src/features\space\livekit\internal\useLiveKitMedia.ts:263:          errorMessage.includes("canceled");
+src/features\space\livekit\internal\useLiveKitMedia.ts:267:        console.error(
+src/features\space\livekit\internal\useLiveKitMedia.ts:268:          "[useLiveKitMedia] Screen share toggle error:",
+src/features\space\livekit\internal\useLiveKitMedia.ts:269:          error
+src/features\space\livekit\internal\useLiveKitMedia.ts:271:        setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\useLiveKitMedia.ts:305:      } catch (error) {
+src/features\space\livekit\internal\useLiveKitMedia.ts:306:        console.error(
+src/features\space\livekit\internal\useLiveKitMedia.ts:307:          "[useLiveKitMedia] setLocalMicrophoneMuted error:",
+src/features\space\livekit\internal\useLiveKitMedia.ts:308:          error
+src/features\space\livekit\internal\useLiveKitMedia.ts:330:      } catch (error) {
+src/features\space\livekit\internal\useLiveKitMedia.ts:331:        console.error(
+src/features\space\livekit\internal\useLiveKitMedia.ts:332:          "[useLiveKitMedia] Camera switch error:",
+src/features\space\livekit\internal\useLiveKitMedia.ts:333:          error
+src/features\space\livekit\internal\useLiveKitMedia.ts:335:        setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\useLiveKitMedia.ts:356:      } catch (error) {
+src/features\space\livekit\internal\useLiveKitMedia.ts:357:        console.error(
+src/features\space\livekit\internal\useLiveKitMedia.ts:358:          "[useLiveKitMedia] Microphone switch error:",
+src/features\space\livekit\internal\useLiveKitMedia.ts:359:          error
+src/features\space\livekit\internal\useLiveKitMedia.ts:361:        setMediaError(parseMediaError(error));
+src/features\space\livekit\internal\useLiveKitMedia.ts:388:      } catch (error) {
+src/features\space\livekit\internal\useLiveKitMedia.ts:389:        console.error(
+src/features\space\livekit\internal\useLiveKitMedia.ts:390:          "[useLiveKitMedia] Camera restart error:",
+src/features\space\livekit\internal\useLiveKitMedia.ts:391:          error
+src/features\space\livekit\internal\useLiveKitMedia.ts:393:        setMediaError(parseMediaError(error));
+src/features\space\game\internal\asset-loader.ts:15:  frameWidth?: number;
+src/features\space\game\internal\asset-loader.ts:16:  frameHeight?: number;
+src/features\space\game\internal\asset-loader.ts:24:    filePath: string;
+src/features\space\game\internal\asset-loader.ts:36:          url: asset.filePath,
+src/features\space\game\internal\asset-loader.ts:37:          frameWidth: (meta.frameWidth as number) || 64,
+src/features\space\game\internal\asset-loader.ts:38:          frameHeight: (meta.frameHeight as number) || 64,
+src/features\space\game\internal\asset-loader.ts:45:          url: asset.filePath,
+src/features\space\game\internal\asset-loader.ts:52:          url: asset.filePath,
+src/features\space\game\internal\asset-loader.ts:59:          url: asset.filePath,
+src/features\space\game\internal\asset-loader.ts:66:          url: asset.filePath,
+src/features\space\game\internal\asset-loader.ts:84:        config: { frameWidth: number; frameHeight: number }
+src/features\space\game\internal\asset-loader.ts:94:      if (asset.type === "spritesheet" && asset.frameWidth && asset.frameHeight) {
+src/features\space\game\internal\asset-loader.ts:96:          frameWidth: asset.frameWidth,
+src/features\space\game\internal\asset-loader.ts:97:          frameHeight: asset.frameHeight,
+src/features\space\game\internal\asset-loader.ts:102:    } catch (error) {
+src/features\space\game\internal\asset-loader.ts:105:        error: error instanceof Error ? error.message : "Failed to load asset",
+src/features\space\game\internal\asset-loader.ts:111:  scene.load.on("loaderror", (...args: unknown[]) => {
+src/features\space\game\internal\asset-loader.ts:116:      error: `Failed to load: ${key}`,
+src/features\assets\internal\safe-path.ts:5: * 모든 정상 filePath/thumbnailPath는 DB에 `/assets/generated/...` 형태로 저장되며
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:50:  onError?: (error: Error) => void;
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:101:        const errorData = await response.json().catch(() => ({}));
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:103:          errorData.error || "Failed to get LiveKit token"
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:121:    } catch (error) {
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:122:      const errorMessage =
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:123:        error instanceof Error ? error.message : "Connection failed";
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:124:      console.error("[LiveKitProvider] Token fetch failed:", errorMessage);
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:128:        connectionError: errorMessage,
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:131:      if (onError && error instanceof Error) {
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:132:        onError(error);
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:223:    (error: Error) => {
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:224:      console.error("[LiveKitProvider] Room error:", error);
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:227:        connectionError: error.message,
+src/features\space\livekit\internal\LiveKitRoomProvider.tsx:229:      onError?.(error);
+src/features\assets\internal\specs.ts:9:    frameWidth: 128,
+src/features\assets\internal\specs.ts:10:    frameHeight: 128,
+src/features\assets\internal\specs.ts:19:    frameWidth: 32,
+src/features\assets\internal\specs.ts:20:    frameHeight: 32,
+src/features\space\game\events\types.ts:15:  SCENE_ERROR: "scene:error",
+src/features\space\game\events\types.ts:32:  ASSET_LOAD_ERROR: "asset:load:error",
+src/features\space\game\events\types.ts:88:  error: string;
+src/features\space\game\events\types.ts:102:  metadata: Record<string, unknown>;
+src/features\space\game\events\types.ts:107:  error: string;
+src/features\space\game\events\types.ts:113:  metadata: Record<string, unknown>;
+src/features\space\game\events\types.ts:117:  error: string;
+src/features\assets\internal\workflow-loader.ts:6:const WORKFLOW_DIR = join(process.cwd(), "comfyui-workflows");
+src/features\assets\internal\workflow-loader.ts:31:): Promise<{ meta: WorkflowMeta; workflow: ComfyUIWorkflow }> {
+src/features\assets\internal\workflow-loader.ts:34:  const filePath = join(WORKFLOW_DIR, filename);
+src/features\assets\internal\workflow-loader.ts:35:  const content = await readFile(filePath, "utf-8");
+src/features\assets\internal\workflow-loader.ts:41:  const workflow: ComfyUIWorkflow = {};
+src/features\assets\internal\workflow-loader.ts:44:      workflow[key] = value as ComfyUIWorkflow[string];
+src/features\assets\internal\workflow-loader.ts:48:  return { meta, workflow };
+src/features\assets\internal\workflow-loader.ts:53:  workflow: ComfyUIWorkflow,
+src/features\assets\internal\workflow-loader.ts:57:  const injected = JSON.parse(JSON.stringify(workflow)) as ComfyUIWorkflow;
+src/features\assets\internal\validator.ts:11:  const errors: string[] = [];
+src/features\assets\internal\validator.ts:17:        errors.push(
+src/features\assets\internal\validator.ts:22:        errors.push(
+src/features\assets\internal\validator.ts:30:        errors.push(
+src/features\assets\internal\validator.ts:35:        errors.push(
+src/features\assets\internal\validator.ts:43:        errors.push(
+src/features\assets\internal\validator.ts:48:        errors.push(
+src/features\assets\internal\validator.ts:56:        errors.push(`Map width must be >= 512px, got ${width}px`);
+src/features\assets\internal\validator.ts:59:        errors.push(`Map height must be >= 384px, got ${height}px`);
+src/features\assets\internal\validator.ts:69:    valid: errors.length === 0,
+src/features\assets\internal\validator.ts:70:    errors,
+src/features\assets\internal\validator.ts:77:  const errors: string[] = [];
+src/features\assets\internal\validator.ts:82:    errors.push(
+src/features\assets\internal\validator.ts:88:    errors.push("Asset must be PNG format");
+src/features\assets\internal\validator.ts:92:    valid: errors.length === 0,
+src/features\assets\internal\validator.ts:93:    errors,
+src/features\assets\internal\types.ts:10:  errors: string[];
+src/features\assets\internal\types.ts:19:  workflow?: string;
+src/features\assets\internal\types.ts:20:  seed?: number;
+src/features\assets\internal\types.ts:66:  frameWidth?: number;
+src/features\assets\internal\types.ts:67:  frameHeight?: number;
+src/features\assets\internal\types.ts:79:  workflow: string;
+src/features\assets\internal\types.ts:82:  frameWidth?: number;
+src/features\assets\internal\types.ts:83:  frameHeight?: number;
+src/features\assets\internal\types.ts:86:  filePath: string;
+src/features\assets\internal\types.ts:87:  thumbnailPath?: string;
+src/features\assets\internal\types.ts:90:  comfyuiJobId?: string;
+src/features\assets\internal\types.ts:91:  seed?: number;
+src/features\space\avatar\internal\parts\parts-compositor.ts:112:    { frameWidth: PLAYER_WIDTH, frameHeight: PLAYER_HEIGHT },
+src/features\space\game\internal\scenes\main-scene.ts:57:        frameWidth: PLAYER_WIDTH,
+src/features\space\game\internal\scenes\main-scene.ts:58:        frameHeight: PLAYER_HEIGHT,
+src/features\space\game\internal\scenes\main-scene.ts:84:    } catch (error) {
+src/features\space\game\internal\scenes\main-scene.ts:85:      const message = error instanceof Error ? error.message : "Unknown scene error";
+src/features\space\game\internal\scenes\main-scene.ts:86:      eventBridge.emit(GameEvents.SCENE_ERROR, { error: message });
+src/features\space\game\internal\scenes\main-scene.ts:170:    const filePath = data.metadata?.filePath as string | undefined;
+src/features\space\game\internal\scenes\main-scene.ts:171:    if (!filePath) return;
+src/features\space\game\internal\scenes\main-scene.ts:174:      { id: data.assetId, type: data.type, filePath, metadata: data.metadata },
+
+ succeeded in 267ms:
+/** ?ì…‹ ? í˜• */
+export type AssetType = "character" | "tileset" | "object" | "map";
+
+/** ?ì…‹ ?íƒœ */
+export type AssetStatus = "pending" | "processing" | "completed" | "failed";
+
+/** ?ì…‹ ? íš¨??ê²€ì¦?ê²°ê³¼ */
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/** ?ì…‹ ?ì„± ?”ì²­ ?Œë¼ë¯¸í„° */
+export interface CreateAssetParams {
+  type: AssetType;
+  name: string;
+  prompt: string;
+  workflow?: string;
+  seed?: number;
+  width?: number;
+  height?: number;
+  /** ?¤ê±°?°ë¸Œ ?„ë¡¬?„íŠ¸ (ë¯¸ì?????? í˜•ë³?ê¸°ë³¸ê°??¬ìš©) */
+  negativePrompt?: string;
+  /** KSampler steps (ë¯¸ì??????„ë¦¬???ëŠ” ?Œí¬?Œë¡œ??ê¸°ë³¸ê°? */
+  steps?: number;
+  /** CFG Scale (ë¯¸ì??????„ë¦¬???ëŠ” ?Œí¬?Œë¡œ??ê¸°ë³¸ê°? */
+  cfgScale?: number;
+  /** Sampler ?´ë¦„ (euler, dpmpp_2m ?? */
+  samplerName?: string;
+  /** Scheduler (normal, karras ?? */
+  scheduler?: string;
+  /** ?ˆì§ˆ ?„ë¦¬??(draft/standard/high) - ê°œë³„ ê°’ë³´???°ì„  */
+  qualityPreset?: string;
+  /** ë°°ê²½ ?œê±° ?¬ë? (character/object ê¸°ë³¸ true) */
+  removeBackground?: boolean;
+  /** ë°°ê²½ ?œê±° ?‰ìƒ ?ˆìš© ?¤ì°¨ (0-255, ê¸°ë³¸ 30) */
+  bgRemovalTolerance?: number;
+  /** Seamless ?€?¼ë§ (tileset ?„ìš©) */
+  seamless?: boolean;
+  /** ControlNet ?¬ìš© ?¬ë? (character ?„ìš©) */
+  useControlNet?: boolean;
+  /** ControlNet ëª¨ë¸ ?´ë¦„ */
+  controlNetModel?: string;
+  /** ControlNet ê°•ë„ (0-1) */
+  controlNetStrength?: number;
+  /** ?¬ì¦ˆ ì°¸ì¡° ?´ë?ì§€ ê²½ë¡œ */
+  poseImage?: string;
+  /** ì¹˜ë¹„ ?¤í???ìºë¦­???ì„± (?„ë ˆ?„ë³„ ?ì„± + ?©ì„±) */
+  useChibiStyle?: boolean;
+  /** LoRA ?ìš© ê°•ë„ (0-1, ê¸°ë³¸ 0.9) */
+  loraStrength?: number;
+  /** ControlNet ?œìž‘ (0-1, ê¸°ë³¸ 0.0) */
+  controlNetStart?: number;
+  /** ControlNet ??(0-1, ê¸°ë³¸ 0.8) */
+  controlNetEnd?: number;
+  /** IP-Adapter ê°•ë„ (0-1, ê¸°ë³¸ 0.8) */
+  ipAdapterWeight?: number;
+}
+
+/** ?ì…‹ ê·œê²© ?•ì˜ */
+export interface AssetSpec {
+  type: AssetType;
+  width: number;
+  height: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  columns?: number;
+  rows?: number;
+  requiresTransparency: boolean;
+}
+
+/** ?ì„±???ì…‹ ë©”í??°ì´??*/
+export interface GeneratedAssetMetadata {
+  id: string;
+  type: AssetType;
+  name: string;
+  prompt: string;
+  workflow: string;
+  width: number;
+  height: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  columns?: number;
+  rows?: number;
+  filePath: string;
+  thumbnailPath?: string;
+  fileSize: number;
+  format: "png";
+  comfyuiJobId?: string;
+  seed?: number;
+  generatedAt: string;
+  processingTime: number;
+  status: AssetStatus;
+}
+
+/** ?Œí¬?Œë¡œ??ë©”í??°ì´??(JSON ?Œì¼??_meta ?„ë“œ) */
+export interface WorkflowMeta {
+  name: string;
+  description: string;
+  version: string;
+  assetType: AssetType;
+  outputFormat: {
+    width: number;
+    height: number;
+    grid?: string;
+    frameSize?: string;
+    tileSize?: string;
+  };
+  parameters: Record<
+    string,
+    {
+      nodeId: string;
+      field: string;
+      type: string;
+      default?: unknown;
+    }
+  >;
+}
+
+
+codex
+동의합니다. 지금 상태에서는 **WI-019 먼저**가 맞습니다. 이유는 가장 국소적이고, 이미 WI-014에서 같은 수리 패턴이 검증됐고, 현재 구현이 `GeneratedAsset` row를 그대로 외부 REST 응답으로 내보내는 구조라 장기적으로 계속 새 필드 유출 위험을 만듭니다. WI-018은 운영 안전망으로 중요하지만 fail-fast는 배포 환경 계약을 바꾸므로 적용 전 env 인벤토리 확인이 필요합니다. WI-017은 UX 방어 심화라 그다음으로 봅니다. 순서는 `WI-019 -> WI-018 -> WI-017`가 합리적입니다.
+
+WI-019 구현 패턴은 **`include` 기반 전체 row 반환을 `select` + 명시 DTO 반환으로 바꾸는 방식**이 맞습니다. 다만 제안 allowlist는 조금 줄이겠습니다. 응답은 대략 `id, type, name, status, metadata, filePath, thumbnailPath, fileSize, isShared, createdAt, updatedAt, user:{id,name}` 정도면 충분하고, `userId`는 내부 권한 판정에는 필요하지만 응답에는 굳이 넣지 않는 편이 낫습니다. `user.id`가 이미 있고, 내부 소비처도 `userId`를 쓰지 않습니다.
+
+제외 대상은 `prompt`, `workflow`, `comfyuiJobId`가 맞습니다. 특히 `prompt`는 “본인 소유라 괜찮다”는 반론이 가능하지만, 이 엔드포인트는 게임 런타임 로더가 호출하는 자산 상세 API에 가깝고 프롬프트 열람 API가 아닙니다. 프롬프트는 사용자의 의도·취향·업로드 맥락이 섞일 수 있어서 별도 UI 요구가 생길 때 별도 계약으로 노출하는 게 낫습니다. `workflow`와 `comfyuiJobId`는 명확히 내부 구현/인프라 정보라 제외가 맞습니다. `status`는 dev 스크립트뿐 아니라 생성 완료 전 폴링 계약으로 자연스럽기 때문에 유지하는 편이 안전합니다.
+
+가장 중요한 수정점은 `metadata`입니다. 지금 성공 경로에서 `metadata: JSON.parse(JSON.stringify(metadata))`로 저장되는데, 타입상 `GeneratedAssetMetadata` 안에 `prompt`, `workflow`, `comfyuiJobId`가 다시 들어갑니다. 그래서 top-level에서 세 필드를 제외해도 `metadata`를 통째 반환하면 사실상 우회 노출됩니다. 따라서 `metadata`도 통째 allowlist가 아니라 public metadata로 정규화해야 합니다. 최소 public metadata는 `width, height, frameWidth, frameHeight, columns, rows, format, seed?, generatedAt?, processingTime?` 정도이고, 실패 폴링을 유지하려면 `error`만 제한적으로 허용할 수 있습니다. 소비처 기준으로는 `frameWidth/frameHeight`가 핵심입니다.
+
+회귀 위험상 빠뜨리면 안 되는 것은 `filePath`, `metadata.frameWidth`, `metadata.frameHeight`, 그리고 폴링용 `status`입니다. `scripts/test-chibi-generation.ts`는 실패 시 `metadata.error`도 읽으니, dev 스크립트 유지까지 포함하면 `metadata.error`를 허용하거나 스크립트를 새 에러 계약에 맞춰야 합니다.
+
+내가 반드시 짚고 싶은 놓친 위험 1가지는 이것입니다: **`metadata` 안에 제외하려는 민감 필드가 중복 저장되어 있어, top-level allowlist만으로는 WI-019가 해결되지 않을 수 있습니다.** 이 WI의 핵심은 `asset` 전체 반환 제거가 아니라 “public asset response DTO”를 만드는 것입니다.
+tokens used
+30,466
