@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.7,
+    "consistency": 9.9,
+    "specificity": 10,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.78,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/lib/route-access.ts:16 (PUBLIC_FILES); src/features/space/game/internal/scenes/main-scene.ts:41-53",
+      "description": "Allowlist 완전성 드리프트(유지보수 footgun). public/ 루트는 현재 Logo.png 1개뿐이라 allowlist=['/Logo.png']는 완전하나, public/assets/tiles/*.png·objects/*.png 등 게임 정적자산은 main-scene.ts에서 정적 URL(/assets/...)로 로드되며 matcher(_next/static|_next/image|favicon.ico만 제외)에 안 걸려 미들웨어를 통과한다. 현재는 게임씬이 인증 게이트된 /spaces/[id] 안에서만 로드돼 인증 사용자만 fetch → 라이브 회귀 아님. 그러나 향후 public/ 루트에 robots.txt·sitemap·manifest·opengraph-image 등을 추가하면 allowlist를 함께 갱신하지 않는 한 동일 307 회귀가 재발한다(코드 주석이 이 절차를 명시하나 강제 메커니즘은 없음). SUSPECTED 아님 — 실측: public/ 루트 = Logo.png 단일, main-scene.ts:41-53이 /assets/tiles·objects 정적 로드 확인.",
+      "recommendation": "현 스코프 회귀(/Logo.png) 해소는 완결이므로 즉시수정 불요. 향후 public 루트 자산 추가 시 allowlist 동기화를 강제하려면 (a) public/ 루트 파일 목록 ↔ PUBLIC_FILES 정합을 검증하는 테스트, 또는 (b) /assets/ 같은 명시 public namespace prefix 허용을 후속 WI로. 현재는 코드 주석 가이드로 충분.",
+      "defer": true,
+      "deferRationale": "라이브 회귀 아님(게임자산은 인증게이트된 /spaces/[id] 내 로드, 루트 public 자산은 Logo.png 단일이라 allowlist 완전). 향후 자산 추가 시점의 유지보수 부채일 뿐 현 변경의 결함 아님. WI 목표(/Logo.png 통과+deny-by-default 보존) 완전 충족.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/route-access.ts:30",
+      "description": "Next 내부 자산 분기가 startsWith(\"/_next\")/startsWith(\"/favicon\") 접두 매칭이라 /_next-evil·/favicons-x 같은 경로도 public 판정된다(인증 우회). 다만 (1) /_next·/favicon은 Next 예약 내부 namespace라 앱 라우트가 충돌 점유할 수 없고, (2) matcher가 _next/static·_next/image를 이미 제외, (3) WI-001에서 도입된 선재 로직을 verbatim 이관한 것이라 이번 변경이 신규 도입한 표면 아님. 실제 보호 라우트 노출로 이어질 경로 부재. SUSPECTED: 잔존 prefix-vs-exact 비대칭이나 실 악용 경로 없음.",
+      "recommendation": "심층방어로 /_next/·/favicon. 형태(세그먼트 경계) 매칭으로 타이트화 가능하나 실익 미미. 선재 코드 정합 차원의 nit.",
+      "defer": true,
+      "deferRationale": "Next 예약 내부 namespace라 앱 라우트 충돌 불가 → 실 우회 경로 부재. WI-001 선재 로직 verbatim 이관(이번 WI가 새 표면 도입 안 함). 회귀·보안 영향 0.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/components/auth/login-form.tsx (callbackUrl 처리 — 변경 파일 외, 선재)",
+      "description": "설계 consult 놓친위험 E. 미인증 정적/보호 요청이 /login?callbackUrl=<path>로 리다이렉트되고 로그인 폼이 callbackUrl을 그대로 사용 → 내부경로 검증 부재 시 open-redirect 표면. 이번 변경으로 /Logo.png는 더 이상 리다이렉트 경로를 타지 않아(allowlist 통과) 이 WI가 표면을 넓히지 않음. 선재 이슈이며 WI-020 변경 파일(route-access.ts/middleware.ts) 밖.",
+      "recommendation": "callbackUrl을 same-origin 내부 pathname으로만 허용하는 검증을 별도 WI(백로그)로. 현 WI 스코프 밖.",
+      "defer": true,
+      "deferRationale": "WI-020 변경 파일 밖 선재 이슈 + 이번 수정으로 /Logo.png가 리다이렉트 경로를 타지 않아 표면 무증가. 별 도메인(로그인 폼) 후속 백로그.",
+      "fixNow": false
+    }
+  ]
+}
