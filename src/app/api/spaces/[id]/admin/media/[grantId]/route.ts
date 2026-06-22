@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -41,9 +42,6 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to delete grant", details: error instanceof Error ? error.message : undefined },
-      { status: 500 }
-    );
+    return internalErrorResponse("DELETE /api/spaces/[id]/admin/media/[grantId]", error, "Failed to delete grant");
   }
 }

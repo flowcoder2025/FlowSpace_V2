@@ -386,6 +386,7 @@ describe("POST /api/spaces — superAdmin 생성 가드", () => {
   });
 
   it("space.create 실패 시 500 폴백 (Failed to create space)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
     mockPrisma.template.findUnique.mockResolvedValue({ id: "tpl-1", key: "OFFICE" });
     mockPrisma.space.create.mockRejectedValue(new Error("db down"));
@@ -398,20 +399,23 @@ describe("POST /api/spaces — superAdmin 생성 가드", () => {
     );
 
     expect(res.status).toBe(500);
-    const body = await readJson<{ error: string }>(res);
-    expect(body.error).toBe("Failed to create space");
+    const body = await readJson<Record<string, unknown>>(res);
+    expect(body).toEqual({ error: "Failed to create space" });
+    expect(body.details).toBeUndefined();
   });
 });
 
 describe("GET /api/spaces — 500 폴백", () => {
   it("findMany 실패 시 500 (Failed to fetch spaces)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     mockAuth.mockResolvedValue(makeSession({ id: "u1" }));
     mockPrisma.space.findMany.mockRejectedValue(new Error("db down"));
 
     const res = await GET(buildGetRequest("/api/spaces"));
 
     expect(res.status).toBe(500);
-    const body = await readJson<{ error: string }>(res);
-    expect(body.error).toBe("Failed to fetch spaces");
+    const body = await readJson<Record<string, unknown>>(res);
+    expect(body).toEqual({ error: "Failed to fetch spaces" });
+    expect(body.details).toBeUndefined();
   });
 });

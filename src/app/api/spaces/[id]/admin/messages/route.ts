@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
+import { internalErrorResponse } from "@/lib/api-error";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -43,9 +44,6 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ messages: items, nextCursor });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch messages", details: error instanceof Error ? error.message : undefined },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces/[id]/admin/messages", error, "Failed to fetch messages");
   }
 }

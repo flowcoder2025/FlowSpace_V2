@@ -178,12 +178,19 @@ describe("GET /api/assets/[id] — 응답 allowlist", () => {
 });
 
 describe("GET /api/assets/[id] — 에러 처리", () => {
-  it("prisma 예외 시 500 폴백", async () => {
+  it("prisma 예외 시 500 폴백 (원본 에러 미노출 — WI-023)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
-    mockPrisma.generatedAsset.findUnique.mockRejectedValue(new Error("db down"));
+    mockPrisma.generatedAsset.findUnique.mockRejectedValue(
+      new Error("Invalid `prisma.generatedAsset.findUnique()` at /srv/app")
+    );
 
     const res = await GET(new Request("http://localhost"), routeCtx("asset-1"));
+    const body = await readJson<Record<string, unknown>>(res);
 
     expect(res.status).toBe(500);
+    expect(JSON.stringify(body)).not.toContain("prisma.generatedAsset");
+    expect(body.details).toBeUndefined();
+    expect(body).toEqual({ error: "Failed to fetch asset" });
   });
 });

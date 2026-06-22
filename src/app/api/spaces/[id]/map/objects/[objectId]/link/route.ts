@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -100,12 +101,6 @@ export async function POST(request: Request, { params }: RouteParams) {
       targetId: body.targetObjectId,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to link objects",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/spaces/[id]/map/objects/[objectId]/link", error, "Failed to link objects");
   }
 }

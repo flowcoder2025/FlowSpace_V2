@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { processAssetGeneration } from "@/features/assets";
 import type { CreateAssetParams } from "@/features/assets";
@@ -113,12 +114,6 @@ export async function POST(request: Request) {
       { status: 202 }
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to start asset generation",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/assets/generate", error, "Failed to start asset generation");
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { internalErrorResponse } from "@/lib/api-error";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -50,9 +51,6 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ logs: items, nextCursor });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch logs", details: error instanceof Error ? error.message : undefined },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces/[id]/admin/logs", error, "Failed to fetch logs");
   }
 }

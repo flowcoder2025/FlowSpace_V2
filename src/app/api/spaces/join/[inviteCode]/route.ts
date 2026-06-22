@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -34,13 +35,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       _count: undefined,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to fetch space",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("GET /api/spaces/join/[inviteCode]", error, "Failed to fetch space");
   }
 }
 
@@ -103,12 +98,6 @@ export async function POST(request: Request, { params }: RouteParams) {
       { status: 201 }
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to join space",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/spaces/join/[inviteCode]", error, "Failed to join space");
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { internalErrorResponse } from "@/lib/api-error";
 
 const SALT_ROUNDS = 12;
 
@@ -53,12 +54,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(user, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Registration failed",
-        details: error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+    return internalErrorResponse("POST /api/auth/register", error, "Registration failed");
   }
 }
