@@ -1,12 +1,24 @@
 # HANDOFF
 
 ## Active WI
-(없음) — **WI-014/015/016 develop 머지 완료**(PR#15 `0f8daf2` / PR#16 `9b103b8` / PR#17 `4719ab7`). 2026-06-22 **승격前 통합감사**(codex consult + 9축 멀티에이전트 감사 46에이전트 + 적대검증)에서 발굴한 신규결함 3건을 사용자 지시("신규결함 WI 먼저")로 develop 정상 플로우 처리 완료. WI-001~016 develop 반영. READY 큐 비어 있음(WI-017~019 BACKLOG).
+(없음) — **✅ develop→main 승격 완료(2026-06-22)**. WI-001~016 라이브 반영. READY 큐 비어 있음(WI-017~019 BACKLOG).
 
-## ⚠️ 다음 세션 우선 — READY 큐 비어 있음, 승인 게이트만 남음
-READY WI 없음. 남은 건 **사용자 승인이 필요한 게이트**(큐 WI 아님):
-1. **WI-013 + WI-016 prod 적용**: (WI-013) Space 복합 인덱스 prod 적용 + **프로덕션 EXPLAIN**(cursor seek 효율 — codex 지목). 대용량이면 direct(비-PgBouncer) connection에서 `CREATE/DROP INDEX CONCURRENTLY` + `prisma migrate resolve --applied 20260622120000_space_hot_query_index`. (WI-016) `GeneratedAsset.isShared` 베이스라인 — prod는 컬럼 존재(db push)라 멱등 `migrate deploy`(IF NOT EXISTS: 컬럼 skip·인덱스 없으면 생성) 또는 인덱스 확인 후 `migrate resolve --applied 20260622130000_generated_asset_is_shared`. **적용 전 prod `\d "GeneratedAsset"`로 컬럼/복합 인덱스 실제 정의 확인 권장**(codex consult 놓친위험: 인덱스 부재 은닉 회피). 둘 다 build에 migrate deploy 자동실행 없음(수동). 스펙 prod-gate 참조.
-2. **develop→main 승격**: 누적 WI-001~016을 라이브 반영(process 07 — `.flowset/promotion-readiness.md` 작성 + 사용자 승인 + 작성자 `flowcoder25@gmail.com`). **승격 시 OCI 소켓 재배포 발동**(deploy-socket.yml: server/**·protocol·enforce·auth-secret·Dockerfile.socket 변경→main push 트리거. WI-012-1이 Dockerfile.socket COPY에 auth-secret.ts 추가해 빌드 정상). **🔴 최대 go-live 위험**(통합감사·codex 지목): WI-001 AUTH_SECRET fail-closed가 이번 승격으로 처음 라이브 적용 → prod에 **≥32자 + Vercel·OCI 동일값** 아니면 `/api/socket/token` 500 → 아무도 메타버스 진입 불가. **WI-005 운영 env**: OCI `.env` `SOCKET_INTERNAL_SECRET` + Vercel `SOCKET_INTERNAL_URL`/`SOCKET_INTERNAL_SECRET`(미설정 시 실시간 추방만 degrade·크래시 아님). **main↔develop 분기**: main에 develop에 없는 `38459d5`(Vercel 재배포 빈 커밋) 존재 — 승격 PR이 자동 통합하나 어떤 커밋 올릴지 인지 필요.
+## ✅ 승격 완료 (2026-06-22) — PR#18 rebase 머지
+사용자 지시("코덱스와 협의하여 작업 진행" → "직접 확인해봐" + "양쪽다 머지해")로 승격 실행:
+- **머지**: develop→main **PR#18 rebase 머지** → main HEAD `50d9af0`(author=`flowcoder25@gmail.com` **보존** — rebase가 author 유지해 Vercel 인가 통과). main↔develop는 rebase로 SHA 분기 → **back-sync 완료**.
+- **Vercel(웹)**: Production 배포 **● Ready** — 신 WI-001~016 코드 라이브(`flowspace-v2.vercel.app` HTTP200, `/api/socket/token` 307=NextAuth 리다이렉트, 500 아님).
+- **prod DB**: `prisma migrate deploy` 적용 — WI-013 `Space_status_updatedAt_id_idx` 생성+구 `Space_status_idx` 제거(**Space 7행라 즉시·무락, CONCURRENTLY 불필요**), WI-016 `isShared` no-op(IF NOT EXISTS, prod 컬럼·인덱스 기존재). `_prisma_migrations` 3건 SoT 정합.
+- **사전검증 전수 실측**: 기계게이트(tsc0/vitest165/build0) · OCI esbuild 번들+metafile COPY 완전성 · **🔴AUTH_SECRET 해소**(라이브 OCI `socket-v2.144.24.72.143.nip.io`가 로컬 `.env` AUTH_SECRET[44자]로 서명한 JWT 검증 성공 → prod OCI=44자≥32 확정; live 웹 HTTP200 → Vercel==OCI transitive) · WI-016 prod 컬럼 존재 prod DB 직접확인 · codex consult 1R + 적대검증 워크플로우 19에이전트(승격차단 코드결함 0). 산출물: `.flowset/promotion-readiness.md` + `.flowset/promotion-approval.json` + `eval-results/PROMOTION-consult*`.
+
+## ⚠️ 다음 세션 우선 — OCI 소켓 신코드 수동 배포 (사용자 전용, SSH 필요)
+승격으로 **Vercel·DB는 신코드 반영됐으나 OCI 소켓은 구코드 가동 중**:
+- **`deploy-socket.yml` 자동배포는 과거 전부 실패**(2026-03/04/06 전수) — `OCI_SSH_PRIVATE_KEY` 시크릿 미설정 = `"can't connect without a private SSH key"`. **선재 조건, 승격이 깬 게 아님.** OCI는 그동안 수동 SSH 배포돼 옴.
+- **현재 라이브 무중단**: 구 OCI 컨테이너 가동(소켓 HTTP200), 신 Vercel 코드와 호환(AUTH_SECRET 불변·WI-012 protocol 순수리팩터·enforce는 미구현 엔드포인트라 graceful degrade).
+- **사용자 작업**: OCI(144.24.72.143) SSH → `cd ~/flowspace-v2 && git pull origin main && docker compose -f docker-compose.prod.yml up --build -d` 로 신 server/** 코드 배포. **OR** repo Secrets에 `OCI_SSH_PRIVATE_KEY` 등록 후 `gh workflow run deploy-socket.yml` 재실행. 배포해야 **WI-005 실시간 제재(ban/kick/mute/role 즉시추방)** 활성.
+- **함께 설정**: OCI `.env` `SOCKET_INTERNAL_SECRET`(AUTH_SECRET과 다른 값) + Vercel `SOCKET_INTERNAL_URL`(`https://socket-v2.144.24.72.143.nip.io`)·`SOCKET_INTERNAL_SECRET`(OCI와 동일). 미설정=실시간 제재만 degrade(DB 반영·재접속 차단 보존, 크래시 아님).
+- **선택**: WI-013 prod EXPLAIN(cursor seek 효율, codex 지목) — Space 7행이라 현재는 무의미, 데이터 증가 후.
+
+(이전 핸드오프의 승격 게이트는 위로 해소됨. 백로그 WI-017~019는 READY 아님.)
 - 그 외: 신규 WI는 사용자 요구·실사용·실측에서 발굴. 백로그 WI-017(소켓토큰 폴백)/018(prod env fail-fast)/019(assets GET 응답 정형화)는 READY 아님. 시작 전 `.flowset/HANDOFF.md`+`.flowset/fix_plan.md` 읽기.
 - **진행 방식(사용자 확정 2026-06-21)**: 모든 WI는 develop 정상 플로우 — 분기 → 기계게이트(tsc/lint/vitest/build) → 듀얼검증(codex CLI + evaluator-agent) → `.pass` → **develop PR 머지**. 경계/prod 영향 WI는 구현 전 codex consult(process 02). 라이브 반영은 develop→main **승격**(process 07; 승인 + 작성자 `flowcoder25@gmail.com`).
 

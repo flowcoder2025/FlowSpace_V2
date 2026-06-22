@@ -1,0 +1,22 @@
+{
+  "approved": true,
+  "approvedBy": "user (kryou2922@gmail.com)",
+  "approvalUtterance": "양쪽다 머지해 / AUTH_SECRET 직접 확인해봐",
+  "approvedAt": "2026-06-22",
+  "scope": "develop → main 승격 (WI-001 ~ WI-016, +89커밋)",
+  "readinessDoc": ".flowset/promotion-readiness.md",
+  "mergeStrategy": "rebase (HEAD author=flowcoder25@gmail.com 보존 → Vercel 인가)",
+  "preflightVerification": {
+    "machineGates": "tsc0 / vitest 165·165 / next build0 / lint=선재 LiveKit 경고1(CI 통과)",
+    "ociSocketBundle": "esbuild 번들0 + metafile COPY 완전성 실증(src 입력 3개 ⊆ Dockerfile.socket COPY 4개)",
+    "authSecret": "라이브 OCI(socket-v2.144.24.72.143.nip.io)가 로컬 .env AUTH_SECRET(44자)로 서명한 JWT 검증 성공 → prod OCI AUTH_SECRET=44자(>=32) 확정. live 웹 HTTP200+소켓 작동 → Vercel==OCI transitive 확정. fail-closed go-live 위험 해소.",
+    "wi016Gate": "prod DB 직접 조회: GeneratedAsset.isShared 컬럼(boolean NOT NULL default false) + 복합 인덱스 이미 존재 → go-live 게이트 충족. 마이그레이션=완전 no-op.",
+    "wi013": "prod Space 7행 / GeneratedAsset 17행 → CONCURRENTLY 불필요(일반 migrate 즉시·무락). 복합 인덱스 미생성(적용 대상).",
+    "mergeAuthor": "git user=flowcoder25@gmail.com, gh auth=yonghyeon-dev → rebase 머지로 HEAD author=740c4f1(flowcoder25) 보존."
+  },
+  "residualRisks": [
+    "SOCKET_INTERNAL_SECRET/URL prod 미설정 시 실시간 제재만 degrade(크래시 아님, DB는 반영, 재접속 차단 보존). Vercel env 조회 권한 없어 미확인.",
+    "merge 후 Vercel 배포 author 인가는 rebase로 대비했으나 배포 성공 실측 필요(smoke)."
+  ],
+  "rollback": "Vercel instant rollback(이전 배포) + main revert. OCI 빌드 실패 시 기존 컨테이너 유지. DB: WI-013 인덱스 swap 회귀 가능(데이터 무손실), isShared는 기존 컬럼이라 회귀 불필요."
+}

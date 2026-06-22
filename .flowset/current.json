@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-016-chore",
+  "activeWI": null,
   "lastWI": "WI-016-chore",
-  "type": "chore",
-  "status": "VERIFIED_PR_PENDING",
+  "type": null,
+  "status": "PROMOTED_main_LIVE",
   "integrationBranch": "develop",
-  "branch": "chore/WI-016-chore-migration-baseline",
+  "branch": "develop",
   "startedAt": "2026-06-22",
-  "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "3e8705b",
-  "note": "WI-016-chore GeneratedAsset.isShared 마이그레이션 베이스라인 정합 — schema.prisma 무변경(이미 isShared 보유), 마이그레이션 .sql + lock만 추가(소스 무변경). 신규 20260622130000_generated_asset_is_shared(ADD COLUMN/CREATE INDEX IF NOT EXISTS) + migration_lock.toml force-add. 설계 codex consult 1R(IF NOT EXISTS 자가치유·timestamp WI-013 이후·lock 추가·prod 승인게이트). 기계게이트 5/5(tsc0/lint0/vitest 165·165/build0/prisma validate OK). 듀얼검증 1R 수렴: codex WARNING(P3 env-only) · evaluator WARNING 9.83(P3×2 defer) + .pass(empty fingerprint, 소스 무변경). impl 3e8705b. **develop PR 대기.** **사용자 선택 신규결함 3건(WI-014/015/016) 전부 처리 완료. READY 큐 비어 있음(WI-017~019 BACKLOG).** 미해결 = 사용자 승인 게이트: WI-013+016 prod 적용(prod \\d 확인 권장) / develop→main 승격."
+  "requiredGates": ["tsc", "lint", "vitest", "build", "server-esbuild", "promotion-approval"],
+  "lastVerifiedCommit": "50d9af0",
+  "note": "✅ 승격 완료(2026-06-22): develop→main PR#18 rebase 머지 → main HEAD 50d9af0(author=flowcoder25 보존). Vercel Production ● Ready(신 WI-001~016 코드 라이브, author 인가 통과). prod DB 마이그레이션 적용 완료(migrate deploy: WI-013 Space 복합인덱스 생성+구 Space_status_idx 제거[7행 즉시]·WI-016 isShared no-op[IF NOT EXISTS], _prisma_migrations 3건 SoT 정합). 사전검증 전수 실측: 기계게이트 green / OCI esbuild 번들+metafile COPY 완전성 / 🔴AUTH_SECRET 해소(라이브 OCI가 로컬 .env 44자 시크릿 서명 JWT 검증 성공→prod=44자≥32 확정, live 웹 HTTP200→Vercel==OCI transitive) / WI-016 prod 컬럼 존재 확정 / 적대검증 19에이전트=승격차단 코드결함 0. **⚠️ 남은 운영작업(사용자 전용, SSH 필요): OCI 소켓 신코드 수동 배포** — deploy-socket.yml 자동배포는 과거 전부 실패(OCI_SSH_PRIVATE_KEY 시크릿 미설정, 선재). 현재 OCI는 구 소켓코드 가동(라이브 200, 신Vercel과 호환: AUTH불변·protocol 순수리팩터·enforce graceful degrade) → WI-005 실시간제재 등 신기능은 OCI 수동배포 후 활성. SOCKET_INTERNAL_* prod env 설정도 함께 필요(미설정=degrade). develop↔main rebase 분기는 back-sync 정합."
 }
