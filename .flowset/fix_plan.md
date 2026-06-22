@@ -5,7 +5,7 @@
 > 초기 시드 = 2026-06-19 듀얼 블라인드 검증(codex CLI + Claude) 확정 결함.
 
 ## Active WI
-- (없음) — **WI-014/015/016 develop 머지 완료/대기. 사용자 선택 신규결함 3건 전부 처리 완료.** READY 큐 비어 있음(WI-017~019 BACKLOG). 미해결 = 사용자 승인 게이트(WI-013+016 prod 적용 / develop→main 승격).
+- (없음) — **✅ develop→main 승격 완료(2026-06-22, PR#18 rebase)**. WI-001~016 라이브(Vercel ● Ready + prod DB migrate deploy 적용). READY 큐 비어 있음(WI-017~019 BACKLOG). **남은 운영작업: OCI 소켓 신코드 수동 SSH 배포(사용자 전용 — 자동배포 시크릿 선재 미설정)** + SOCKET_INTERNAL_* prod env.
 
 ## Queue (2026-06-22 승격前 통합감사 발굴 — codex consult + 9축 멀티에이전트 감사 + 적대검증)
 | WI | Type | Status | Goal | Notes |
@@ -16,9 +16,10 @@
 
 > **감사 false-positive (재발 주의)**: 감사 에이전트가 "main에 `server/handlers/enforce.ts`/`src/lib/auth-secret.ts`/`Dockerfile.socket` 신규파일 없음 → 장애" 류를 P0 블로커로 다수 오분류함. 이는 **develop ⊋ main = 승격의 목적 그 자체**이며 git merge가 원자적으로 함께 가져감(세 파일 모두 develop 트리 존재 확인). develop 내부 정합성은 기계게이트 green(tsc0/lint0/vitest147)으로 검증됨. **결함 아님.** 실제 go-live 게이트는 아래 '미해결 승인 항목' 2건 + WI-016(드리프트).
 
-## 미해결 승인 항목 (큐 WI 아님 — 사용자 게이트)
-- **WI-013 + WI-016 prod 적용**: (WI-013) Space 복합 인덱스 마이그레이션 프로덕션 적용 + 프로덕션 EXPLAIN(cursor seek 효율, codex 지목). 대용량이면 `CREATE/DROP INDEX CONCURRENTLY` via direct connection + `migrate resolve`. (WI-016) GeneratedAsset.isShared 베이스라인 마이그레이션 — prod는 컬럼 존재(db push)라 `migrate deploy`로 멱등 적용(IF NOT EXISTS: 컬럼 skip·인덱스 없으면 생성) 또는 인덱스 확인 후 `migrate resolve --applied`. 적용 전 prod `\d "GeneratedAsset"`로 컬럼/복합 인덱스 실제 정의 확인 권장. 둘 다 build에 migrate deploy 자동실행 없음(수동).
-- **develop→main 승격**: WI-001~013 누적을 라이브 반영. process 07(promotion-readiness.md + 사용자 승인 + 작성자 `flowcoder25@gmail.com`). WI-012-1 main 승격 시 OCI 소켓 재배포 발동(auth-secret COPY 보강됨). WI-005 운영 env 설정 필요.
+## 승격 완료 + 남은 운영작업 (사용자 게이트)
+- **✅ WI-013 + WI-016 prod 적용 완료**(2026-06-22): `prisma migrate deploy`로 두 마이그레이션 적용. WI-013 `Space_status_updatedAt_id_idx` 생성+구 인덱스 제거(Space 7행 → 즉시·무락, CONCURRENTLY 불필요로 판명). WI-016 isShared no-op(IF NOT EXISTS, prod 컬럼·인덱스 기존재). `_prisma_migrations` 3건(0_init+WI-013+WI-016) SoT 정합. EXPLAIN은 7행이라 후속(데이터 증가 후).
+- **✅ develop→main 승격 완료**(2026-06-22): PR#18 **rebase 머지** → main HEAD `50d9af0`(author=flowcoder25 보존→Vercel 인가). Vercel Production ● Ready. process 07 산출물(promotion-readiness.md + promotion-approval.json). codex consult 1R + 적대검증 19에이전트(승격차단 코드결함 0). AUTH_SECRET 라이브 OCI 토큰검증 probe로 44자≥32 확정. main↔develop rebase 분기 back-sync 정합.
+- **⚠️ 남은: OCI 소켓 신코드 수동 배포**(사용자 SSH 전용): `deploy-socket.yml` 자동배포가 과거 전수 실패(`OCI_SSH_PRIVATE_KEY` 시크릿 미설정, 선재). 현재 OCI 구코드 가동(라이브 무중단, 신 Vercel과 호환). 사용자가 OCI SSH로 `git pull origin main && docker compose -f docker-compose.prod.yml up --build -d` 또는 SSH 시크릿 등록 후 워크플로우 재실행. + SOCKET_INTERNAL_*(OCI/Vercel) env 설정해야 WI-005 실시간 제재 활성(미설정=degrade).
 
 ## Done
 - **WI-016-chore** (마이그레이션 베이스라인 정합) — `GeneratedAsset.isShared`(+`@@index([isShared,status,type])`)가 schema.prisma:402/410엔 있으나 `0_init`엔 없던 드리프트(2026-03 `db push`로 prod 직접 추가) 정합 — `prisma/migrations`를 스키마 SoT로. **schema.prisma 무변경**(이미 isShared 보유) — 마이그레이션 파일만 추가. 신규 `20260622130000_generated_asset_is_shared/migration.sql`(`ADD COLUMN IF NOT EXISTS isShared` + `CREATE INDEX IF NOT EXISTS GeneratedAsset_isShared_status_type_idx`) + `migration_lock.toml`(`provider=postgresql`) force-add(Prisma 공식 권장, 기존 0_init/WI-013 폴더는 lock 누락이라 이번에 SoT 완전성까지 정합 — evaluator 적출). 설계 codex consult 1R: **IF NOT EXISTS 채택**(prod 컬럼 존재하나 복합 인덱스 미검증 → 일반 ADD COLUMN은 prod서 실패·`resolve --applied`는 인덱스 부재 영구 은닉하는 위험[consult 놓친위험]을 멱등 자가치유로 회피: prod 컬럼 skip·인덱스 없으면 생성·fresh 둘 다 생성) · timestamp WI-013 이후(append-only) · prod 적용 승인게이트 분리. 오프라인 검증: `migrate diff --from-schema-datamodel <isShared 제거본> --to-schema-datamodel schema --script` 델타=정확히 이 2 DDL(evaluator 양방향 재현, 0_init+WI-013 외 발산 없음). 기계게이트 5/5(tsc0/lint0[선재 LiveKit 경고1·WI무관]/vitest 165·165/next build0/prisma validate OK). 소스(.ts/.tsx/.prisma) 무변경 → 런타임 무회귀, Stop fingerprint empty(changed=0). **듀얼검증 1R 수렴: codex WARNING**(유일 P3는 codex 샌드박스 EPERM 환경문제·파일결함 아님·오케스트레이터 게이트로 충족) **· evaluator WARNING 9.83**(P3×2 defer: IF NOT EXISTS 정의동일성 미보장[prod \d 확인 권고]·AssetWorkflow.id format nit[선재·스코프밖]) + `.pass`(fingerprint empty `e3b0c44`). **prod 적용은 WI-013과 함께 사용자 승인 게이트(미실행).** **develop PR 대기**(impl `3e8705b`).
