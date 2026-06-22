@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-020-fix",
-  "lastWI": "WI-016-chore",
+  "activeWI": null,
+  "lastWI": "WI-020-fix",
   "type": "fix",
-  "status": "VERIFIED_PR_PENDING",
+  "status": "DONE_PROMOTED_LIVE",
   "integrationBranch": "develop",
-  "branch": "fix/WI-020-fix-middleware-public-asset",
+  "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "b849a77",
-  "note": "WI-020-fix 미들웨어 public 정적에셋 회귀 — 미인증 시 /Logo.png 이 /login 으로 307 리다이렉트(WI-001 strict화 부작용, 승격으로 라이브화)돼 로그인 페이지 로고 깨짐. 수정: 인라인 분류를 순수함수 src/lib/route-access.ts(isPublicRequest + PUBLIC_FILES allowlist=['/Logo.png'])로 추출, 미들웨어가 호출. 확장자 전체 통과(/\\.\\w+$/) 대신 명시 allowlist(codex 적대 설계 협의 권고 — /api/spaces/foo.png 확장자 우회 표면 회피, deny-by-default 보존). 회귀테스트 9(route-access.test.ts). 기계게이트 4/4(tsc0/lint0/vitest 174·174[+9]/build0). 설계 codex consult 1R(WI-020-consult). 듀얼검증 중."
+  "lastVerifiedCommit": "9cde274",
+  "note": "✅ WI-020-fix 완료·승격·라이브검증(2026-06-22). 미인증 시 public 정적자산 /Logo.png 이 /login 307 리다이렉트→로그인 페이지 로고 깨짐(WI-001 strict화 부작용, 승격으로 라이브화) 해소. 수정: 인라인 분류→순수함수 src/lib/route-access.ts(isPublicRequest+PUBLIC_FILES allowlist=['/Logo.png']), 미들웨어가 호출. 확장자 전체통과 거부·명시 allowlist(codex 적대 협의: /api/spaces/foo.png 우회 표면 회피, deny-by-default 보존). 회귀테스트 9. 기계게이트 4/4(tsc0/lint0/vitest174/build0). 설계 codex consult 1R + 듀얼검증 codex WARNING(P3×2)·evaluator 9.78(P3×3, 변이검증 5종 검출). PR#20→develop(rebase) → PR#21 승격→main 9cde274(flowcoder25). **라이브 검증: /Logo.png + /_next/image 둘 다 307→200 image/png**(space.flow-coder.com+vercel.app). develop==main 정합. READY 큐 비어 있음."
 }
