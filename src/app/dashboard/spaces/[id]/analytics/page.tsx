@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { UsageChart } from "@/components/dashboard/usage-chart";
+import { ExportCsvButton } from "@/components/dashboard/export-csv-button";
+import { analyticsToCsv, downloadCsv, csvFilename } from "@/components/dashboard/csv-export";
 
 interface DataPoint {
   date: string;
@@ -38,16 +40,27 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-ink">Analytics</h1>
-        <select
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-          className="text-sm border border-line rounded px-3 py-1.5"
-        >
-          <option value={7}>Last 7 days</option>
-          <option value={14}>Last 14 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <select
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+            className="text-sm border border-line rounded px-3 py-1.5"
+          >
+            <option value={7}>Last 7 days</option>
+            <option value={14}>Last 14 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={90}>Last 90 days</option>
+          </select>
+          <ExportCsvButton
+            disabled={data.dailyMessages.length === 0 && data.dailyVisitors.length === 0}
+            onExport={() =>
+              downloadCsv(
+                csvFilename("analytics", spaceId, new Date()),
+                analyticsToCsv(data)
+              )
+            }
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
