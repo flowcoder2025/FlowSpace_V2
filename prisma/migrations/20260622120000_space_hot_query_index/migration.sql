@@ -9,8 +9,8 @@
 --   운영 절차를 권장(CONCURRENTLY는 트랜잭션 내 실행 불가라 Prisma migrate deploy 경로에 못 넣음).
 --   소규모 테이블이면 일반 `migrate deploy`로도 무방. 적용 전 프로덕션 EXPLAIN 검증 필요.
 
--- DropIndex
-DROP INDEX "Space_status_idx";
-
--- CreateIndex
+-- CreateIndex (먼저 생성 — 트랜잭션/수동 CONCURRENTLY 양쪽에서 인덱스 없는 구간 회피)
 CREATE INDEX "Space_status_updatedAt_id_idx" ON "Space"("status", "updatedAt" DESC, "id" DESC);
+
+-- DropIndex (복합 인덱스 생성 후 구 단일 인덱스 제거)
+DROP INDEX "Space_status_idx";

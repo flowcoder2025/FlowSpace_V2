@@ -28,10 +28,10 @@
 ## 변경 표면
 
 - `prisma/schema.prisma` Space 모델: `@@index([status])` 제거 → `@@index([status, updatedAt(sort: Desc), id(sort: Desc)])` 추가.
-- `prisma/migrations/20260622120000_space_hot_query_index/migration.sql` 신규:
+- `prisma/migrations/20260622120000_space_hot_query_index/migration.sql` 신규(CREATE→DROP 순 — 트랜잭션/수동 CONCURRENTLY 양쪽에서 인덱스 없는 구간 회피):
   ```sql
-  DROP INDEX "Space_status_idx";
   CREATE INDEX "Space_status_updatedAt_id_idx" ON "Space"("status", "updatedAt" DESC, "id" DESC);
+  DROP INDEX "Space_status_idx";
   ```
 - **gitignore 주의**: `.gitignore`에 `prisma/migrations/`가 있으나 `0_init`은 추적(force-add 선례) + `migration_lock.toml`은 미추적·부재. 신규 마이그레이션도 0_init과 동일하게 `git add -f`로 추적. 팀이 `db push` 기반이면 schema 변경만으로 충분(마이그레이션은 참조용).
 
