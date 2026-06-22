@@ -15,9 +15,15 @@
 - **신 소켓 컨테이너 `Up (healthy)` 포트 3002** — 로그 정상(Server running·CORS·**실사용자 접속·룸 입장** [Socket] Connected/[Room] 조용현 joined). 로컬 3002=200, 외부 nip.io=200. **신 코드 AUTH_SECRET 검증이 라이브 Vercel 토큰과 end-to-end 작동 실증.**
 - **⚠️ OCI 배포 인프라 함정(다음 배포 시 주의)**: (1) `deploy-socket.yml` 자동배포는 `OCI_SSH_PRIVATE_KEY` repo Secret **미설정**이라 과거 전수 실패 → 수동 배포만 가능(키는 로컬 `~/.ssh/flowspace-oci`에 있음). (2) OCI는 **docker-compose v1(1.29.2)** 만 설치(yml의 `docker compose -f` v2 명령 미존재) + **v1 recreate 버그** `KeyError: 'ContainerConfig'`(신 Docker 엔진 비호환). **우회 배포 절차**: `docker-compose -f docker-compose.prod.yml build socket` → `docker-compose -f docker-compose.prod.yml rm -f -s socket` → `docker-compose -f docker-compose.prod.yml up -d --no-build socket`(구 컨테이너 제거 후 fresh up = recreate 경로 회피). 롤백 이미지 `flowspace-v2_socket:rollback-pre-promo`(4759e28a3e68) 보존.
 
-## ⚠️ 남은 선택 작업 (사용자 — 필수 아님)
-- **WI-005 실시간 제재 활성화**: 현재 OCI `.env`에 `SOCKET_INTERNAL_SECRET` **미설정** → enforce 503 graceful degrade(제재는 DB 반영+재접속 차단으로 동작, 즉시추방만 미작동). 활성하려면: OCI `.env`에 `SOCKET_INTERNAL_SECRET=<강한값>` + Vercel에 `SOCKET_INTERNAL_SECRET=<동일값>`·`SOCKET_INTERNAL_URL=https://socket-v2.144.24.72.143.nip.io` 설정(Vercel env는 사용자 권한 필요 — 내 vercel 계정 `kryou2922-4113`은 team env 쓰기 권한 없음) 후 OCI 컨테이너 재시작.
-- **OCI 배포 자동화 복구(선택)**: repo Secrets `OCI_SSH_PRIVATE_KEY` 등록 + `deploy-socket.yml`을 docker-compose **v1 + rm/up 우회**로 수정(또는 OCI에 compose v2 설치).
+## ✅ OCI 자동배포(CD) 복구 완료 (2026-06-22)
+사용자 "flowcoder25@gmail.com으로 자동배포 설정해놔야지" 지시로 복구:
+- `OCI_SSH_PRIVATE_KEY` repo secret 등록(`~/.ssh/flowspace-oci` 내용) — **과거 전수 실패의 근본 원인이던 미설정 해소**.
+- `deploy-socket.yml` 수정(PR#19 main 반영): `docker compose`(v2 미설치)→`docker-compose`(v1) + recreate 버그(KeyError ContainerConfig) 우회(build→`rm -f -s socket`→`up -d --no-build`) + `workflow_dispatch`(수동 트리거) + 배포 후 헬스체크(실패 시 exit1).
+- **테스트 실증**: `gh workflow run deploy-socket.yml` → **✓ deploy 25s 성공**(과거 8초 즉시실패 대비), 로그 `✅ socket healthy`. 향후 main push(server/**·Dockerfile.socket 등) 시 자동 배포됨.
+
+## ⚠️ 남은 작업
+- **🔴 정식 도메인 DNS 미설정(사용자 — DNS 권한)**: `v2-socket.flow-coder.com`이 **NXDOMAIN**(DNS 레코드 없음, nslookup non-existent). Caddy엔 라우트 존재하나 DNS가 없어 죽음(HTTP000). **라이브는 임시 `socket-v2.144.24.72.143.nip.io`로 운영 중**(Caddyfile 주석 "nip.io 임시(Cloudflare DNS 전)"). flow-coder.com NS=`ns1.cnmnoc.co.kr`. 정식 도메인 쓰려면 DNS 패널에서 `v2-socket` A레코드(→144.24.72.143) 추가 + Vercel `NEXT_PUBLIC_SOCKET_URL` 갱신(현재 nip.io 추정). **방치해도 라이브 정상**(nip.io 작동) — 정식 도메인 전환은 선택.
+- **WI-005 실시간 제재 활성화(선택)**: OCI `.env` `SOCKET_INTERNAL_SECRET` 미설정 → enforce degrade(제재는 DB+재접속 차단 동작, 즉시추방만 미작동). 활성=OCI `.env` `SOCKET_INTERNAL_SECRET` + Vercel `SOCKET_INTERNAL_SECRET`(동일)·`SOCKET_INTERNAL_URL` 설정(Vercel env는 사용자 권한 — 내 vercel 계정 team env 쓰기 불가) 후 OCI 컨테이너 재시작.
 - **WI-013 prod EXPLAIN**: Space 7행이라 현재 무의미, 데이터 증가 후.
 
 (승격 게이트 전부 해소. 백로그 WI-017~019는 READY 아님. READY 큐 비어 있음.)
