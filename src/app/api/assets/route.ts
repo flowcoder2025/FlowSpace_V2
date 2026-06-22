@@ -1,7 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AssetType, AssetStatus } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parsePageLimit, parsePageNumber } from "@/lib/pagination";
 import { toPublicAssetListItem } from "@/features/assets";
+
+/** limit 미지정 시 기본 페이지 크기 (WI-022 이전 동작 보존). */
+const ASSETS_DEFAULT_LIMIT = 20;
+/**
+ * 필터 enum allowlist — Prisma 런타임 enum에서 도출(하드코딩 배열 회피, enum
+ * 추가 시 자동 동기화). 값은 모두 대문자라 입력을 정규화(trim+대문자)한 뒤 검증한다.
+ */
+const ASSET_TYPE_VALUES = new Set<string>(Object.values(AssetType));
+const ASSET_STATUS_VALUES = new Set<string>(Object.values(AssetStatus));
+
+/**
+ * 쿼리 enum 필터를 정규화(trim+대문자)·검증한다.
+ * - null/빈값 → undefined (필터 미적용)
+ * - allowlist 불일치 → null (호출부가 400 INVALID_FILTER로 처리)
+ * - 유효 → 정규화된 대문자 enum 값
+ */
+function normalizeEnumFilter(
+  raw: string | null,
+  allowed: Set<string>
+): string | undefined | null {
+  if (!raw) return undefined;
+  const value = raw.trim().toUpperCase();
+  return allowed.has(value) ? value : null;
+}
 
 /** GET /api/assets - 에셋 목록 (필터링) */
 export async function GET(request: NextRequest) {
@@ -12,11 +38,25 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const type = searchParams.get("type");
-    const status = searchParams.get("status");
     const shared = searchParams.get("shared");
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "20", 10);
+
+    // 입력 검증(WI-022): type/status를 AssetType/AssetStatus allowlist로 검증.
+    // 잘못된 enum은 조용히 무시(전체 목록 응답)하지 않고 400으로 거절(WI-009 정합).
+    const type = normalizeEnumFilter(searchParams.get("type"), ASSET_TYPE_VALUES);
+    const status = normalizeEnumFilter(
+      searchParams.get("status"),
+      ASSET_STATUS_VALUES
+    );
+    if (type === null || status === null) {
+      return NextResponse.json(
+        { error: "Invalid asset filter", code: "INVALID_FILTER" },
+        { status: 400 }
+      );
+    }
+
+    // page/limit 정규화(WI-022): NaN/0/음수 → 음수 skip(500) 방지, limit 상한 100.
+    const page = parsePageNumber(searchParams.get("page"));
+    const limit = parsePageLimit(searchParams.get("limit"), ASSETS_DEFAULT_LIMIT);
 
     const where: Record<string, unknown> = {};
 
@@ -29,10 +69,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (type) {
-      where.type = type.toUpperCase();
+      where.type = type;
     }
     if (status) {
-      where.status = status.toUpperCase();
+      where.status = status;
     }
 
     // 응답 allowlist (WI-021): 목록은 lean DTO만 반환한다.

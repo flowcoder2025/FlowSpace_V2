@@ -1,9 +1,13 @@
 /**
- * Cursor 기반 페이지네이션 공용 헬퍼 (순수 함수 — Prisma/React 무의존).
+ * 페이지네이션 쿼리 파싱 + 변환 공용 헬퍼 (순수 함수 — Prisma/React 무의존).
  *
- * 코드베이스 관례(`src/app/api/spaces/[id]/messages/route.ts`)와 동일한
- * `take: limit + 1` 패턴을 캡슐화한다. 쿼리에서 limit보다 1건 더 가져온 뒤
- * `buildCursorPage`로 잘라 `hasMore`/`nextCursor`를 도출한다.
+ * - `parsePageLimit`/`parsePageNumber`: 쿼리스트링 limit/page를 안전한 정수로 정규화.
+ * - `buildCursorPage`: cursor 페이지네이션의 `take: limit + 1` 패턴
+ *   (`src/app/api/spaces/[id]/messages/route.ts` 관례)을 캡슐화 — limit보다 1건 더
+ *   가져온 행을 잘라 `hasMore`/`nextCursor`를 도출한다.
+ *
+ * offset 페이지네이션(`skip`/`take`) 라우트는 `parsePageNumber`+`parsePageLimit`만,
+ * cursor 페이지네이션 라우트는 `parsePageLimit`+`buildCursorPage`를 사용한다.
  */
 
 /** limit 미지정/이상치 시 기본 페이지 크기 */
@@ -13,13 +17,33 @@ export const MAX_PAGE_LIMIT = 100;
 
 /**
  * 쿼리스트링 `limit` 값을 안전한 정수 페이지 크기로 정규화한다.
- * - null/빈값/비정수/0 이하 → DEFAULT_PAGE_LIMIT
+ * - null/빈값/비정수/0 이하 → `defaultLimit`
  * - MAX_PAGE_LIMIT 초과 → MAX_PAGE_LIMIT로 절상(cap)
+ *
+ * @param defaultLimit limit 미지정/이상치 시 기본값(라우트별 기본 페이지 크기를
+ *   보존하기 위한 선택 인자, 미지정 시 DEFAULT_PAGE_LIMIT).
  */
-export function parsePageLimit(raw: string | null): number {
+export function parsePageLimit(
+  raw: string | null,
+  defaultLimit: number = DEFAULT_PAGE_LIMIT
+): number {
   const n = parseInt(raw ?? "", 10);
-  if (!Number.isFinite(n) || n <= 0) return DEFAULT_PAGE_LIMIT;
+  if (!Number.isFinite(n) || n <= 0) return defaultLimit;
   return Math.min(n, MAX_PAGE_LIMIT);
+}
+
+/**
+ * 쿼리스트링 `page`(1-base offset 페이지 번호)를 안전한 양의 정수로 정규화한다.
+ * - null/빈값/비정수/1 미만 → 1
+ * - 상한 없음 (offset 페이지 범위는 데이터 크기에 의존)
+ *
+ * offset 라우트에서 `skip: (page - 1) * limit` 계산 시 page가 NaN/0/음수면
+ * 음수 skip이 되어 Prisma가 throw(→500)하던 것을 방지한다.
+ */
+export function parsePageNumber(raw: string | null): number {
+  const n = parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return n;
 }
 
 export interface CursorPage<T> {
