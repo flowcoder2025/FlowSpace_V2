@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-023-fix",
-  "lastWI": "WI-022-fix",
-  "type": "fix",
-  "status": "ACTIVE",
+  "activeWI": null,
+  "lastWI": "WI-023-fix",
+  "type": null,
+  "status": "WI_023_MERGED_DEVELOP",
   "integrationBranch": "develop",
-  "branch": "fix/WI-023-fix-error-detail-leak",
+  "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "d352c45",
-  "note": "WI-023-fix(500 응답 details 정보 노출 일괄 제거, CWE-209) — VERIFY 통과, develop PR 대기. 다수 API 라우트가 catch 블록 500 응답에 details:error.message로 원본 에러를 클라이언트에 노출하던 것을 중앙 헬퍼 internalErrorResponse(src/lib/api-error.ts)로 일괄 제거. 실측: WI-022 defer P3는 assets/route.ts 단독 등록이었으나 grep 결과 26파일 37곳 전역 표면(messages 포함). 설계 codex consult 1R 수렴(A채택·26파일 일괄·헬퍼·offset 분리). 헬퍼는 원본 에러를 console.error 서버 로그에만, 클라엔 {error} 500만(details 환경 무관 영구 미반환). DB metadata.error(500 아님)·제외 3라우트(socket/token·livekit/webhook·livekit/token) 미변경. 테스트 헬퍼5+대표라우트3. 기계게이트 4/4(tsc0/lint0err/vitest 227->232/build0). 잔여 누출 grep 0. 듀얼 블라인드 1R: codex PASS 0 issues · evaluator WARNING 9.85(P0/P1 0, P3x2 defer: metadata.error->WI-024 / console.error 패턴정합). evaluator 변이검증(details 복원 6테스트 FAIL·원복 diff0). .pass fingerprint empty e3b0c44(source 커밋 후 clean). impl d352c45. offset 상한 분리->WI-025. === BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-024(metadata.error 누출)/WI-025(offset 상한). WI-019/021/022/023 develop만 반영 — main 미승격. === 남은 사용자 게이트(비코드): V1 폐기·WI-005 SOCKET_INTERNAL_*·WI-013 prod EXPLAIN."
+  "lastVerifiedCommit": "b788009",
+  "note": "✅ WI-023-fix(500 응답 details 정보 노출 일괄 제거, CWE-209) develop 머지 완료(2026-06-22, PR#25 merge b788009, impl d352c45). 다수 API 라우트가 catch 블록 500 응답에 details:error.message로 원본 에러를 클라이언트에 노출하던 것을 중앙 헬퍼 internalErrorResponse(src/lib/api-error.ts)로 일괄 제거. 실측: WI-022 defer P3는 assets/route.ts 단독 등록이었으나 grep 결과 26파일 37곳 전역 표면(messages 포함). 설계 codex consult 1R 수렴(A채택·26파일 일괄·헬퍼·offset 분리). 헬퍼는 원본 에러를 console.error 서버 로그에만, 클라엔 {error} 500만(details 환경 무관 영구 미반환). DB metadata.error(500 아님)·제외 3라우트(socket/token·livekit/webhook·livekit/token) 미변경. 테스트 헬퍼5+대표라우트3. 기계게이트 4/4(tsc0/lint0err/vitest 227->232/build0). 잔여 누출 grep 0. 듀얼 블라인드 1R: codex PASS 0 issues · evaluator WARNING 9.85(P0/P1 0, P3x2 defer). evaluator 변이검증(details 복원 6테스트 FAIL·원복 diff0). .pass fingerprint empty e3b0c44. 머지 후 develop tsc0/vitest232 재확인. === 직전: WI-022-fix PR#24 5469f99 / WI-021-fix PR#23 13c3b55 / WI-019-fix PR#22 221f8df. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-024(assets 상세 metadata.error 누출, WI-023 evaluator 발굴)/WI-025(parsePageNumber offset 상한, WI-023 분리). WI-019/021/022/023 develop만 반영 — main 미승격(승격은 사용자 승인 게이트). === 남은 사용자 게이트(비코드): V1 폐기·WI-005 SOCKET_INTERNAL_*·V2 AUTH_SECRET rotation·WI-013 prod EXPLAIN."
 }
