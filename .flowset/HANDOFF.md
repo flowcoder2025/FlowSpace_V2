@@ -1,11 +1,10 @@
 # HANDOFF
 
-## Active WI — WI-019-fix (develop PR 대기)
-**✅ WI-019-fix (assets 상세 GET 응답 allowlist) 구현·듀얼검증·`.pass` 완료. develop PR 머지만 남음.**
-- 브랜치 `fix/WI-019-fix-assets-get-allowlist`(HEAD `e3762f0`, base=develop). 커밋: impl `d725837` → codex P3 강화 `5fef58d` → 검증산출물 `e3762f0`.
-- **무엇**: `GET /api/assets/[id]`가 raw `GeneratedAsset` 전체 행(+민감 `prompt`/`workflow`/`comfyuiJobId`)을 반환하던 것을 `select` + 공개 DTO(`toPublicGeneratedAsset`, `features/assets/internal/public-asset.ts`+배럴)로 정형화 (WI-014 동일 클래스). **핵심**: 민감 3필드가 `metadata`(Json)에도 중복 저장(generate/batch 라우트가 `GeneratedAssetMetadata` 전체 JSON 저장) → top-level allowlist만으론 우회 노출 → `PUBLIC_METADATA_KEYS` allowlist로 metadata 정규화. userId는 권한판정 select·DTO 미포함. 무회귀(소비처 3곳 실측 보존).
-- **검증**: 설계 codex consult 1R(metadata 우회 적출) + 듀얼 블라인드 1R 수렴 codex WARNING(P3x1 defer, **즉시 해소**)·evaluator WARNING 9.78(P0/P1 0, P3x3 defer) + `.pass`(`0b92337e`). 기계게이트 4/4(tsc0/lint0/vitest 192·192/build0). 회귀 테스트 18·변이검증 실증.
-- **다음 액션**: `gh pr create --base develop` (PR 본문 `.flowset/eval-results/WI-019-pr-body.md`) → 머지. 후속 **WI-021**(목록 `GET /api/assets` route.ts:47 `prompt:true` 선재누출, evaluator P3 발굴, `toPublicGeneratedAsset` 재사용 검토).
+## Active WI
+(없음) — **✅ WI-019-fix (assets 상세 GET 응답 allowlist) develop 머지 완료(2026-06-22, PR#22 merge `221f8df`)**. READY 큐 비어 있음. **main 미승격 — 라이브 미반영**(승격은 사용자 승인 게이트).
+
+## ✅ WI-019-fix (2026-06-22) — assets 상세 GET 응답 allowlist
+`GET /api/assets/[id]`가 raw `GeneratedAsset` 전체 행(+민감 `prompt`/`workflow`/`comfyuiJobId`)을 반환하던 것을 `select` + 공개 DTO(`toPublicGeneratedAsset`, `features/assets/internal/public-asset.ts`+배럴)로 정형화 (WI-014 동일 클래스·별 도메인, owner/superAdmin 게이트 하 정보위생). **핵심(설계 codex consult 적출)**: 민감 3필드가 `metadata`(Json) 컬럼에도 중복 저장(generate/route.ts:90·batch/route.ts:79가 `GeneratedAssetMetadata` 전체를 JSON 저장) → top-level allowlist만으론 metadata 우회 노출 → `PUBLIC_METADATA_KEYS`(`width,height,frameWidth,frameHeight,columns,rows,format,seed,generatedAt,processingTime,error`)로 metadata 정규화. `userId`는 권한판정용 select·DTO 미포함. 무회귀(소비처 3곳 실측: game-loader/sprite-generator/test-chibi-generation 필요필드 전부 보존). 듀얼 블라인드 1R 수렴 **codex WARNING**(P3x1 defer: metadata 테스트 self-referential 오라클 — 실누출 없음 명시 → **WI-011 교훈대로 즉시 해소**: fixture 민감 extras + 리터럴 exact-key-set 단언 + 상수 가드, 변이검증[accessSecret allowlist 추가 시 4 테스트 FAIL])·**evaluator WARNING 9.78**(P0/P1 0, P3x3 defer) + `.pass`(`0b92337e`). 기계게이트 4/4(tsc0/lint0/vitest 192/build0). impl `d725837`/강화 `5fef58d`. **교훈**: 응답 정형화 시 raw 스칼라뿐 아니라 **`metadata`(Json) 컬럼에 중복 저장된 민감필드까지 정규화**해야 함(generate/batch가 `GeneratedAssetMetadata` 전체를 통째 저장 → top-level allowlist 우회). 순수 헬퍼+배럴(WI-004 safe-path 패턴) 재사용 → **WI-021**(목록 `GET /api/assets`)에서 `toPublicGeneratedAsset` 재활용 가능.
 
 ## 이전 상태 (참고)
 **✅ develop→main 승격 완료(2026-06-22)** + **✅ WI-020-fix(로그인 로고 회귀) 완료·승격·라이브검증** + V1→V2 컷오버 e2e 검증(사용자 정상확인). WI-001~016 + WI-020 라이브 반영. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-021(assets 목록 GET).
