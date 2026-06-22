@@ -1,0 +1,47 @@
+{
+  "wi": "WI-013-perf",
+  "schemaVersion": 1,
+  "commit": "eca0ff2",
+  "target": "develop (PR 예정)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0, "rounds": 1, "convergence": "r1 PASS 0 issues — 인덱스 정확성·D4 제거 안전·마이그레이션 형식·prod 게이트 문서 전부 검증 통과(5a45b6d)." },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.78, "scores": { "completeness": 9.7, "consistency": 10.0, "specificity": 9.8, "actionability": 9.5 }, "issueCount": 2, "runs": 1, "note": "P3x2 둘 다 defer/fixNow:false. #1 migration SQL DROP→CREATE 순서 일관성(eca0ff2로 CREATE→DROP 정렬 해소) · #2 D2 joined 인덱스 보류(의도된 prod-gate 후속, 설계 근거 건전·스펙 정확 문서화). migrate diff로 SQL↔schema 정합 독립 실증, status-only 쿼리 부재 grep 확인. eval.json은 검증 완료 후 정상 기록(에이전트 응답 전송만 연결오류)." }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "DB 인덱스 perf WI(설계+로컬검증, prod 적용/EXPLAIN은 승인 게이트). 양 검증자 1R 수렴: codex PASS 0 issues · evaluator WARNING 9.78 P3x2(둘 다 defer, fixNow:false). 차단 이슈(P0/P1/P2·fixNow) 0. evaluator P3 #1(migration DROP→CREATE 순서)은 eca0ff2에서 CREATE→DROP 정렬로 해소(트랜잭션/CONCURRENTLY 양쪽 인덱스 무공백, end-state 동일·schema delta 정합 유지). P3 #2(joined 인덱스 보류)는 스펙 D2·prod-gate #1/#3에 prod EXPLAIN 후속으로 정확히 분리·문서화된 의도된 defer. 기계게이트 5/5(prisma generate 0/tsc 0/lint 0(기존 LiveKit 경고 1)/vitest 147·147/next build 0) + 로컬 prisma validate·migrate diff(SQL↔schema 일관). 인덱스 변경은 client 타입·런타임 무변(무회귀). **prod 적용 + 프로덕션 EXPLAIN(cursor seek 효율 포함)은 사용자 승인 게이트(미실행)** — 결함 아님. -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "복합 인덱스 정확성·D4 redundant status 제거 안전·마이그레이션 형식·prod 게이트 문서.",
+      "codex": "PASS (0 issues)",
+      "evaluator": "WARNING 9.78 (P3x2 defer)",
+      "status": "CONVERGED — 차단 이슈 0. evaluator P3 #1 eca0ff2 해소, #2 의도된 prod-gate 후속."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "prisma/migrations/20260622120000_space_hot_query_index/migration.sql",
+      "description": "deploy-path SQL이 DROP→CREATE 순서였음(단일 트랜잭션 deploy엔 외부 가시성 갭 없으나, 권장 수동 CONCURRENTLY 절차는 CREATE→DROP). 순서 일관성 nit.",
+      "assessment": "단일 트랜잭션에서 동작 차이 없음. 그러나 CREATE→DROP이 트랜잭션·CONCURRENTLY 양쪽에서 인덱스 무공백을 보장하는 보편 안전 순서라 즉시 정렬.",
+      "defer": false,
+      "deferRationale": null,
+      "fixNow": false,
+      "status": "RESOLVED(eca0ff2) — CREATE→DROP 정렬 + 스펙 스니펫 동기화. migrate diff로 end-state·schema delta 정합 재확인."
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": ".claude/specs/architecture/2026-06-22-space-hot-query-index.md (D2 joined)",
+      "description": "joined scope 보조 인덱스 보류 — 세미조인은 Space 단독 정렬 인덱스로 완전 최적화 불가, prod EXPLAIN에서 joined가 별도 병목일 수 있음(실측 미확인).",
+      "assessment": "본 WI 부하 지점은 all/superAdmin 전역 정렬. joined 최적화는 prod EXPLAIN 승인 게이트의 후속 검토로 스펙 D2·prod-gate #1/#3에 정확히 분리·문서화. 설계 근거(저카디널리티·세미조인 한계) 건전.",
+      "defer": true,
+      "deferRationale": "prod EXPLAIN 승인 후 병목 확인 시 후속 WI로 별도 인덱스 검토 — 스펙에 명시된 의도된 게이트.",
+      "fixNow": false
+    }
+  ]
+}

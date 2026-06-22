@@ -1,0 +1,15 @@
+WI=WI-013-perf
+commit=eca0ff2
+sourceFingerprint=c206e20b80ef127ee77afe258c90f811b3d37825fd91b71ee78bea8018adbb9e
+fingerprintScope=changeset(1 .prisma file vs develop: prisma/schema.prisma — Space @@index([status]) 제거→@@index([status, updatedAt(Desc), id(Desc)])). 마이그레이션(.sql)·스펙(.md)은 소스 fingerprint 범위 외(Stop 게이트는 .ts/.tsx/.prisma만 추적). 커밋 후 워킹트리 clean이라 Stop 게이트는 changed=0으로 통과(검증된 changeset 감사 기록).
+codex=.flowset/eval-results/WI-013-perf.codex.json
+evaluator=.flowset/eval-results/WI-013-perf.eval.json
+merged=.flowset/eval-results/WI-013-perf.merged.json
+gates=tsc,lint,vitest,build
+gatesEvidence=prisma generate 0 / tsc 0 / lint 0(기존 LiveKit 경고 1) / vitest 147·147 / next build 0 + prisma validate·migrate diff(SQL↔schema 일관)
+codexVerdict=PASS(r1, 0 issues)
+evaluatorVerdict=WARNING(9.78, P3x2: #1 migration 순서[eca0ff2 해소]·#2 D2 joined 보류[의도된 prod-gate 후속])
+gateDecision=PASS
+prodGate=DB 마이그레이션 적용 + 프로덕션 EXPLAIN(cursor seek 효율 포함)은 사용자 승인 게이트(미실행)
+target=develop (PR 예정)
+createdAt=2026-06-22T13:28:15+09:00
