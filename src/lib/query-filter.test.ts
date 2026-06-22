@@ -70,4 +70,16 @@ describe("parseDateRangeFilter", () => {
     expect(parseDateRangeFilter("not-a-date", null)).toBe("invalid");
     expect(parseDateRangeFilter(null, "garbage")).toBe("invalid");
   });
+
+  it("date-only / offsetless(비-instant) → invalid (ISO instant 계약 강제)", () => {
+    expect(parseDateRangeFilter("2026-06-23", null)).toBe("invalid"); // date-only
+    expect(parseDateRangeFilter("2026-06-23T00:00:00", null)).toBe("invalid"); // TZ 없음
+  });
+
+  it("offset(+09:00) instant 허용", () => {
+    const r = parseDateRangeFilter("2026-06-23T00:00:00+09:00", null) as {
+      gte?: Date;
+    };
+    expect(r.gte).toBeInstanceOf(Date);
+  });
 });

@@ -17,6 +17,17 @@ describe("localDateToStartInstant / localDateToEndInstant", () => {
     expect(localDateToEndInstant("2026-13-99")).toBeNull();
   });
 
+  it("YYYY-MM-DD 형식 아님 → null", () => {
+    expect(localDateToStartInstant("2026/06/23")).toBeNull();
+    expect(localDateToStartInstant("2026-6-23")).toBeNull();
+    expect(localDateToStartInstant("2026-06-23T00:00")).toBeNull();
+  });
+
+  it("달력 롤오버 거부(2026-02-31 → null, JS Date 보정 차단)", () => {
+    expect(localDateToStartInstant("2026-02-31")).toBeNull();
+    expect(localDateToEndInstant("2026-04-31")).toBeNull();
+  });
+
   it("유효 날짜 → ISO instant 문자열", () => {
     expect(localDateToStartInstant("2026-06-23")).toMatch(
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/

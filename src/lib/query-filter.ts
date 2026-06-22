@@ -63,10 +63,19 @@ export function parseDateRangeFilter(
   return range;
 }
 
+/**
+ * ISO 8601 datetime **instant**(날짜+시간+TZ 지정자 Z 또는 ±HH:MM)만 허용한다.
+ * date-only(`2026-06-23`)나 offsetless(`...T00:00:00`)는 서버에서 UTC/로컬로 모호하게
+ * 해석되므로 계약에서 거부(클라이언트는 `.toISOString()`으로 항상 instant 전송).
+ */
+const ISO_INSTANT_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+
 function parseInstant(raw: string | null): Date | undefined | "invalid" {
   if (raw === null) return undefined;
   const trimmed = raw.trim();
   if (trimmed.length === 0) return undefined;
+  if (!ISO_INSTANT_RE.test(trimmed)) return "invalid";
   const d = new Date(trimmed);
   if (Number.isNaN(d.getTime())) return "invalid";
   return d;
