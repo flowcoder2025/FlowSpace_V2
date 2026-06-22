@@ -57,10 +57,23 @@ describe("membersToCsv", () => {
     );
   });
 
-  it("이름·이메일이 전혀 없으면 빈 문자열", () => {
+  it("이름·이메일이 전혀 없으면 화면과 동일하게 Unknown", () => {
     const csv = membersToCsv([member({})]);
     expect(csv.split("\r\n")[1]).toBe(
-      ",,PARTICIPANT,NONE,No,2026-06-23T00:00:00.000Z"
+      "Unknown,,PARTICIPANT,NONE,No,2026-06-23T00:00:00.000Z"
+    );
+  });
+
+  it("빈 문자열 이름은 화면처럼 다음 폴백으로 넘어간다(?? 아닌 || 체인)", () => {
+    // user.name="" → guest nickname → displayName → "Unknown" 순(MemberTable 일치).
+    const csv = membersToCsv([
+      member({
+        user: { id: "u1", name: "", email: "e@x.com", image: null },
+        displayName: "표시이름",
+      }),
+    ]);
+    expect(csv.split("\r\n")[1]).toBe(
+      "표시이름,e@x.com,PARTICIPANT,NONE,No,2026-06-23T00:00:00.000Z"
     );
   });
 

@@ -42,10 +42,14 @@ const ANALYTICS_HEADERS = ["Date", "Messages", "Visitors"] as const;
 /** payload 직렬화 실패 시 표기(JSON.stringify가 던지는 경우 — 순환참조 등). */
 const UNSERIALIZABLE_PAYLOAD = "[unserializable]";
 
-/** 멤버 목록을 CSV로 직렬화한다(이름 폴백: user.name → guest nickname → displayName). */
+/**
+ * 멤버 목록을 CSV로 직렬화한다. 이름은 MemberTable/filterMembers와 **동일한 표시
+ * 우선순위**(truthy `||` 체인)로 해석한다 — `??`(nullish)를 쓰면 빈 문자열 이름이
+ * 폴백되지 않아 화면과 CSV가 어긋난다(codex 적출). 최종 폴백은 화면 표기와 동일한 "Unknown".
+ */
 export function membersToCsv(members: ReadonlyArray<Member>): string {
   const rows = members.map((m) => [
-    m.user?.name ?? m.guestSession?.nickname ?? m.displayName ?? "",
+    m.user?.name || m.guestSession?.nickname || m.displayName || "Unknown",
     m.user?.email ?? "",
     m.role,
     m.restriction,
@@ -114,7 +118,11 @@ export function downloadCsv(filename: string, csv: string): void {
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  try {
+    a.click();
+  } finally {
+    // click/제거가 던져도 앵커 분리 + objectURL 해제를 보장(누수 방지).
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 }
