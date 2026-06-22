@@ -5,7 +5,8 @@
 > 초기 시드 = 2026-06-19 듀얼 블라인드 검증(codex CLI + Claude) 확정 결함.
 
 ## Active WI
-- (없음) — **✅ WI-024-fix (assets metadata.error 정보 노출 차단, CWE-209) develop 머지 완료(2026-06-22, PR#26 merge `91079d1`)**. 듀얼 블라인드 1R 수렴 **codex PASS 0 issues·evaluator 9.85**(P0/P1 0, fixNow 0, P3×3 defer). C안(A+B): allowlist에서 error 제거 + 저장 generic 정규화 + 백필 스크립트. impl `3cd7d04`. READY 큐 비어 있음. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-025(offset 상한)/WI-026(저장 metadata public/internal 분리). **WI-019/021/022/023/024 develop만 반영 — main 미승격**(승격은 사용자 승인 게이트). **남은 사용자 게이트: WI-024 백필 `--apply` prod 실행(선택, 응답 누출은 이미 차단·DB 잔존 정화용).**
+- **WI-018-feat (prod env fail-fast — 소켓 서버 부팅 env 검증) ACTIVE** (2026-06-22, 브랜치 `feature/WI-018-feat-prod-env-fail-fast`). 설계 codex consult 1R 수렴(WI-018 우선 선정 + AUTH_SECRET hard-fail/SOCKET_INTERNAL_SECRET warn 구분 + production만 throw). 신규 순수 모듈 `src/lib/socket-startup.ts` `validateSocketStartupConfig()`(getAuthSecret eager 호출, production+무효 AUTH_SECRET→throw·비-prod→warn·SOCKET_INTERNAL_SECRET 미설정→prod warn·시크릿 값 미로깅) + `server/index.ts` listen 전 호출 + Dockerfile.socket COPY + deploy-socket.yml paths. 기계게이트 4/4(tsc0/lint0err/vitest 238→249[+11]/build0) + esbuild metafile COPY 완전성(런타임 src 4 = chat-constants·enforce contract·auth-secret·socket-startup) + PoC 2종(prod+단문→listen 전 crash exit1/prod+유효→부팅+warn). 듀얼검증 대기.
+- (직전) **✅ WI-024-fix (assets metadata.error 정보 노출 차단, CWE-209) develop 머지 완료(2026-06-22, PR#26 merge `91079d1`)**. 듀얼 블라인드 1R 수렴 **codex PASS 0 issues·evaluator 9.85**(P0/P1 0, fixNow 0, P3×3 defer). C안(A+B): allowlist에서 error 제거 + 저장 generic 정규화 + 백필 스크립트. impl `3cd7d04`. READY 큐 비어 있음. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-025(offset 상한)/WI-026(저장 metadata public/internal 분리). **WI-019/021/022/023/024 develop만 반영 — main 미승격**(승격은 사용자 승인 게이트). **남은 사용자 게이트: WI-024 백필 `--apply` prod 실행(선택, 응답 누출은 이미 차단·DB 잔존 정화용).**
 - (이전) **✅ WI-023-fix (500 응답 details 정보 노출 일괄 제거, CWE-209) develop 머지 완료(2026-06-22, PR#25 merge `b788009`)**. 듀얼 블라인드 1R 수렴 **codex PASS 0 issues·evaluator 9.85**(P0/P1 0, P3×2 defer). 26파일 37곳 중앙 헬퍼 일괄. impl `d352c45`.
 - (이전) **✅ develop→main 승격 완료(2026-06-22, PR#18 rebase)** + V1→V2 컷오버 e2e 검증. WI-001~016+020 라이브(Vercel ● Ready + prod DB migrate deploy 적용). **남은 운영작업: OCI 소켓 신코드 수동 SSH 배포(사용자 전용)** + SOCKET_INTERNAL_* prod env.
 
@@ -13,7 +14,7 @@
 | WI | Type | Status | Goal | Notes |
 |---|---|---|---|---|
 | WI-017 | improve | BACKLOG | 소켓 토큰 획득 실패 폴백 | `socket-client.ts:40`이 `/api/socket/token` !ok시 즉시 throw, retry/offline fallback 없음. AUTH_SECRET 오설정 시 메타버스 진입 전면 실패. UX 방어심화(승격 차단 아님) |
-| WI-018 | feat | BACKLOG | prod env fail-fast | `dispatchEnforcement`/소켓 서버가 prod env(`SOCKET_INTERNAL_*`) 미설정 시 조용히 degrade. startup 검증으로 fail-fast(운영 안전망). 현재 graceful degrade라 차단 아님 |
+| WI-018 | feat | **ACTIVE** | prod env fail-fast | 소켓 서버 startup이 AUTH_SECRET을 lazy(첫 연결)만 검증 → 미설정 컨테이너가 healthy로 떠 전 연결 조용히 거부. `validateSocketStartupConfig()`로 listen 전 eager 검증(prod AUTH_SECRET 무효→crash, SOCKET_INTERNAL_SECRET→warn). 듀얼검증 진행 중. |
 | WI-022 | fix | **DONE** | assets 목록 입력 강건화 | ✅ 듀얼검증 3R 수렴(codex PASS·eval 9.88). 아래 Done 참조. |
 | WI-023 | fix | **DONE** | 500 응답 details 정보 노출 일괄 제거(CWE-209) | ✅ 26파일 37곳 중앙 헬퍼 일괄. 듀얼검증 1R 수렴(codex PASS 0 issues·eval 9.85). 아래 Done 참조. (원래 등록된 "정보위생+offset 상한" 중 정보위생만 — 실측 결과 assets 단독 아닌 전역 표면이라 일괄로 확대, offset 상한은 WI-025로 분리) |
 | WI-024 | fix | **DONE** | assets 상세 metadata.error 누출(CWE-209) | ✅ C안(A+B): allowlist에서 error 제거 + 저장 generic 정규화 + 백필. 듀얼검증 1R 수렴(codex PASS 0 issues·eval 9.85). 아래 Done 참조. |
