@@ -1,0 +1,70 @@
+{
+  "wi": "WI-016-chore",
+  "schemaVersion": 1,
+  "commit": "3e8705b",
+  "target": "develop (PR 예정)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": {
+      "verdict": "WARNING",
+      "issueCount": 1,
+      "rounds": 1,
+      "convergence": "r1 WARNING — 마이그레이션 결함 0 명시('No migration correctness defect found': 컬럼/인덱스 정의·순서 정합, lock provider 정합, force-add 추적 확인). 유일 P3는 codex 자체 read-only 샌드박스의 EPERM(prisma validate/vitest/build 실행 불가)로 게이트 미완 — 파일 결함 아님, defer/fixNow:false. 권고(writable env서 게이트 실행)는 오케스트레이터가 이미 충족(tsc0/lint0/vitest165/build0/validate OK)."
+    },
+    "evaluator": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.83,
+      "scores": { "completeness": 9.8, "consistency": 10.0, "specificity": 9.8, "actionability": 9.7 },
+      "issueCount": 2,
+      "runs": 1,
+      "note": "migrate diff 양방향(제거본↔현 schema) 재현으로 드리프트가 isShared 컬럼+복합 인덱스 단 둘임 확정, 0_init/WI-013 외 발산 없음. 인덱스 명/컬럼순서 Prisma 규칙 일치. lock 최초 추적으로 SoT 완전성까지 정합. 기계게이트 재실행 green. P3×2 defer: ① IF NOT EXISTS는 prod 기존 컬럼이 발산 정의면 조용히 skip(prod 미접촉·db push 동일 출처라 정렬 가능성 높음·헤더가 \\d 사전확인 권고·prod 승인게이트) ② AssetWorkflow.id prisma format 공백(develop 선재·isShared 무관·스코프 밖)."
+    }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "마이그레이션 베이스라인 정합 chore(소스 .ts/.tsx/.prisma 무변경 — schema.prisma는 이미 isShared 보유, 마이그레이션 .sql+lock만 추가). 양 검증자 1R 수렴: codex WARNING(유일 P3는 codex 샌드박스 EPERM 환경문제·파일결함 아님·오케스트레이터 게이트로 충족) · evaluator WARNING 9.83(P3×2 defer). 차단 이슈(P0/P1/P2·fixNow) 0. evaluator가 migrate diff 양방향으로 드리프트=isShared+인덱스 단 둘 독립 확정, 인덱스 명/순서 Prisma 정합, lock provider 정합. IF NOT EXISTS 채택은 설계 codex consult 1R 결론(prod 컬럼 존재하나 인덱스 미검증 → resolve --applied가 인덱스 부재 은닉하는 위험을 자가치유로 회피). 기계게이트 5/5(tsc0/lint0[선재 LiveKit 경고1·WI무관]/vitest 165·165/next build0/prisma validate OK). 코드·런타임 무변(무회귀). **prod 적용(migrate deploy 또는 resolve)은 WI-013 prod 적용과 함께 사용자 승인 게이트(미실행).** -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "isShared 마이그레이션 SQL 정합·IF NOT EXISTS 안전성·드리프트 범위·lock 정합.",
+      "codex": "WARNING (P3×1 env-only defer)",
+      "evaluator": "WARNING 9.83 (P3×2 defer)",
+      "status": "CONVERGED — 차단 이슈 0. 드리프트=2건 양방향 확정, 게이트 green."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["codex"],
+      "round": 1,
+      "location": "validation gates (codex 샌드박스)",
+      "description": "codex read-only 샌드박스가 prisma validate/vitest/build를 Temp mkdir/spawn EPERM으로 실행 못 함. 파일 결함 아님 — 마이그레이션 정합성은 확인됨.",
+      "assessment": "오케스트레이터가 writable 환경에서 전 게이트 실행 완료(tsc0/lint0/vitest 165·165/build0/prisma validate OK). 전체 replay 정합은 shadow DB 필요 — prod 게이트 후속(WI 명시).",
+      "defer": true,
+      "deferRationale": "환경 한계이지 WI-016 파일 결함 아님. 게이트는 오케스트레이터가 충족.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "round": 1,
+      "location": "prisma/migrations/20260622130000_generated_asset_is_shared/migration.sql:16",
+      "description": "ADD COLUMN IF NOT EXISTS는 prod 기존 컬럼이 발산 정의(nullable/다른 default)면 조용히 skip — IF NOT EXISTS는 존재만 확인, 정의 동일성 미보장.",
+      "assessment": "prod 컬럼은 동일 schema의 db push 출처라 정렬 가능성 높음. 마이그레이션 헤더가 prod 적용 전 `\\d \"GeneratedAsset\"` 사전확인 권고. prod 적용은 승인 게이트(미실행).",
+      "defer": true,
+      "deferRationale": "prod 미접촉·db push 동일 출처. prod 게이트에서 \\d 확인으로 커버.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "round": 1,
+      "location": "prisma/schema.prisma:434 (AssetWorkflow.id)",
+      "description": "prisma format 시 정렬 공백 1건 변동. develop 선재·isShared 무관·validate green·이 WI(schema 무변경) 스코프 밖.",
+      "assessment": "선재 포맷 nit. WI-016 무관.",
+      "defer": true,
+      "deferRationale": "develop 선재·스코프 밖.",
+      "fixNow": false
+    }
+  ],
+  "prodGate": "prod 적용(기존 prod는 컬럼 존재 → migrate deploy로 멱등 적용 시 컬럼 skip·인덱스 없으면 생성, 또는 인덱스 사전 확인 후 resolve --applied)은 WI-013 prod 적용과 함께 사용자 승인 게이트. 적용 전 prod에서 isShared 컬럼/복합 인덱스 실제 정의 확인 권장."
+}
