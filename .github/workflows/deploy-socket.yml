@@ -11,6 +11,7 @@ on:
       - 'src/lib/auth-secret.ts'
       - 'Dockerfile.socket'
       - 'docker-compose.prod.yml'
+  workflow_dispatch: {}  # 수동 실행 허용 (재배포/테스트)
 
 jobs:
   deploy:
@@ -24,8 +25,25 @@ jobs:
           host: 144.24.72.143
           username: ubuntu
           key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          command_timeout: 15m
           script: |
+            set -e
             cd ~/flowspace-v2
             git pull origin main
-            docker compose -f docker-compose.prod.yml up --build -d
-            echo "Deployed at $(date)"
+            # OCI는 docker-compose v1(1.29.2)만 설치(plugin v2 `docker compose` 미존재).
+            # v1 + 신 Docker 엔진 조합에서 `up --build` 의 컨테이너 recreate 가
+            # `KeyError: 'ContainerConfig'` 로 실패(구 컨테이너 image inspect 버그).
+            # 우회: build(구 컨테이너 가동 유지) → stop/rm → fresh up(recreate 경로 회피).
+            docker-compose -f docker-compose.prod.yml build socket
+            set +e
+            docker-compose -f docker-compose.prod.yml rm -f -s socket
+            docker-compose -f docker-compose.prod.yml up -d --no-build socket
+            sleep 6
+            docker-compose -f docker-compose.prod.yml ps
+            if curl -sf -m 10 "http://localhost:3002/socket.io/?EIO=4&transport=polling" >/dev/null; then
+              echo "✅ socket healthy @ $(date)"
+            else
+              echo "❌ socket DOWN after deploy — 롤백 검토 (이미지 태그 flowspace-v2_socket:rollback-*)"
+              docker logs --tail 30 flowspace-v2_socket_1 || true
+              exit 1
+            fi
