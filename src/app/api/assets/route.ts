@@ -16,17 +16,22 @@ const ASSET_STATUS_VALUES = new Set<string>(Object.values(AssetStatus));
 
 /**
  * 쿼리 enum 필터를 정규화(trim+대문자)·검증한다.
- * - null/빈값/공백-only → undefined (필터 미적용; trim 후 비면 "미지정"과 동일 취급)
- * - allowlist 불일치 → null (호출부가 400 INVALID_FILTER로 처리)
- * - 유효 → 정규화된 대문자 enum 값
+ * 중복 파라미터(`?type=a&type=b`)의 검증 우회를 막기 위해 `getAll()`로 받은
+ * **모든 값**을 검사한다 (`get()`은 첫 값만 봐 invalid 2번째 값이 숨는다).
+ * - 빈 배열/공백-only만 → undefined (필터 미적용; trim 후 비면 "미지정"과 동일)
+ * - 하나라도 allowlist 불일치 → null (호출부가 400 INVALID_FILTER로 처리)
+ * - 전부 유효 → 첫 값(Prisma scalar equality)으로 필터
  */
 function normalizeEnumFilter(
-  raw: string | null,
+  values: string[],
   allowed: Set<string>
 ): string | undefined | null {
-  const value = raw?.trim().toUpperCase();
-  if (!value) return undefined;
-  return allowed.has(value) ? value : null;
+  const normalized = values
+    .map((v) => v.trim().toUpperCase())
+    .filter((v) => v.length > 0);
+  if (normalized.length === 0) return undefined;
+  if (normalized.some((v) => !allowed.has(v))) return null;
+  return normalized[0];
 }
 
 /** GET /api/assets - 에셋 목록 (필터링) */
@@ -42,9 +47,13 @@ export async function GET(request: NextRequest) {
 
     // 입력 검증(WI-022): type/status를 AssetType/AssetStatus allowlist로 검증.
     // 잘못된 enum은 조용히 무시(전체 목록 응답)하지 않고 400으로 거절(WI-009 정합).
-    const type = normalizeEnumFilter(searchParams.get("type"), ASSET_TYPE_VALUES);
+    // getAll로 중복 파라미터까지 전수 검증(중복값 검증 우회 차단, codex r2).
+    const type = normalizeEnumFilter(
+      searchParams.getAll("type"),
+      ASSET_TYPE_VALUES
+    );
     const status = normalizeEnumFilter(
-      searchParams.get("status"),
+      searchParams.getAll("status"),
       ASSET_STATUS_VALUES
     );
     if (type === null || status === null) {

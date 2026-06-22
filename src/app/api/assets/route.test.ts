@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 import { buildGetRequest, makeSession, readJson } from "@/__tests__/helpers/api-route";
+
+/** 중복 쿼리 파라미터(`?k=a&k=b`)를 표현하기 위한 raw-URL 요청 빌더. */
+function buildRawRequest(query: string): NextRequest {
+  return new NextRequest(new URL(`http://localhost/api/assets?${query}`));
+}
 
 // ============================================
 // auth()/prisma mock — vi.hoisted + vi.mock은 파일 로컬 호이스팅이라
@@ -308,6 +314,29 @@ describe("GET /api/assets — 입력 검증 (WI-022)", () => {
       where: Record<string, unknown>;
     };
     expect(arg.where.type).toBeUndefined();
+  });
+
+  it("중복 파라미터의 invalid 값도 검증한다 (getAll 전수 — 검증 우회 차단)", async () => {
+    // codex r2: get()은 첫 값만 봐 invalid 2번째 값이 숨음 → getAll로 전수 검증.
+    const resType = await GET(buildRawRequest("type=character&type=weapon"));
+    expect(resType.status).toBe(400);
+
+    const resStatus = await GET(
+      buildRawRequest("status=COMPLETED&status=compelted")
+    );
+    expect(resStatus.status).toBe(400);
+
+    expect(mockPrisma.generatedAsset.findMany).not.toHaveBeenCalled();
+  });
+
+  it("중복 파라미터가 모두 유효하면 첫 값으로 필터한다", async () => {
+    const res = await GET(buildRawRequest("type=character&type=tileset"));
+
+    expect(res.status).toBe(200);
+    const arg = mockPrisma.generatedAsset.findMany.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(arg.where.type).toBe("CHARACTER");
   });
 
   it("limit 미지정 → take 20 (기존 default 보존)", async () => {
