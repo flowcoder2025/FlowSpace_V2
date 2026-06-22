@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-012-2-refactor",
-  "lastWI": "WI-012-1-refactor",
+  "activeWI": null,
+  "lastWI": "WI-012-2-refactor",
   "type": "refactor",
-  "status": "VERIFY",
+  "status": "MERGED",
   "integrationBranch": "develop",
-  "branch": "refactor/WI-012-2-refactor-cleanup",
+  "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "94a21a5",
-  "note": "WI-012-2-refactor(WI-012 분할 2/2 cleanup, codex consult D3~D5) VERIFY: S3 EventBridge 단일진입점(game 배럴 30 payload 명시노출 + editor/avatar 통일 + ESLint **/game/events 차단) + S4 useScreenRecorder close() L263+L357 .catch 4경로 통일(+AudioContext 스텁 변이검증 2건) + S5 messages 2라우트 cursor를 src/lib/pagination.ts 헬퍼 통일(응답계약 보존, admin hasMore 미추가 D5, +라우트 테스트 11) + S6 POST/api/spaces 커버리지 201/401/400/404/500+GET500(테스트전용, route.ts 무변경). 기계게이트 4/4(tsc 0/lint 0/vitest 128→147/build 0). 듀얼검증 codex r1 PASS 0 issues·evaluator 9.8(P3x1 defer parsePageLimit 엣지=strict improvement) + .pass(16c001a0). 양측 변이검증 실증. 직전 WI-012-1 develop 머지(PR#12, 84ea3d8)."
+  "lastVerifiedCommit": "986747a",
+  "note": "WI-012-2-refactor(WI-012 분할 2/2 cleanup) develop 머지 완료 — PR#13, merge 986747a(impl f3058be). S3 EventBridge 단일진입점(game 배럴 30 payload 명시노출 + editor/avatar 통일 + ESLint **/game/events 차단) + S4 useScreenRecorder close() L263+L357 .catch 4경로 통일(+AudioContext 스텁 변이검증 2건) + S5 messages 2라우트 cursor를 src/lib/pagination.ts 헬퍼 통일(응답계약 보존, admin hasMore 미추가 D5, +라우트 테스트 11) + S6 POST/api/spaces 커버리지 201/401/400/404/500+GET500(테스트전용·route.ts 무변경). 기계게이트 4/4(vitest 128→147). 듀얼검증 codex r1 PASS 0 issues·evaluator 9.8(P3x1 defer) + .pass(16c001a0). WI-012 전체(1+2) 완결. 큐 잔여: WI-013-perf(Space 복합 인덱스 마이그레이션 — DB 승인+프로덕션 EXPLAIN 필요). 승격 미실행 부채: WI-001~012-2 develop만, main(라이브) 미반영."
 }
