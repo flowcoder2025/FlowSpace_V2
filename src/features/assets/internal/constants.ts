@@ -1,5 +1,16 @@
 import type { AssetType } from "./types";
 
+/**
+ * 비동기 에셋 생성 실패 시 DB `GeneratedAsset.metadata.error`에 저장할 일반화 메시지 (WI-024).
+ *
+ * 배경: generate/batch 라우트의 fire-and-forget `.catch`가 raw `error.message`를
+ * metadata.error에 저장하면, ComfyUI 내부 URL·로컬 파일 경로·프롬프트 단편·스택 조각이
+ * `GET /api/assets/[id]` 응답으로 새 나간다(CWE-209, WI-023과 동일 클래스).
+ * 따라서 raw 에러는 `console.error`로 서버 로그에만 남기고, 저장값은 이 고정 메시지로 정규화한다.
+ * (`internalErrorResponse` 정책 정합 — raw→서버 로그, generic→클라 노출.)
+ */
+export const GENERATION_FAILURE_MESSAGE = "Asset generation failed";
+
 /** 품질 프리셋 */
 export type QualityPreset = "draft" | "standard" | "high";
 
