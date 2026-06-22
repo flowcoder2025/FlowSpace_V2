@@ -55,6 +55,11 @@ describe("toCsv", () => {
       expect(toCsv(["x"], [["\tfoo"]])).toBe("x\r\n'\tfoo");
     });
 
+    it("선두 LF + 수식도 중화한다(공백류 비대칭 방지, 중화 후 개행으로 감쌈)", () => {
+      // '\n'으로 시작 → '\'' prefix → '\n' 포함이라 따옴표로 감싼다.
+      expect(toCsv(["x"], [["\n=SUM(1)"]])).toBe('x\r\n"\'\n=SUM(1)"');
+    });
+
     it("'-'로 시작하는 정상 텍스트도 중화한다(문서화된 트레이드오프)", () => {
       expect(toCsv(["x"], [["-홍길동"]])).toBe("x\r\n'-홍길동");
       expect(toCsv(["x"], [["-5"]])).toBe("x\r\n'-5");

@@ -3,7 +3,7 @@
  *
  * - RFC 4180 이스케이프: 구분자(`,`)/따옴표(`"`)/개행(CR·LF) 포함 셀은 큰따옴표로
  *   감싸고 내부 `"`는 이중화. 레코드 구분자는 CRLF.
- * - CSV/수식 인젝션 중화: 셀이 위험 문자(`= + - @` 또는 탭/CR)로 시작하면 작은따옴표
+ * - CSV/수식 인젝션 중화: 셀이 위험 문자(`= + - @` 또는 탭/CR/LF)로 시작하면 작은따옴표
  *   prefix로 텍스트 강제(OWASP CSV Injection — Excel/Sheets가 셀을 수식으로 실행하는
  *   것 차단). 모든 셀에 일률 적용(신뢰 가능한 숫자/날짜/enum 컬럼은 선두 위험 문자가
  *   없어 무영향, 사용자 제어 텍스트만 실제로 중화됨).
@@ -17,8 +17,12 @@ export const CSV_BOM = "﻿";
 /** RFC 4180 레코드 구분자 (CRLF). */
 const CSV_LINE_BREAK = "\r\n";
 
-/** 셀 선두에 오면 수식으로 해석될 수 있는 문자 (OWASP CSV Injection). */
-const FORMULA_INJECTION_PREFIXES = new Set(["=", "+", "-", "@", "\t", "\r"]);
+/**
+ * 셀 선두에 오면 수식으로 해석될 수 있는 문자 (OWASP CSV Injection).
+ * 공백류(탭/CR/LF)를 포함하는 이유: 일부 스프레드시트가 선두 공백을 무시한 뒤 그
+ * 다음 문자를 수식으로 해석하므로, `\t`/`\r`과 동일하게 `\n`도 중화 대상에 둔다.
+ */
+const FORMULA_INJECTION_PREFIXES = new Set(["=", "+", "-", "@", "\t", "\r", "\n"]);
 
 /** 따옴표 감싸기가 필요한 문자 (구분자·따옴표·개행). */
 const NEEDS_QUOTING_RE = /[",\r\n]/;
