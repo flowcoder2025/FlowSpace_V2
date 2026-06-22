@@ -1,0 +1,16 @@
+WI=WI-015-fix
+commit=33cdbb0
+sourceFingerprint=64feec04290033a4443e5844173446c3349bdeb6b359760b5b08e4151dc63a7f
+fingerprintScope=changeset(7 source files vs develop: main-scene.ts + remote-player-sprite.ts/.test + local-player.ts/.test + interactive-object.ts/.test). 검증된 changeset 감사 기록. 커밋 후 워킹트리 clean이라 Stop 게이트는 changed=0으로 통과.
+codex=.flowset/eval-results/WI-015-fix.codex.json
+evaluator=.flowset/eval-results/WI-015-fix.eval.json
+merged=.flowset/eval-results/WI-015-fix.merged.json
+gates=tsc,lint,vitest,build
+gatesEvidence=tsc 0 / lint 0(--max-warnings 0, game scope) / vitest 165·165 / next build 0 (선재 LiveKit 경고는 WI 무관·develop 베이스 재현)
+codexVerdict=r1 FAIL(P2x2) -> r2 FAIL(P2) -> r3 PASS(0 issues)
+evaluatorVerdict=r1 9.46 -> r2 9.75 -> r3 WARNING 9.78(P3x2 defer)
+gateDecision=PASS
+scopeNote=감사 2건(RemotePlayerSprite jump·MainScene 가드)에서 듀얼검증이 동일 클래스 확장 적출 → LocalPlayer(실호출자)·RemotePlayerSprite moveTo·InteractiveObject 무한 tween 포괄 해소. game/ tweens.add 3파일 전수 커버.
+followUp=interactive-object glowTween killTweensOf(graphics) 심층방어(선택) / LiveKitMediaContext.tsx:578 선재 lint 경고(별도 chore)
+target=develop (PR 예정)
+createdAt=2026-06-22T15:46:31+09:00
