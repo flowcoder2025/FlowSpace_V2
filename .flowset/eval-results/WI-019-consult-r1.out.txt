@@ -1,0 +1,11 @@
+동의합니다. 지금 상태에서는 **WI-019 먼저**가 맞습니다. 이유는 가장 국소적이고, 이미 WI-014에서 같은 수리 패턴이 검증됐고, 현재 구현이 `GeneratedAsset` row를 그대로 외부 REST 응답으로 내보내는 구조라 장기적으로 계속 새 필드 유출 위험을 만듭니다. WI-018은 운영 안전망으로 중요하지만 fail-fast는 배포 환경 계약을 바꾸므로 적용 전 env 인벤토리 확인이 필요합니다. WI-017은 UX 방어 심화라 그다음으로 봅니다. 순서는 `WI-019 -> WI-018 -> WI-017`가 합리적입니다.
+
+WI-019 구현 패턴은 **`include` 기반 전체 row 반환을 `select` + 명시 DTO 반환으로 바꾸는 방식**이 맞습니다. 다만 제안 allowlist는 조금 줄이겠습니다. 응답은 대략 `id, type, name, status, metadata, filePath, thumbnailPath, fileSize, isShared, createdAt, updatedAt, user:{id,name}` 정도면 충분하고, `userId`는 내부 권한 판정에는 필요하지만 응답에는 굳이 넣지 않는 편이 낫습니다. `user.id`가 이미 있고, 내부 소비처도 `userId`를 쓰지 않습니다.
+
+제외 대상은 `prompt`, `workflow`, `comfyuiJobId`가 맞습니다. 특히 `prompt`는 “본인 소유라 괜찮다”는 반론이 가능하지만, 이 엔드포인트는 게임 런타임 로더가 호출하는 자산 상세 API에 가깝고 프롬프트 열람 API가 아닙니다. 프롬프트는 사용자의 의도·취향·업로드 맥락이 섞일 수 있어서 별도 UI 요구가 생길 때 별도 계약으로 노출하는 게 낫습니다. `workflow`와 `comfyuiJobId`는 명확히 내부 구현/인프라 정보라 제외가 맞습니다. `status`는 dev 스크립트뿐 아니라 생성 완료 전 폴링 계약으로 자연스럽기 때문에 유지하는 편이 안전합니다.
+
+가장 중요한 수정점은 `metadata`입니다. 지금 성공 경로에서 `metadata: JSON.parse(JSON.stringify(metadata))`로 저장되는데, 타입상 `GeneratedAssetMetadata` 안에 `prompt`, `workflow`, `comfyuiJobId`가 다시 들어갑니다. 그래서 top-level에서 세 필드를 제외해도 `metadata`를 통째 반환하면 사실상 우회 노출됩니다. 따라서 `metadata`도 통째 allowlist가 아니라 public metadata로 정규화해야 합니다. 최소 public metadata는 `width, height, frameWidth, frameHeight, columns, rows, format, seed?, generatedAt?, processingTime?` 정도이고, 실패 폴링을 유지하려면 `error`만 제한적으로 허용할 수 있습니다. 소비처 기준으로는 `frameWidth/frameHeight`가 핵심입니다.
+
+회귀 위험상 빠뜨리면 안 되는 것은 `filePath`, `metadata.frameWidth`, `metadata.frameHeight`, 그리고 폴링용 `status`입니다. `scripts/test-chibi-generation.ts`는 실패 시 `metadata.error`도 읽으니, dev 스크립트 유지까지 포함하면 `metadata.error`를 허용하거나 스크립트를 새 에러 계약에 맞춰야 합니다.
+
+내가 반드시 짚고 싶은 놓친 위험 1가지는 이것입니다: **`metadata` 안에 제외하려는 민감 필드가 중복 저장되어 있어, top-level allowlist만으로는 WI-019가 해결되지 않을 수 있습니다.** 이 WI의 핵심은 `asset` 전체 반환 제거가 아니라 “public asset response DTO”를 만드는 것입니다.
