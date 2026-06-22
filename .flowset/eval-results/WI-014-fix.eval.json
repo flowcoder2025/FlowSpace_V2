@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 9.9,
+    "specificity": 9.6,
+    "actionability": 9.8
+  },
+  "weightedTotal": 9.79,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/route.test.ts:374-385",
+      "description": "POST 정상생성 테스트는 응답 본문 키집합(['id','name','template'])과 inviteCode 부재를 단언하지만, prisma.space.create 호출 인자에 select가 사용됐는지(include 복귀 여부)는 단언하지 않는다. 응답은 라우트가 손수 조립({id,name,template})하므로 create를 include로 되돌려도 응답 형태는 동일 → 이 변이는 테스트로 검출 불가. 단, 실제 보안 보장(응답 누출 차단)은 응답 키집합 단언으로 커버되며, create select는 '민감 스칼라 미fetch' 심층방어 차원. 누출 가드 자체는 무결.",
+      "recommendation": "route.test.ts POST 테스트에 mockPrisma.space.create.mock.calls[0][0].select 키집합 단언(['id','name','template'] 또는 select 존재) 추가로 include→select 변이까지 결정적 검출.",
+      "defer": true,
+      "deferRationale": "실제 누출 차단은 응답 본문 exact-key-set 단언으로 이미 보호됨(create select 복귀해도 응답엔 inviteCode 안 새어 보안 회귀 아님). create select 미단언은 심층방어 변이검출 공백일 뿐 게이트 통과를 위장하지 않음. 동일 클래스 후속 테스트 강화 항목으로 흡수 가능.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/assets/[id]/route.ts:20-38",
+      "description": "동일 클래스 잔여 패턴 — GET /api/assets/[id]가 prisma.generatedAsset.findUnique를 include로 호출해 GeneratedAsset 전체 raw row(전 스칼라)를 응답한다. WI-014가 정형화한 응답 allowlist 원칙과 같은 부류. 다만 owner/superAdmin 게이트(L34) 하에 본인 소유 에셋 메타데이터만 노출되며 accessSecret 같은 크로스테넌트 시크릿은 없음. WI-014 명시 범위(spaces members/space 응답)에 포함되지 않음.",
+      "recommendation": "assets GET 응답 allowlist 정형화는 별도 WI로 분리. 본인 소유 메타라 활성 익스플로잇은 아니나 일관성 차원에서 후속 정리.",
+      "defer": true,
+      "deferRationale": "WI-014 수용기준 범위 밖(WI 브리프가 '동일 클래스 잔여 누출은 범위 밖이면 defer'로 명시). owner-gated + 본인 소유 메타라 신규 누출/권한 밖 노출 없음. 별도 정리 WI 후속.",
+      "fixNow": false
+    }
+  ]
+}
