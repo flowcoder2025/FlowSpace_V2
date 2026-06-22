@@ -1,0 +1,17 @@
+WI=WI-022-fix
+commit=0cad729
+sourceFingerprint=0c66c8a53e28d36cfaa67368e9a81f2064a416521e2669a3980e198f9ce9f343
+fingerprintScope=changeset(4 source files vs develop: api/assets/route.ts + route.test.ts + lib/pagination.ts + pagination.test.ts). 검증된 changeset 감사 기록. 커밋 후 워킹트리 clean이라 Stop 게이트는 changed=0(EmitFingerprint empty e3b0c442)으로 통과. eval-results .json/.md/.pass는 소스 fingerprint 범위 외(.ts/.tsx/.prisma만 추적).
+codex=.flowset/eval-results/WI-022-fix.codex.json
+codexRounds=.flowset/eval-results/WI-022-fix.codex.json(r3 canonical) / WI-022-fix.codex.r2.json / WI-022-fix.codex.r3.json (r1=초기 WI-022-fix.codex.json 덮어쓰기 전, stream.log 보존)
+evaluator=.flowset/eval-results/WI-022-fix.eval.json
+merged=.flowset/eval-results/WI-022-fix.merged.json
+consult=.flowset/eval-results/WI-022-consult-r1.out.txt
+gates=tsc,lint,vitest,build
+gatesEvidence=tsc 0 / lint 0(선재 LiveKit 경고 1·WI무관) / vitest 227·227(+23, route 25케이스+pagination 19) / next build 0
+codexVerdict=3R 수렴 PASS (r1 WARNING fixNow P3 공백-only → r2 WARNING fixNow P3 중복 파라미터 → r3 PASS 0 issues). page 상한 부재는 3R 내내 defer(설계 의도)
+evaluatorVerdict=WARNING 9.88 (최종HEAD 0cad729 재채점, P0/P1 0, P3x3 defer: 500 details 선재·page 상한 의도·타입 nit. 변이검증 3종 실증)
+gateDecision=PASS
+followUp=정보위생 일괄(500 details 노출 spaces/messages 정렬) + 큰 offset 상한/cursor 전환(perf) — 둘 다 선택 backlog. WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast) 미착수.
+target=develop (PR 예정)
+createdAt=2026-06-22T21:50:00+09:00

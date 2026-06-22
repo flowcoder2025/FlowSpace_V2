@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.9,
+    "consistency": 9.9,
+    "specificity": 10.0,
+    "actionability": 9.7
+  },
+  "weightedTotal": 9.88,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/assets/route.ts:124",
+      "description": "500 폴백이 `details: error.message`로 내부 예외 메시지를 응답 본문에 노출한다. WI-022 변경분이 아닌 선재 코드(diff상 catch 블록 무변경)이며, 인증 가드 통과한 사용자에게만 도달하고 DB 에러 텍스트 수준이라 즉시 누출 위험은 낮다. 자매 라우트(spaces/route.ts:catch)는 details를 노출하지 않아 비대칭.",
+      "recommendation": "500 응답에서 `details`를 제거하거나 NODE_ENV !== 'production'에서만 노출. 별 WI(정보위생 일괄)로 spaces/messages 라우트와 함께 정렬 권장.",
+      "defer": true,
+      "deferRationale": "WI-022 스코프(enum/limit/page 입력 강건화) 밖의 선재 결함이며 인증 게이트 하 저위험. 오케스트레이터가 명시한 defer 가능 항목(500 details 노출).",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/pagination.ts:43-47",
+      "description": "parsePageNumber에 상한이 없어 매우 큰 page(예: page=100000000)가 그대로 통과해 거대한 OFFSET skip을 만든다. offset 페이지네이션의 본질적 스케일 비효율(큰 OFFSET 풀스캔)이며, 음수 skip(500 throw)은 차단됐으나 상한 부재는 DoS 표면으로 남는다. 현 소비처(asset-loader/asset-palette)는 page를 보내지 않아 실표면 미미.",
+      "recommendation": "큰 offset에 대한 상한(예: page * limit cap) 또는 cursor 전환을 후속에서 검토. 즉시 차단 불요.",
+      "defer": true,
+      "deferRationale": "오케스트레이터가 명시한 defer 가능 항목(큰 offset 상한). page 주석에 '상한 없음(데이터 크기 의존)'으로 의도 문서화됨. 현 소비처 미사용으로 실표면 없음.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/assets/internal/public-asset.ts:126-147",
+      "description": "PublicAssetListItem과 GeneratedAssetForListItem이 동일 8필드 구조로 중복 선언됨(WI-021 도입분, WI-022 무변경). 출력 DTO와 입력 수용 타입을 구조적으로 분리한 의도는 있으나 8필드 완전 동일이라 유지보수 시 동기화 부채. SUSPECTED 누출 아님(타입 레벨).",
+      "recommendation": "입력 타입을 출력 DTO의 superset 또는 동일 타입 별칭으로 통합 검토. 누출/동작 영향 없어 nit.",
+      "defer": true,
+      "deferRationale": "WI-021에서 도입된 타입 nit이며 WI-022 변경분 아님. 런타임/보안 영향 없는 순수 타입 중복.",
+      "fixNow": false
+    }
+  ]
+}
