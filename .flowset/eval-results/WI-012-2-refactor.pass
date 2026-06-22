@@ -1,0 +1,14 @@
+WI=WI-012-2-refactor
+commit=f3058be
+sourceFingerprint=16c001a00aa3b76e0049126c77d2e0943dfbf8b3ca03f57c189da8bdbb3ecb34
+fingerprintScope=changeset(11 .ts/.tsx files vs develop: game/index, editor/{editor-system,use-editor}, avatar/sprite-generator, hooks/useScreenRecorder(+test), spaces/[id]/messages/route(+test), spaces/[id]/admin/messages/route(+test), spaces/route.test). eslint.config.mjs는 .mjs라 소스 fingerprint 범위 외(WI 변경 일부지만 Stop 게이트는 .ts/.tsx/.prisma만 추적). 커밋 후 워킹트리 clean이라 Stop 게이트는 changed=0으로 통과(검증된 changeset 감사 기록).
+codex=.flowset/eval-results/WI-012-2-refactor.codex.json
+evaluator=.flowset/eval-results/WI-012-2-refactor.eval.json
+merged=.flowset/eval-results/WI-012-2-refactor.merged.json
+gates=tsc,lint,vitest,build
+gatesEvidence=tsc 0 / lint 0(기존 LiveKit 경고 1) / vitest 128->147(+19) / next build 0. server/ 무관(esbuild 게이트 불요).
+codexVerdict=PASS(r1, 0 issues)
+evaluatorVerdict=WARNING(9.8, P3x1 defer/fixNow:false — parsePageLimit 엣지 strict improvement, 관찰만)
+gateDecision=PASS
+target=develop (PR 예정)
+createdAt=2026-06-22T12:20:44+09:00

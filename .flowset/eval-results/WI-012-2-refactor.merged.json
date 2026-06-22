@@ -1,0 +1,35 @@
+{
+  "wi": "WI-012-2-refactor",
+  "schemaVersion": 1,
+  "commit": "f3058be",
+  "target": "develop (PR 예정)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": { "verdict": "PASS", "issueCount": 0, "rounds": 1, "convergence": "r1 PASS 0 issues — S3~S6 전 항목 검증 통과." },
+    "evaluator": { "verdict": "WARNING", "weightedTotal": 9.8, "scores": { "completeness": 9.8, "consistency": 9.9, "specificity": 9.8, "actionability": 9.5 }, "issueCount": 1, "runs": 1, "note": "P3x1 defer(parsePageLimit 엣지 변동 — strict improvement, 관찰만). S3 ESLint 글로벌 변이검증·S4 L361 .catch 제거 FAIL 실증·S5 응답계약 lock·S6 route.ts 무변경 전부 독립 확인." }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "저위험 cleanup WI(WI-012 분할 2/2, S3~S6). 양 검증자 동일 커밋(f3058be) 1R 수렴: codex PASS 0 issues · evaluator WARNING 9.8 P3x1(defer, fixNow:false). 차단 이슈(P0/P1/P2·fixNow) 0. 양측 변이검증 독립 실증 — evaluator가 (1)ESLint probe로 game/events 서브배럴 cross-module BLOCK + game-internal 상대 ../events 미오탐 + 최상위 배럴 allow 확인, (2)S4 L361 .catch 제거 시 변이검증 테스트 FAIL 확인, (3)S5 응답 계약 exact-key allowlist + admin hasMore 미노출 lock, (4)S6 src/app/api/spaces/route.ts diff 빈결과(소스 무변경) 확인. 기계게이트 4/4(tsc 0/lint 0(기존 LiveKit 경고 1)/vitest 128->147(+19: S4 +2/S5 +11/S6 +6)/next build 0). server/ 무관 → esbuild 게이트 불요. -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "S3~S6 전 항목 검증 (EventBridge 단일진입점·recorder .catch·messages DRY·POST 커버리지).",
+      "codex": "PASS (0 issues)",
+      "evaluator": "WARNING 9.8 (P3x1 defer)",
+      "status": "CONVERGED — 양측 1R 수렴. 차단 이슈 0. 변이검증 양측 실증."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "source": ["evaluator"],
+      "divergent": true,
+      "location": "src/lib/pagination.ts parsePageLimit (S5 통일 적용 효과)",
+      "description": "messages 2라우트가 인라인 limit 파싱(비-admin parseInt(...||\"50\"), admin Number(...)||50)에서 공용 parsePageLimit으로 통일되며 limit 파싱 엣지 동작이 미세 변동(float 정수화, NaN/0/음수 → 기본 50으로 정규화).",
+      "assessment": "응답 계약 보존 + 전 케이스 무회귀이며 오히려 strict improvement(구 비-admin take:NaN, 구 admin take:음수 잠재버그 제거). 의도된 DRY 통일의 부수효과로 개선 방향. evaluator도 fixNow:false/관찰만으로 분류.",
+      "defer": true,
+      "deferRationale": "동작 개선(회귀 아님) — 별도 조치 불필요. 관찰 항목.",
+      "fixNow": false
+    }
+  ]
+}
