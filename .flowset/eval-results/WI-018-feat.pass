@@ -1,0 +1,12 @@
+WI=WI-018-feat
+commit=e8d2f16
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-018-feat.codex.json
+evaluator=.flowset/eval-results/WI-018-feat.eval.json
+merged=.flowset/eval-results/WI-018-feat.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:249pass,build:0,esbuild-server:0,metafile-copy-complete,poc:fail-fast-verified
+codexVerdict=PASS
+evaluatorVerdict=WARNING:9.8
+blockingIssues=0
+createdAt=2026-06-22T15:09:06Z

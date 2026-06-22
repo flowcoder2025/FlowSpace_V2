@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 10,
+    "specificity": 9.8,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.8,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/lib/socket-startup.test.ts:99-114",
+      "description": "production throw 경로의 시크릿 미노출 테스트('production throw 시 메시지에 시크릿 값 미포함')는 사실상 항상 통과하는 약한 오라클이다. 검증 코드(socket-startup.ts:43)가 production에서 getAuthSecret()의 에러를 가공 없이 그대로 re-throw하고, getAuthSecret()(auth-secret.ts:22-25)의 메시지는 정적 문자열(시크릿 값 미참조)이라 throw 경로에 값 누출 변이를 주입할 지점이 없다. 변이검증으로 확인: dev-warning 경로에 AUTH_SECRET을 끼워넣는 변이(Mutation 3)는 dev-canary 테스트가 1건 FAIL로 잡지만, prod-throw 카나리는 socket-startup이 메시지를 wrap/가공하지 않는 한 무력하다. 누출 안전망은 dev-warning 카나리 1건에만 실효적으로 의존한다.",
+      "recommendation": "throw 경로의 미노출을 의미있게 잠그려면 socket-startup이 prod에서 reason 문자열을 재가공해 throw하는 형태(현재는 raw re-throw)일 때만 가치가 있다. 현 구조에선 카나리를 dev/warn 경로에 집중하는 것이 맞고, prod-throw 카나리는 회귀 방어가 아닌 문서적 의미로 유지해도 무방하다. 후속 정리 대상.",
+      "defer": true,
+      "deferRationale": "약한 오라클일 뿐 거짓 통과(false-pass)로 결함을 은폐하지 않는다. 실효적 누출 방어는 dev-warning 카나리(Mutation 3로 검출 실증)와 getAuthSecret의 정적 메시지(WI-001 확립)가 이미 담당. 게이트 차단 사유 아님(테스트 부채 P3).",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/socket-startup.ts:39",
+      "description": "production 판정이 `process.env.NODE_ENV === \"production\"` 엄격 일치라, 대문자/오타 변형(예: \"Production\")이면 fail-fast가 우회되어 비-prod 경고 경로로 빠진다. SUSPECTED 영향: 실배포 설정은 Dockerfile.socket:57·docker-compose.prod.yml:14가 정확히 소문자 `NODE_ENV=production`을 박고 있어 현재 회귀 표면은 없다. 코드베이스 관례(server/handlers/media.ts:23 `=== \"development\"`)와도 일치하는 패턴이라 의도적 엄격성으로 본다.",
+      "recommendation": "Node 관례상 NODE_ENV는 소문자가 표준이며 배포 SoT 2곳이 이를 고정하므로 현행 유지가 합리적. 방어심화가 필요하면 `(process.env.NODE_ENV ?? \"\").toLowerCase() === \"production\"`로 정규화 가능하나 동작 변경·테스트 수정 동반이라 즉시성 낮음.",
+      "defer": true,
+      "deferRationale": "실배포 두 SoT(Dockerfile.socket:57, docker-compose.prod.yml:14)가 소문자 production을 고정해 실제 우회 경로 부재. 코드베이스 기존 NODE_ENV 비교 관례와 정합. 가설적 오설정 하드닝일 뿐 현 계약 위반 아님.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "server/index.ts:24-27",
+      "description": "validateSocketStartupConfig()가 모듈 top-level(부수효과)에서 즉시 실행되어 server/index.ts를 import만 해도 throw/경고가 발생한다. server는 esbuild 단일 진입(server/index.ts) 번들이라 실해(實害)는 없으나, 향후 server/index.ts를 테스트 하니스나 다른 진입점에서 import할 경우 부팅 부수효과가 따라온다. 현재는 socket-startup 로직이 순수 함수로 분리·단위 테스트되어 있어 server/index.ts를 import할 이유가 없다.",
+      "recommendation": "현행 구조(순수 validator + top-level 호출)는 fail-fast 의도에 정확히 부합하고 server 진입점이 단일이라 적정. server/index.ts를 import하는 소비처가 생기면 main 가드(`if (require.main === module)`)로 부팅 부수효과를 격리할 것.",
+      "defer": true,
+      "deferRationale": "server는 단일 esbuild 진입점이며 socket-startup 로직은 이미 순수 함수로 추출·테스트됨. top-level 실행은 fail-fast(listen 전 crash) 달성에 필수이고 현재 import 소비처 부재라 회귀 표면 없음.",
+      "fixNow": false
+    }
+  ]
+}
