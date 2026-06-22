@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import { MessageType } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
+import { normalizeEnumFilter, parseDateRangeFilter } from "@/lib/query-filter";
 import { internalErrorResponse } from "@/lib/api-error";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
+
+/** 메시지 타입 필터 allowlist (Prisma 런타임 enum) */
+const MESSAGE_TYPE_VALUES = new Set<string>(Object.values(MessageType));
 
 export async function GET(request: Request, { params }: RouteParams) {
   try {
@@ -32,8 +38,29 @@ export async function GET(request: Request, { params }: RouteParams) {
     const cursor = searchParams.get("cursor");
     const limit = parsePageLimit(searchParams.get("limit"));
 
+    // 고급 필터(WI-030): 타입 enum + 날짜 범위. 잘못된 값은 400(무시 시 의도보다
+    // 넓은 결과 노출). where가 cursor보다 항상 적용돼 권한 밖 row 노출 불가(WI-010).
+    const type = normalizeEnumFilter(
+      searchParams.getAll("type"),
+      MESSAGE_TYPE_VALUES
+    );
+    const dateRange = parseDateRangeFilter(
+      searchParams.get("startDate"),
+      searchParams.get("endDate")
+    );
+    if (type === null || dateRange === "invalid") {
+      return NextResponse.json(
+        { error: "Invalid filter", code: "INVALID_FILTER" },
+        { status: 400 }
+      );
+    }
+
+    const where: Prisma.ChatMessageWhereInput = { spaceId };
+    if (type) where.type = type as MessageType;
+    if (dateRange) where.createdAt = dateRange;
+
     const messages = await prisma.chatMessage.findMany({
-      where: { spaceId },
+      where,
       orderBy: { createdAt: "desc" },
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
