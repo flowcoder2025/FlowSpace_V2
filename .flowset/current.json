@@ -2,11 +2,11 @@
   "activeWI": null,
   "lastWI": "WI-016-chore",
   "type": null,
-  "status": "PROMOTED_main_LIVE",
+  "status": "PROMOTED_LIVE_ALL_TARGETS",
   "integrationBranch": "develop",
   "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "server-esbuild", "promotion-approval"],
   "lastVerifiedCommit": "50d9af0",
-  "note": "✅ 승격 완료(2026-06-22): develop→main PR#18 rebase 머지 → main HEAD 50d9af0(author=flowcoder25 보존). Vercel Production ● Ready(신 WI-001~016 코드 라이브, author 인가 통과). prod DB 마이그레이션 적용 완료(migrate deploy: WI-013 Space 복합인덱스 생성+구 Space_status_idx 제거[7행 즉시]·WI-016 isShared no-op[IF NOT EXISTS], _prisma_migrations 3건 SoT 정합). 사전검증 전수 실측: 기계게이트 green / OCI esbuild 번들+metafile COPY 완전성 / 🔴AUTH_SECRET 해소(라이브 OCI가 로컬 .env 44자 시크릿 서명 JWT 검증 성공→prod=44자≥32 확정, live 웹 HTTP200→Vercel==OCI transitive) / WI-016 prod 컬럼 존재 확정 / 적대검증 19에이전트=승격차단 코드결함 0. **⚠️ 남은 운영작업(사용자 전용, SSH 필요): OCI 소켓 신코드 수동 배포** — deploy-socket.yml 자동배포는 과거 전부 실패(OCI_SSH_PRIVATE_KEY 시크릿 미설정, 선재). 현재 OCI는 구 소켓코드 가동(라이브 200, 신Vercel과 호환: AUTH불변·protocol 순수리팩터·enforce graceful degrade) → WI-005 실시간제재 등 신기능은 OCI 수동배포 후 활성. SOCKET_INTERNAL_* prod env 설정도 함께 필요(미설정=degrade). develop↔main rebase 분기는 back-sync 정합."
+  "note": "✅ 승격 완료(2026-06-22): develop→main PR#18 rebase 머지 → main HEAD 50d9af0(author=flowcoder25 보존). Vercel Production ● Ready(신 WI-001~016 코드 라이브, author 인가 통과). prod DB 마이그레이션 적용 완료(migrate deploy: WI-013 Space 복합인덱스 생성+구 Space_status_idx 제거[7행 즉시]·WI-016 isShared no-op[IF NOT EXISTS], _prisma_migrations 3건 SoT 정합). 사전검증 전수 실측: 기계게이트 green / OCI esbuild 번들+metafile COPY 완전성 / 🔴AUTH_SECRET 해소(라이브 OCI가 로컬 .env 44자 시크릿 서명 JWT 검증 성공→prod=44자≥32 확정, live 웹 HTTP200→Vercel==OCI transitive) / WI-016 prod 컬럼 존재 확정 / 적대검증 19에이전트=승격차단 코드결함 0. **✅ OCI 소켓도 배포 완료**(사용자 'ssh키 있잖아'): ~/.ssh/flowspace-oci로 SSH→git pull(06cf9c5→50d9af0 FF)+빌드+재배포, 신 컨테이너 Up(healthy) 포트3002, 실사용자 접속·룸입장 로그 실증(신코드 AUTH 검증 라이브 작동). **OCI 배포함정**: 자동배포 OCI_SSH_PRIVATE_KEY 미설정+OCI는 docker-compose v1만(v2 명령 없음)+v1 recreate 버그 KeyError ContainerConfig → 우회=build→rm -f -s socket→up -d --no-build(fresh up). 롤백이미지 flowspace-v2_socket:rollback-pre-promo 보존. **남은 선택**: WI-005 실시간제재는 OCI .env SOCKET_INTERNAL_SECRET 미설정이라 degrade(DB+재접속차단은 동작) → OCI+Vercel 동일 시크릿+Vercel SOCKET_INTERNAL_URL 설정 시 활성(Vercel env는 사용자 권한). develop↔main rebase 분기 back-sync 정합."
 }
