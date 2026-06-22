@@ -21,6 +21,14 @@
 - `deploy-socket.yml` 수정(PR#19 main 반영): `docker compose`(v2 미설치)→`docker-compose`(v1) + recreate 버그(KeyError ContainerConfig) 우회(build→`rm -f -s socket`→`up -d --no-build`) + `workflow_dispatch`(수동 트리거) + 배포 후 헬스체크(실패 시 exit1).
 - **테스트 실증**: `gh workflow run deploy-socket.yml` → **✓ deploy 25s 성공**(과거 8초 즉시실패 대비), 로그 `✅ socket healthy`. 향후 main push(server/**·Dockerfile.socket 등) 시 자동 배포됨.
 
+## ✅ V1→V2 도메인 컷오버 (2026-06-22) — Codex 적대 협의·검증 거침
+사용자 지시("V1 DB·버셀 죽이고 도메인 유지한 채 V2 넣기" + "코덱스 적대 협의 프로세스")로 실행. **Codex consult(설계) + verify(검증) 양쪽 거침** (`eval-results/CUTOVER-consult*`·`CUTOVER-verify*`).
+- **구조**: V1=Vercel `flowspace`+Supabase ref `dqmnlygfulhxhatyoiql`+`space.flow-coder.com` / V2=Vercel `flowspace-v2`+Supabase ref `fqhcnudechuchaazwrzg`+OCI소켓. **DB 분리 확인**(다른 Supabase 프로젝트). Vercel 소유=flowcoder 팀(`vercel login flowcoder25@gmail.com`으로 owner 권한 획득, gh는 yonghyeon-dev).
+- **실행(Codex 순서: env→재배포→도메인이동)**: ① OCI Caddy에 `space-socket.flow-coder.com`→:3002(v2-socket 블록에 추가, **sed -i가 ro 바인드마운트 inode 교체→caddy 재시작으로 반영**) ② OCI `.env` CORS += `https://space.flow-coder.com`(소켓 rm+up) ③ V2 env `NEXT_PUBLIC_SOCKET_URL=https://space-socket.flow-coder.com`·`AUTH_URL=https://space.flow-coder.com` ④ V2 재배포 ⑤ 도메인 `space.flow-coder.com` V1→V2 **Vercel REST API**(DELETE v9/projects/{V1}/domains + POST v10/projects/{V2}/domains; CLI `domains add --force`는 이 버전서 400/1-arg버그라 API 사용. 토큰=`%APPDATA%/com.vercel.cli/Data/auth.json`).
+- **검증됨**: space.flow-coder.com→V2 서빙(title 일치)·V2 도메인목록 반영·Google OAuth(space redirect 등록, 사용자 확인)·CORS·space-socket 핸드셰이크·AUTH_SECRET 불변.
+- **🔴 미완 e2e(사용자, incognito 필수)**: Google 로그인→공간입장→소켓 WebSocket 101→동기화→LiveKit. **옛 쿠키 함정**(V1/V2 AUTH_SECRET 동일→옛 JWT가 V2서 통과하나 user 부재). 소켓 nip.io로 잡히면 무캐시 재빌드(`vercel deploy --prod --force` 또는 main 빈커밋).
+- **V1 = quarantine**(도메인만 제거, 미삭제). **삭제 보류**(Codex: 7~14일+공유자원 감사[Supabase Storage 등]+백업). 롤백=Vercel move API로 V1 복귀.
+
 ## ⚠️ 남은 작업
 - **🔴 정식 도메인 DNS 미설정(사용자 — DNS 권한)**: `v2-socket.flow-coder.com`이 **NXDOMAIN**(DNS 레코드 없음, nslookup non-existent). Caddy엔 라우트 존재하나 DNS가 없어 죽음(HTTP000). **라이브는 임시 `socket-v2.144.24.72.143.nip.io`로 운영 중**(Caddyfile 주석 "nip.io 임시(Cloudflare DNS 전)"). flow-coder.com NS=`ns1.cnmnoc.co.kr`. 정식 도메인 쓰려면 DNS 패널에서 `v2-socket` A레코드(→144.24.72.143) 추가 + Vercel `NEXT_PUBLIC_SOCKET_URL` 갱신(현재 nip.io 추정). **방치해도 라이브 정상**(nip.io 작동) — 정식 도메인 전환은 선택.
 - **WI-005 실시간 제재 활성화(선택)**: OCI `.env` `SOCKET_INTERNAL_SECRET` 미설정 → enforce degrade(제재는 DB+재접속 차단 동작, 즉시추방만 미작동). 활성=OCI `.env` `SOCKET_INTERNAL_SECRET` + Vercel `SOCKET_INTERNAL_SECRET`(동일)·`SOCKET_INTERNAL_URL` 설정(Vercel env는 사용자 권한 — 내 vercel 계정 team env 쓰기 불가) 후 OCI 컨테이너 재시작.
