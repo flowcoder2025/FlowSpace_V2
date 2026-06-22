@@ -55,7 +55,25 @@ class MockMediaStream {
   }
 }
 
+// AudioContext 스텁 — close()가 reject(이미 closed 등)하도록 모사해 .catch 정책을 검증.
+// mixAudioTracks(audioContextRef 세팅 경로)가 요구하는 최소 표면만 제공.
+class MockAudioContext {
+  static closeCalls = 0;
+  createMediaStreamDestination(): { stream: MockMediaStream } {
+    return { stream: new MockMediaStream() };
+  }
+  createMediaStreamSource(): { connect: () => void } {
+    return { connect: () => {} };
+  }
+  close(): Promise<void> {
+    MockAudioContext.closeCalls += 1;
+    // reject — 호출부가 .catch로 흡수하지 않으면 unhandled rejection이 된다.
+    return Promise.reject(new Error("InvalidStateError: context already closed"));
+  }
+}
+
 const fakeTrack = {} as unknown as MediaStreamTrack;
+const fakeAudioTrack = {} as unknown as MediaStreamTrack;
 
 function latestRecorder(): MockMediaRecorder {
   const rec = MockMediaRecorder.instances.at(-1);
@@ -334,5 +352,79 @@ describe("useScreenRecorder — unmount 경로 (WI-006/WI-011)", () => {
       delete (window as unknown as { showSaveFilePicker?: unknown })
         .showSaveFilePicker;
     }
+  });
+});
+
+describe("useScreenRecorder — audioContext.close() .catch 정책 (WI-012-2 S4)", () => {
+  // 변이검증: stopRecording(L357)·startRecording 재진입(L263)의 close()는 reject 가능.
+  // .catch(() => {})가 없으면 floating Promise rejection → unhandled rejection이 발생한다.
+  // 4경로(unmount/onerror/start/stop) 모두 .catch로 통일됨을 process 리스너로 검출.
+  async function withUnhandledTracking(
+    fn: () => Promise<void>
+  ): Promise<unknown[]> {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      await fn();
+      // unhandledRejection은 마이크로태스크 드레인 후 다음 틱에 발화 → 매크로태스크 1회 양보
+      await new Promise((r) => setTimeout(r, 0));
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+    return unhandled;
+  }
+
+  beforeEach(() => {
+    MockAudioContext.closeCalls = 0;
+    vi.stubGlobal("AudioContext", MockAudioContext);
+  });
+
+  it("stopRecording의 audioContext.close() reject가 unhandled rejection으로 새지 않는다 (L357)", async () => {
+    const unhandled = await withUnhandledTracking(async () => {
+      const { result } = renderHook(() =>
+        useScreenRecorder({ spaceName: "s" })
+      );
+
+      // audioTracks 전달 → mixAudioTracks가 audioContextRef를 세팅
+      await act(async () => {
+        await result.current.startRecording(fakeTrack, [fakeAudioTrack]);
+      });
+
+      // stopRecording → L357에서 audioContext.close() 호출(reject)
+      let stopPromise: Promise<void> | undefined;
+      act(() => {
+        stopPromise = result.current.stopRecording();
+      });
+      act(() => {
+        latestRecorder().onstop?.();
+      });
+      await act(async () => {
+        await stopPromise;
+      });
+    });
+
+    expect(MockAudioContext.closeCalls).toBeGreaterThan(0); // close()가 실제 호출됨
+    expect(unhandled).toHaveLength(0); // .catch로 흡수 → 누수 0
+  });
+
+  it("startRecording 재진입 시 이전 audioContext.close() reject가 unhandled rejection으로 새지 않는다 (L263)", async () => {
+    const unhandled = await withUnhandledTracking(async () => {
+      const { result } = renderHook(() =>
+        useScreenRecorder({ spaceName: "s" })
+      );
+
+      // 1회차 — audioContextRef 세팅
+      await act(async () => {
+        await result.current.startRecording(fakeTrack, [fakeAudioTrack]);
+      });
+      // 2회차 — L263에서 기존 audioContext.close() 호출(reject)
+      await act(async () => {
+        await result.current.startRecording(fakeTrack, [fakeAudioTrack]);
+      });
+    });
+
+    expect(MockAudioContext.closeCalls).toBeGreaterThan(0);
+    expect(unhandled).toHaveLength(0);
   });
 });

@@ -298,4 +298,118 @@ describe("POST /api/spaces — superAdmin 생성 가드", () => {
     expect(mockPrisma.template.findUnique).not.toHaveBeenCalled();
     expect(mockPrisma.space.create).not.toHaveBeenCalled();
   });
+
+  it("미인증이면 401이고 prisma를 건드리지 않는다", async () => {
+    mockAuth.mockResolvedValue(makeSession(null));
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", { name: "x", templateKey: "OFFICE" })
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockPrisma.template.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.space.create).not.toHaveBeenCalled();
+  });
+
+  it("name 또는 templateKey 누락 시 400 (code 없음) + template 미조회", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", { name: "이름만" }) // templateKey 누락
+    );
+
+    expect(res.status).toBe(400);
+    const body = await readJson<{ error: string; code?: string }>(res);
+    expect(body.error).toBe("name, templateKey are required");
+    expect(body.code).toBeUndefined(); // INVALID_FILTER와 달리 POST 400은 code 없음
+    expect(mockPrisma.template.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.space.create).not.toHaveBeenCalled();
+  });
+
+  it("존재하지 않는 templateKey면 404이고 space.create 미진입", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
+    mockPrisma.template.findUnique.mockResolvedValue(null);
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", { name: "새 공간", templateKey: "NOPE" })
+    );
+
+    expect(res.status).toBe(404);
+    const body = await readJson<{ error: string }>(res);
+    expect(body.error).toBe("Template not found");
+    expect(mockPrisma.space.create).not.toHaveBeenCalled();
+  });
+
+  it("정상 생성 시 201 + create가 ownerId/OWNER 멤버로 호출되고 응답 키 보존", async () => {
+    mockAuth.mockResolvedValue(
+      makeSession({ id: "sa-1", isSuperAdmin: true, name: "관리자" })
+    );
+    mockPrisma.template.findUnique.mockResolvedValue({ id: "tpl-1", key: "OFFICE" });
+    mockPrisma.space.create.mockResolvedValue({
+      id: "sp-new",
+      name: "새 공간",
+      inviteCode: "INV-1",
+      template: { key: "OFFICE", name: "오피스" },
+    });
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", {
+        name: "새 공간",
+        templateKey: "OFFICE",
+      })
+    );
+
+    expect(res.status).toBe(201);
+    const body = await readJson<Record<string, unknown>>(res);
+    expect(Object.keys(body).sort()).toEqual(["id", "inviteCode", "name", "template"]);
+    expect(body).toMatchObject({
+      id: "sp-new",
+      name: "새 공간",
+      inviteCode: "INV-1",
+      template: { key: "OFFICE", name: "오피스" },
+    });
+
+    // create 인자: 세션 userId가 ownerId + OWNER 멤버로 생성
+    const createArg = mockPrisma.space.create.mock.calls[0][0] as {
+      data: {
+        ownerId: string;
+        templateId: string;
+        members: { create: { userId: string; role: string } };
+      };
+    };
+    expect(createArg.data.ownerId).toBe("sa-1");
+    expect(createArg.data.templateId).toBe("tpl-1");
+    expect(createArg.data.members.create.role).toBe("OWNER");
+    expect(createArg.data.members.create.userId).toBe("sa-1");
+  });
+
+  it("space.create 실패 시 500 폴백 (Failed to create space)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
+    mockPrisma.template.findUnique.mockResolvedValue({ id: "tpl-1", key: "OFFICE" });
+    mockPrisma.space.create.mockRejectedValue(new Error("db down"));
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", {
+        name: "새 공간",
+        templateKey: "OFFICE",
+      })
+    );
+
+    expect(res.status).toBe(500);
+    const body = await readJson<{ error: string }>(res);
+    expect(body.error).toBe("Failed to create space");
+  });
+});
+
+describe("GET /api/spaces — 500 폴백", () => {
+  it("findMany 실패 시 500 (Failed to fetch spaces)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1" }));
+    mockPrisma.space.findMany.mockRejectedValue(new Error("db down"));
+
+    const res = await GET(buildGetRequest("/api/spaces"));
+
+    expect(res.status).toBe(500);
+    const body = await readJson<{ error: string }>(res);
+    expect(body.error).toBe("Failed to fetch spaces");
+  });
 });

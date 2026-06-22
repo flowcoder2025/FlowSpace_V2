@@ -260,7 +260,9 @@ export function useScreenRecorder({
         chunksRef.current = [];
 
         if (audioContextRef.current) {
-          audioContextRef.current.close();
+          // close()는 Promise 반환 — reject(이미 closed 등) 시 unhandled rejection 방지.
+          // unmount(L179)·onerror·stopRecording과 동일 .catch 정책 (WI-012-2 S4).
+          audioContextRef.current.close().catch(() => {});
           audioContextRef.current = null;
         }
 
@@ -354,7 +356,9 @@ export function useScreenRecorder({
     stopTimer();
 
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      // close()는 Promise 반환 — reject 시 unhandled rejection 방지(반환 Promise<void>와 무관).
+      // unmount(L179)·onerror·startRecording과 동일 .catch 정책 (WI-012-2 S4).
+      audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
 

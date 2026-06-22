@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -28,7 +29,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const { searchParams } = new URL(request.url);
     const cursor = searchParams.get("cursor");
-    const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
+    const limit = parsePageLimit(searchParams.get("limit"));
 
     const messages = await prisma.chatMessage.findMany({
       where: { spaceId },
@@ -37,9 +38,8 @@ export async function GET(request: Request, { params }: RouteParams) {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    const hasMore = messages.length > limit;
-    const items = hasMore ? messages.slice(0, limit) : messages;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
+    // 응답 계약 보존: admin 라우트는 { messages, nextCursor }만 반환(hasMore 미노출, WI-012-2 S5/D5).
+    const { items, nextCursor } = buildCursorPage(messages, limit);
 
     return NextResponse.json({ messages: items, nextCursor });
   } catch (error) {
