@@ -1,7 +1,10 @@
 # HANDOFF
 
 ## Active WI
-(없음) — **✅ develop→main 승격 완료(2026-06-22)**. WI-001~016 라이브 반영. READY 큐 비어 있음(WI-017~019 BACKLOG).
+(없음) — **✅ develop→main 승격 완료(2026-06-22)** + **✅ WI-020-fix(로그인 로고 회귀) 완료·승격·라이브검증**. WI-001~016 + WI-020 라이브 반영. READY 큐 비어 있음(WI-017~019 BACKLOG).
+
+## ✅ WI-020-fix (2026-06-22) — 미들웨어 public 정적에셋 회귀 (사용자 발견)
+미인증 시 `/Logo.png`이 `/login`으로 307 리다이렉트 → 로그인 페이지 로고 깨짐(WI-001 strict화 부작용, 승격으로 라이브화). 순수함수 `src/lib/route-access.ts`(isPublicRequest + PUBLIC_FILES allowlist) 추출, 미들웨어 호출. **확장자 전체통과 거부·명시 allowlist**(codex 적대 협의: 확장자 우회 표면 회피). 회귀테스트 9. 듀얼검증 codex WARNING·evaluator 9.78(P0/P1 0, 변이검증 5종). PR#20→develop, PR#21 승격→main `9cde274`. **라이브 검증: /Logo.png 307→200 image/png**. 교훈: **미들웨어 deny-by-default 하드닝(WI-001) 시 public/ 루트 정적파일이 보호라우트로 잡히는 회귀** — matcher는 `_next/static·_next/image·favicon.ico`만 제외하므로 public 루트파일(Logo.png)은 코드 allowlist 필요.
 
 ## ✅ 승격 완료 (2026-06-22) — PR#18 rebase 머지
 사용자 지시("코덱스와 협의하여 작업 진행" → "직접 확인해봐" + "양쪽다 머지해")로 승격 실행:
