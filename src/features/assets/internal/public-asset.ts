@@ -110,3 +110,58 @@ export function toPublicGeneratedAsset(
     user: { id: asset.user.id, name: asset.user.name },
   };
 }
+
+/**
+ * 목록 공개 응답 DTO (WI-021) — `GET /api/assets`(목록) 전용 lean 표현.
+ *
+ * 상세(`toPublicGeneratedAsset`)와 의도적으로 분리한다. 목록은 `shared=true`일 때
+ * 타인의 공유 자산을 owner 게이트 없이 반환하므로(아바타 선택 등 의도된 공유),
+ * 상세 DTO를 재사용하면 타인의 `user{id,name}`·`metadata`(seed/generatedAt 등)가
+ * 새로 노출되고 game-loader frameWidth 폴백(64) 동작까지 바뀐다(설계 codex consult).
+ * 따라서 목록은 렌더링/팔레트에 필요한 최소 비민감 필드만 노출한다.
+ *
+ * 제외: prompt·workflow·comfyuiJobId(민감), userId(소유권 판정 전용),
+ * metadata·user·fileSize·isShared(목록 소비처 미사용 + shared 분기 타인 노출 표면).
+ */
+export interface PublicAssetListItem {
+  id: string;
+  type: AssetType;
+  name: string;
+  status: AssetStatus;
+  filePath: string | null;
+  thumbnailPath: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** 목록 헬퍼 입력 — route의 lean select 결과를 구조적으로 수용. */
+export interface GeneratedAssetForListItem {
+  id: string;
+  type: AssetType;
+  name: string;
+  status: AssetStatus;
+  filePath: string | null;
+  thumbnailPath: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * raw GeneratedAsset row → 목록 공개 응답 DTO.
+ * 입력에 민감/소유 필드가 섞여 있어도 lean 키만 골라 반환한다(심층 방어):
+ * select가 우발적으로 넓어져도 응답 키 집합은 고정된다.
+ */
+export function toPublicAssetListItem(
+  asset: GeneratedAssetForListItem
+): PublicAssetListItem {
+  return {
+    id: asset.id,
+    type: asset.type,
+    name: asset.name,
+    status: asset.status,
+    filePath: asset.filePath,
+    thumbnailPath: asset.thumbnailPath,
+    createdAt: asset.createdAt,
+    updatedAt: asset.updatedAt,
+  };
+}

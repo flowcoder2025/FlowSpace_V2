@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 10.0,
+    "specificity": 9.9,
+    "actionability": 9.5
+  },
+  "weightedTotal": 9.81,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/assets/route.ts:32-36",
+      "description": "선재 결함(WI-021 범위 밖). type/status 쿼리 파라미터를 `type.toUpperCase()`로 enum 검증 없이 where에 직접 주입한다. 미허용 값(예 type=FOO)은 Prisma enum 필터에서 빈 결과/런타임 에러로 귀결되며 정보 누출은 아니나, 자매 라우트 `GET /api/spaces`(WI-009)의 `INVALID_FILTER` 400 패턴과 비대칭이다. WI-021 핵심(응답 정형화)과 무관한 입력 검증 부채.",
+      "recommendation": "후속 WI로 type/status를 AssetType/AssetStatus enum allowlist 검증 후 400(code:INVALID_FILTER) 반환. 이번 변경분의 회귀 아님.",
+      "defer": true,
+      "deferRationale": "선재 결함이며 WI-021 변경분(prompt 제거+lean DTO)이 도입하거나 악화시킨 것이 아니다. 정보 누출 없음(enum 미스매치는 빈결과/500). 입력 검증은 별 도메인 부채로 분리 타당.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/assets/route.ts:18-19,46-47",
+      "description": "선재 결함(WI-021 범위 밖). limit 상한이 없다 — `parseInt(limit||'20')`가 그대로 take로 들어가 limit=100000 같은 대량 요청을 막지 못한다(GET /api/spaces는 WI-010에서 parsePageLimit 최대100 적용). page/limit이 NaN이면 skip:NaN/take:NaN으로 Prisma 위임. 스케일/방어 부채이며 응답 정형화와 무관.",
+      "recommendation": "후속 WI로 src/lib/pagination.ts parsePageLimit 류 상한·NaN 정규화 적용. 현 라우트 소비처는 limit=100 고정 호출이라 실위험 낮음.",
+      "defer": true,
+      "deferRationale": "선재 결함, WI-021이 신규 도입/악화 아님. 실측 소비처 2곳(asset-loader/asset-palette) 모두 limit=100 하드코딩이라 실익스플로잇 표면 미미. 페이지네이션 강건화는 WI-010 패턴 후속으로 분리 타당.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/assets/internal/public-asset.ts:126-147",
+      "description": "정리 nit. PublicAssetListItem과 GeneratedAssetForListItem이 8개 필드 동일한 중복 인터페이스다(상세 DTO는 입력 GeneratedAssetForPublic이 응답 PublicGeneratedAsset보다 fileSize 입력형/metadata Json 등으로 의도적 비대칭이라 분리 정당하나, 목록은 입력=출력 키 집합이 완전 동일). 향후 한쪽만 수정 시 드리프트 가능. 기능/보안 영향 없음.",
+      "recommendation": "GeneratedAssetForListItem을 PublicAssetListItem로 단일화하거나 type 별칭으로 통합. 다만 lean select 결과를 '구조적으로 수용'한다는 명시적 입력 계약 의도면 현행 유지도 수용 가능.",
+      "defer": true,
+      "deferRationale": "순수 정리 부채. 두 인터페이스가 동일해 응답 키 집합에 영향 없고, exact-key-set 테스트가 응답을 잠그므로 드리프트 발생해도 회귀 검출됨. fixNow 불필요.",
+      "fixNow": false
+    }
+  ]
+}

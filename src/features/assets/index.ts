@@ -6,11 +6,14 @@ export { ASSET_SPECS, ASSET_STORAGE_PATHS, generateAssetFilename } from "./inter
 export { resolveGeneratedAssetPath } from "./internal/safe-path";
 export {
   toPublicGeneratedAsset,
+  toPublicAssetListItem,
   PUBLIC_METADATA_KEYS,
 } from "./internal/public-asset";
 export type {
   PublicGeneratedAsset,
   GeneratedAssetForPublic,
+  PublicAssetListItem,
+  GeneratedAssetForListItem,
 } from "./internal/public-asset";
 export { loadAssetToPhaser, loadAssetsToPhaser } from "./internal/game-loader";
 export {
