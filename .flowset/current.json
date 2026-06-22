@@ -1,12 +1,12 @@
 {
   "activeWI": null,
-  "lastWI": "WI-019-fix",
+  "lastWI": "WI-021-fix",
   "type": null,
-  "status": "WI_019_MERGED_DEVELOP",
+  "status": "WI_021_VERIFIED_PR_PENDING",
   "integrationBranch": "develop",
-  "branch": "develop",
+  "branch": "fix/WI-021-fix-assets-list-response-allowlist",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "221f8df",
-  "note": "✅ WI-019-fix(assets 상세 GET 응답 allowlist) develop 머지 완료(2026-06-22, PR#22 merge 221f8df). raw GeneratedAsset 전체행→select+공개 DTO(toPublicGeneratedAsset). 핵심: prompt/workflow/comfyuiJobId가 metadata(Json)에도 중복저장 → PUBLIC_METADATA_KEYS allowlist로 metadata 정규화. 설계 codex consult 1R + 듀얼 1R 수렴(codex WARNING·evaluator 9.78, P0/P1 0). main 미승격(라이브 미반영, 승격은 사용자 승인 게이트 — develop이 main보다 WI-019 앞섬). BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-021(목록 GET /api/assets 선재누출, WI-019서 발굴). === 이전: ✅ V1→V2 컷오버 완료·e2e 검증(2026-06-22). space.flow-coder.com=V2 서빙, 사용자 e2e '정상확인'(Google 로그인+공간입장+동기화+미디어). + WI-020-fix(로그인 로고 회귀) 완료·승격·라이브검증(/Logo.png 307→200). main HEAD 흐름: 승격(50d9af0)→OCI소켓배포→CD복구(fc66b44)→WI-020(9cde274). develop==main 정합. 모든 코드/인프라 작업은 codex 적대 협의(설계 consult + 검증) 거침(eval-results/CUTOVER-*·WI-020-*). **남은(사용자 게이트·비코드)**: ①V1 폐기 — Codex 권고 quarantine(도메인만 제거·미삭제), 2026-07-06경(7~14일) 이후 공유자원 감사(Supabase Storage 객체[DB백업 미포함]·OAuth클라·webhook·cron) + V1 DB 백업 후 Vercel `flowspace`+Supabase `dqmnlygfulhxhatyoiql` 삭제. ②WI-005 실시간제재 SOCKET_INTERNAL_*(OCI+Vercel) 설정 시 활성. ③안정화 후 V2 AUTH_SECRET rotation 검토(옛 V1 쿠키 차단, Codex). ④WI-013 prod EXPLAIN(데이터 증가 후). READY 큐 비어 있음(WI-017~019 BACKLOG)."
+  "lastVerifiedCommit": "5cd3f85",
+  "note": "✅ WI-021-fix(assets 목록 GET /api/assets 응답 lean DTO 정형화) 검증 완료·develop PR 대기(2026-06-22, impl 5cd3f85). select의 prompt 제거 + 신규 lean DTO toPublicAssetListItem(8키: id/type/name/status/filePath/thumbnailPath/createdAt/updatedAt). 핵심: shared=true 분기는 owner 게이트 없이 타인 공유자산 반환 → 상세용 toPublicGeneratedAsset 재사용 회피(재사용 시 metadata→game-loader frameWidth 동작 변경 + shared 분기 타인 user 신규 노출 부작용, 설계 codex consult 적출). prompt/workflow/comfyuiJobId(민감)·metadata·user·userId를 select(쿼리단)+transform(응답단) 이중 제외. 설계 codex consult 1R + 듀얼 블라인드 1R 수렴: codex PASS 0 issues · evaluator WARNING 9.81(P0/P1 0, P3x3 defer: enum 무검증·limit 무상한[둘 다 선재→WI-022]·중복 인터페이스 nit, 변이검증 2종 실증). 기계게이트 4/4(tsc0/lint0[선재 LiveKit 경고1·WI무관]/vitest 204·204[+12]/build0). .pass fingerprint d8a1b53f. main 미승격(라이브 미반영, 승격은 사용자 승인 게이트). === 직전: WI-019-fix(assets 상세 GET allowlist) develop 머지(PR#22 221f8df). BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-022(assets 목록 입력 강건화 — enum 검증+limit 상한, WI-021서 발굴). === V1→V2 컷오버 완료·e2e 검증 + WI-020(로그인 로고) 라이브. **남은(사용자 게이트·비코드)**: ①V1 폐기(quarantine·2026-07-06경+공유자원 감사 후) ②WI-005 실시간제재 SOCKET_INTERNAL_* 설정 ③V2 AUTH_SECRET rotation 검토 ④WI-013 prod EXPLAIN."
 }

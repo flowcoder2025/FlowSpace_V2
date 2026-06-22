@@ -1,0 +1,1142 @@
+OpenAI Codex v0.141.0
+--------
+workdir: C:\Team-jane\FlowSpace
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019eef30-b49f-77c1-b5d0-9dc39afb61d8
+--------
+user
+# 설계 협의(적대적) — WI-021 assets 목록 GET 응답 정형화
+
+FlowSpace = Next.js 15 풀스택 + Phaser 메타버스. 너는 Claude(메인)의 **독립 적대 설계 검토자**다. read-only. 산문으로 답하라(스키마 없음). "괜찮다"는 동의보다 **깨질 시나리오·놓친 누출**을 찾는 게 임무다. 합의/반대를 명확히.
+
+## 배경 (직전 WI-019, 머지 완료)
+`GET /api/assets/[id]`(상세, owner/superAdmin 게이트)가 raw `GeneratedAsset` 전체 행을 반환하던 것을 `select` + 공개 DTO `toPublicGeneratedAsset`로 정형화했다. 핵심 교훈: 민감 3필드(`prompt`/`workflow`/`comfyuiJobId`)가 `metadata`(Json) 컬럼에도 **중복 저장**(generate/batch 라우트가 `GeneratedAssetMetadata` 전체를 JSON으로 저장)되므로 top-level allowlist만으론 부족 → metadata도 `PUBLIC_METADATA_KEYS`(width,height,frameWidth,frameHeight,columns,rows,format,seed,generatedAt,processingTime,error)로 정규화.
+
+`toPublicGeneratedAsset(asset)` 반환 키: `{ id, type, name, status, filePath, thumbnailPath, fileSize, isShared, metadata(allowlisted), createdAt, updatedAt, user:{id,name} }` — userId는 입력에 있어도 응답 미포함. (`features/assets/internal/public-asset.ts`, 배럴 export)
+
+## WI-021 대상 (목록 라우트, 별 라우트)
+`GET /api/assets` (`src/app/api/assets/route.ts`). 현재 핵심 코드:
+
+```ts
+const where: Record<string, unknown> = {};
+if (shared === "true") {
+  where.isShared = true;          // ← 타인 공유 자산까지 조회
+} else {
+  where.userId = session.user.id; // 본인 자산만
+}
+if (type) where.type = type.toUpperCase();
+if (status) where.status = status.toUpperCase();
+
+const [assets, total] = await Promise.all([
+  prisma.generatedAsset.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip: (page - 1) * limit,
+    take: limit,
+    select: {
+      id: true, type: true, name: true,
+      prompt: true,            // ← 🔴 민감 필드 누출 (특히 shared 분기 = 타인 prompt)
+      status: true, filePath: true, thumbnailPath: true,
+      createdAt: true, updatedAt: true,
+    },
+  }),
+  prisma.generatedAsset.count({ where }),
+]);
+return NextResponse.json({ assets, pagination: { page, limit, total, totalPages } });
+```
+
+**`GeneratedAsset` 스칼라**: id, userId, type, name, prompt(@db.Text), workflow, status, metadata(Json?), filePath, thumbnailPath, fileSize, comfyuiJobId, isShared, createdAt, updatedAt + user{id,name}.
+
+## 실측 소비처 (목록 라우트 `GET /api/assets` 만, grep 전수)
+1. `src/features/space/game/internal/asset-loader.ts` `fetchGeneratedAssets()` → `createLoadableAssets(data.assets)`: 각 asset의 **`id`, `type`, `filePath`, `metadata?.frameWidth`, `metadata?.frameHeight`** 소비. **단, 현재 목록 select에 `metadata`가 없어** `meta = asset.metadata || {}` → `(meta.frameWidth as number) || 64` 로 **항상 64 폴백** 중(CHARACTER frame).
+2. `src/components/space/editor/asset-palette.tsx` `CompletedAsset`: **`id`, `type`, `name`, `thumbnailPath`, `filePath`** 소비.
+- 상세 `/api/assets/[id]` 소비처(sprite-generator, game-loader)는 별 라우트라 WI-021 범위 밖.
+- 과거 `/assets` 페이지는 제거됨(specs `_index.md`) — 위 2곳이 유일 라이브 소비처.
+
+## 질문 1 — DTO 전략: lean vs 재사용 (핵심)
+두 안의 트레이드오프:
+
+**안 A (lean 목록 DTO / 그냥 `prompt`만 select에서 제거)**: 응답 `{ id, type, name, status, filePath, thumbnailPath, createdAt, updatedAt }`(현행에서 prompt만 제거). 동작 무변·신규 노출 0·무회귀 확실. 단 상세 라우트와 응답 shape 불일치, metadata 미반환 유지.
+
+**안 B (`toPublicGeneratedAsset` 전체 재사용)**: 상세와 동일 shape. 단 부작용 2가지 — (1) `metadata`가 목록에 추가됨 → game-loader가 frameWidth를 64 폴백 대신 **실제 metadata.frameWidth(예: 128)로 읽기 시작** = **렌더링 동작 변경**(보안 수정의 부수효과). (2) `shared=true` 분기는 타인 공유 자산 목록이므로 `user:{id,name}`(타인 표시명/ID) + metadata(seed/generatedAt 등)가 **신규로 외부 노출**됨(현행 목록은 user/metadata 미반환).
+
+내 잠정 결론: **안 A 우선**(보안 수정은 동작 보존이 원칙, shared 분기 신규 노출 회피). 단 상세와의 일관성·metadata frameWidth 정확성을 잃는다. 동의/반대와 근거. 제3안(예: lean DTO인데 metadata만 allowlisted로 포함해 frameWidth 복원)이 더 나은가, 아니면 그건 scope creep인가?
+
+## 질문 2 — `shared=true` 분기의 올바른 필드 경계
+목록은 owner 게이트가 아니라 `isShared=true`면 **누구나 타인 자산을 조회**한다(아바타 선택 등 의도된 공유). 이 분기에서:
+- `user:{id,name}`(생성자 표시명) 노출이 정보위생상 허용되나, 아니면 목록에선 빼야 하나?
+- metadata(allowlisted: seed/generatedAt/width 등) 타인 노출이 문제되나?
+- shared 분기에만 더 타이트한 필드 집합을 적용하는 게 과한가, 아니면 owner 분기 vs shared 분기를 **동일 DTO로 통일**하는 게 맞나?
+
+## 질문 3 — 회귀/엣지
+- `prompt` 제거 시 두 소비처 타입 선언(`CompletedAsset`, `createLoadableAssets` 입력)은 prompt 미사용이라 무회귀 맞나? 빠뜨리면 안 되는 소비 필드 있나?
+- 응답 정형화 외에 이 라우트의 선재 결함(예: `type.toUpperCase()`로 enum 무검증 주입, page/limit 무상한 — WI-010 spaces cursor와 달리 offset pagination)도 WI-021에 포함해야 하나, 아니면 별 WI로 분리?
+- 테스트는 WI-019 패턴(`makeAssetSelectRow` fixture + exact-key-set allowlist 단언 + 민감필드 미노출 + select 인자 단언)을 목록 라우트에 미러링하면 충분한가?
+
+## 질문 4
+**내가 놓칠 위험 1가지**를 반드시 지적하라(설계·보안·회귀 어느 쪽이든).
+
+각 항목 간결하게.
+
+codex
+코드와 실제 소비처를 먼저 확인하겠습니다. read-only라 변경은 하지 않고, 질문별로 반대 가능성이 있는 지점을 좁혀 답하겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "api/assets|fetchGeneratedAssets|createLoadableAssets|CompletedAsset|toPublicGeneratedAsset|PUBLIC_METADATA_KEYS|GeneratedAssetMetadata" -S src features prisma specs' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/features/assets/internal/public-asset.ts' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/app/api/assets/route.ts' in C:\Team-jane\FlowSpace
+ succeeded in 293ms:
+import type { AssetType, AssetStatus, Prisma } from "@prisma/client";
+
+/**
+ * GeneratedAsset ê³µê°œ ?‘ë‹µ DTO (WI-019)
+ *
+ * `GET /api/assets/[id]`??ê²Œìž„ ?°í???ë¡œë”(game-loader/sprite-generator)?€
+ * ?´ë§ ?¤í¬ë¦½íŠ¸ê°€ ?¸ì¶œ?˜ëŠ” ?ì‚° ?ì„¸ API?? raw Prisma rowë¥?ê·¸ë?ë¡?ë°˜í™˜?˜ë©´
+ * ?´ë?/ë¯¼ê° ?„ë“œ(promptÂ·workflowÂ·comfyuiJobId)ê°€ ?¸ë?ë¡????˜ê°„??
+ *
+ * ? ï¸ ?µì‹¬: ?™ì¼ ë¯¼ê° ?„ë“œê°€ `metadata`(Json) ì»¬ëŸ¼?ë„ ì¤‘ë³µ ?€?¥ëœ?? * (generate/batch ?¼ìš°?¸ê? `GeneratedAssetMetadata` ?„ì²´ë¥?JSON?¼ë¡œ ?€??.
+ * ?°ë¼??top-level allowlistë§Œìœ¼ë¡œëŠ” ë¶€ì¡±í•˜ê³?metadata???•ê·œ?”í•´???œë‹¤.
+ */
+
+/**
+ * ê³µê°œ metadata ??allowlist ???Œë”ë§??´ë§???„ìš”??ë¹„ë?ê°??¤ë§Œ.
+ * ?œì™¸: promptÂ·workflowÂ·comfyuiJobId(ë¯¼ê°), idÂ·typeÂ·nameÂ·statusÂ·filePathÂ·
+ * thumbnailPathÂ·fileSize(top-level ì¤‘ë³µ), batchId(?´ë? ê·¸ë£¹??.
+ */
+export const PUBLIC_METADATA_KEYS = [
+  "width",
+  "height",
+  "frameWidth",
+  "frameHeight",
+  "columns",
+  "rows",
+  "format",
+  "seed",
+  "generatedAt",
+  "processingTime",
+  "error",
+] as const;
+
+export interface PublicGeneratedAsset {
+  id: string;
+  type: AssetType;
+  name: string;
+  status: AssetStatus;
+  filePath: string | null;
+  thumbnailPath: string | null;
+  fileSize: number | null;
+  isShared: boolean;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
+  updatedAt: Date;
+  user: { id: string; name: string | null };
+}
+
+/** ?¬í¼ê°€ ?”êµ¬?˜ëŠ” ìµœì†Œ ?…ë ¥ ?•íƒœ(route??select ê²°ê³¼ë¥?êµ¬ì¡°?ìœ¼ë¡??˜ìš©). */
+export interface GeneratedAssetForPublic {
+  id: string;
+  type: AssetType;
+  name: string;
+  status: AssetStatus;
+  filePath: string | null;
+  thumbnailPath: string | null;
+  fileSize: number | null;
+  isShared: boolean;
+  metadata: Prisma.JsonValue;
+  createdAt: Date;
+  updatedAt: Date;
+  user: { id: string; name: string | null };
+}
+
+/**
+ * ?€?¥ëœ metadata(Json)ë¥?ê³µê°œ ??allowlistë¡?ì¶•ì†Œ.
+ * null/ë¹„ê°ì²?ë°°ì—´ ??null. ê°ì²´ë©?allowlist ?¤ë§Œ ê³¨ë¼ ??ê°ì²´ë¡?
+ */
+function toPublicMetadata(
+  metadata: Prisma.JsonValue
+): Record<string, unknown> | null {
+  if (
+    metadata === null ||
+    typeof metadata !== "object" ||
+    Array.isArray(metadata)
+  ) {
+    return null;
+  }
+
+  const src = metadata as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of PUBLIC_METADATA_KEYS) {
+    const value = src[key];
+    if (value !== undefined) {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/**
+ * raw GeneratedAsset row ??ê³µê°œ ?‘ë‹µ DTO.
+ * userId ??ê¶Œí•œ ?ì • ?„ìš© ?„ë“œ???…ë ¥???ˆì–´???‘ë‹µ???¬í•¨?˜ì? ?ŠëŠ”??
+ */
+export function toPublicGeneratedAsset(
+  asset: GeneratedAssetForPublic
+): PublicGeneratedAsset {
+  return {
+    id: asset.id,
+    type: asset.type,
+    name: asset.name,
+    status: asset.status,
+    filePath: asset.filePath,
+    thumbnailPath: asset.thumbnailPath,
+    fileSize: asset.fileSize,
+    isShared: asset.isShared,
+    metadata: toPublicMetadata(asset.metadata),
+    createdAt: asset.createdAt,
+    updatedAt: asset.updatedAt,
+    user: { id: asset.user.id, name: asset.user.name },
+  };
+}
+
+ succeeded in 293ms:
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+/** GET /api/assets - ?愳厠 氇╇ (?勴劙毵? */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const type = searchParams.get("type");
+    const status = searchParams.get("status");
+    const shared = searchParams.get("shared");
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "20", 10);
+
+    const where: Record<string, unknown> = {};
+
+    if (shared === "true") {
+      // 瓿奠毄 ?愳厠 臁绊殞 (?勲皵?€ ?犿儩 ??
+      where.isShared = true;
+    } else {
+      // 氤胳澑 ?愳厠毵?臁绊殞 (IDOR 氚╈?)
+      where.userId = session.user.id;
+    }
+
+    if (type) {
+      where.type = type.toUpperCase();
+    }
+    if (status) {
+      where.status = status.toUpperCase();
+    }
+
+    const [assets, total] = await Promise.all([
+      prisma.generatedAsset.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          type: true,
+          name: true,
+          prompt: true,
+          status: true,
+          filePath: true,
+          thumbnailPath: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.generatedAsset.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      assets,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to fetch assets",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+2026-06-22T11:57:02.086728Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.6 seconds
+Output:
+src\features\space\avatar\internal\sprite-generator.ts:218:  fetch(`/api/assets/${assetId}`)
+src\lib\route-access.test.ts:28:      expect(isPublicRequest("/api/assets/foo.png")).toBe(false);
+src\components\space\editor\asset-palette.tsx:5:interface CompletedAsset {
+src\components\space\editor\asset-palette.tsx:31:  const [assets, setAssets] = useState<CompletedAsset[]>([]);
+src\components\space\editor\asset-palette.tsx:38:    fetch("/api/assets?status=COMPLETED&limit=100")
+src\components\space\editor\asset-palette.tsx:40:      .then((data: { assets: CompletedAsset[] }) => {
+src\features\assets\internal\processor.ts:36:import type { CreateAssetParams, GeneratedAssetMetadata } from "./types";
+src\features\assets\internal\processor.ts:41:): Promise<GeneratedAssetMetadata> {
+src\features\assets\internal\processor.ts:234:  const metadata: GeneratedAssetMetadata = {
+src\features\assets\internal\processor.ts:275:): Promise<GeneratedAssetMetadata> {
+src\features\assets\internal\game-loader.ts:16:    const res = await fetch(`/api/assets/${assetId}`);
+src\features\assets\index.ts:8:  toPublicGeneratedAsset,
+src\features\assets\index.ts:9:  PUBLIC_METADATA_KEYS,
+src\features\assets\index.ts:44:  GeneratedAssetMetadata,
+src\features\assets\internal\public-asset.ts:6: * `GET /api/assets/[id]`는 게임 런타임 로더(game-loader/sprite-generator)와
+src\features\assets\internal\public-asset.ts:11: * (generate/batch 라우트가 `GeneratedAssetMetadata` 전체를 JSON으로 저장).
+src\features\assets\internal\public-asset.ts:20:export const PUBLIC_METADATA_KEYS = [
+src\features\assets\internal\public-asset.ts:82:  for (const key of PUBLIC_METADATA_KEYS) {
+src\features\assets\internal\public-asset.ts:95:export function toPublicGeneratedAsset(
+src\features\assets\internal\public-asset.test.ts:4:  toPublicGeneratedAsset,
+src\features\assets\internal\public-asset.test.ts:5:  PUBLIC_METADATA_KEYS,
+src\features\assets\internal\public-asset.test.ts:11: * metadata는 generate/batch 라우트가 저장하는 `GeneratedAssetMetadata` 전체 형태로,
+src\features\assets\internal\public-asset.test.ts:67:describe("toPublicGeneratedAsset", () => {
+src\features\assets\internal\public-asset.test.ts:69:    const result = toPublicGeneratedAsset(makeAssetRow());
+src\features\assets\internal\public-asset.test.ts:89:    const result = toPublicGeneratedAsset(makeAssetRow()) as unknown as Record<
+src\features\assets\internal\public-asset.test.ts:100:    const { metadata } = toPublicGeneratedAsset(makeAssetRow());
+src\features\assets\internal\public-asset.test.ts:125:    const { metadata } = toPublicGeneratedAsset(makeAssetRow());
+src\features\assets\internal\public-asset.test.ts:126:    // PUBLIC_METADATA_KEYS를 오라클로 쓰지 않고 리터럴 기대값으로 잠근다 —
+src\features\assets\internal\public-asset.test.ts:145:  it("PUBLIC_METADATA_KEYS 상수 자체가 알려진 민감/내부 키를 포함하지 않는다", () => {
+src\features\assets\internal\public-asset.test.ts:157:    const keys = PUBLIC_METADATA_KEYS as readonly string[];
+src\features\assets\internal\public-asset.test.ts:164:    const result = toPublicGeneratedAsset(
+src\features\assets\internal\public-asset.test.ts:171:    const result = toPublicGeneratedAsset(
+src\features\assets\internal\public-asset.test.ts:185:      toPublicGeneratedAsset(makeAssetRow({ metadata: ["a", "b"] })).metadata
+src\features\assets\internal\public-asset.test.ts:188:      toPublicGeneratedAsset(makeAssetRow({ metadata: "raw string" })).metadata
+src\features\assets\internal\public-asset.test.ts:193:    const result = toPublicGeneratedAsset(makeAssetRow());
+src\app\api\assets\[id]\route.ts:5:import { resolveGeneratedAssetPath, toPublicGeneratedAsset } from "@/features/assets";
+src\app\api\assets\[id]\route.ts:11:/** GET /api/assets/[id] - 에셋 상세 + 상태 */
+src\app\api\assets\[id]\route.ts:21:    // userId는 소유권 판정 전용 — 응답 DTO(toPublicGeneratedAsset)에는 미포함.
+src\app\api\assets\[id]\route.ts:54:    return NextResponse.json(toPublicGeneratedAsset(asset));
+src\app\api\assets\[id]\route.ts:66:/** DELETE /api/assets/[id] - 에셋 삭제 */
+src\features\assets\internal\types.ts:74:export interface GeneratedAssetMetadata {
+src\app\api\assets\[id]\route.test.ts:65:describe("GET /api/assets/[id] — 인증/인가 가드", () => {
+src\app\api\assets\[id]\route.test.ts:105:describe("GET /api/assets/[id] — 응답 allowlist", () => {
+src\app\api\assets\[id]\route.test.ts:180:describe("GET /api/assets/[id] — 에러 처리", () => {
+src\app\api\assets\route.ts:5:/** GET /api/assets - 에셋 목록 (필터링) */
+src\features\space\game\internal\asset-loader.ts:20:export function createLoadableAssets(
+src\features\space\game\internal\asset-loader.ts:122:export async function fetchGeneratedAssets(): Promise<LoadableAsset[]> {
+src\features\space\game\internal\asset-loader.ts:124:    const response = await fetch("/api/assets?status=completed&limit=100");
+src\features\space\game\internal\asset-loader.ts:128:    return createLoadableAssets(data.assets);
+src\features\space\game\index.ts:40:  createLoadableAssets,
+src\features\space\game\index.ts:42:  fetchGeneratedAssets,
+src\app\api\assets\generate\route.ts:14:/** POST /api/assets/generate - 에셋 생성 작업 시작 */
+src\app\api\assets\batch\route.ts:16:/** POST /api/assets/batch - 배치 에셋 생성 */
+src\app\api\assets\batch\route.ts:119:/** GET /api/assets/batch?batchId=xxx - 배치 상태 조회 */
+src\features\space\game\internal\scenes\boot-scene.ts:9:import { fetchGeneratedAssets, loadAssetsInScene } from "../asset-loader";
+src\features\space\game\internal\scenes\boot-scene.ts:70:    fetchGeneratedAssets().then((assets) => {
+src\features\space\game\internal\scenes\main-scene.ts:18:import { createLoadableAssets, loadAssetsInScene } from "../asset-loader";
+src\features\space\game\internal\scenes\main-scene.ts:173:    const loadable = createLoadableAssets([
+rg: features: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: specs: 지정된 파일을 찾을 수 없습니다. (os error 2)
+
+ exited 1 in 603ms:
+src\features\space\avatar\internal\sprite-generator.ts:218:  fetch(`/api/assets/${assetId}`)
+src\lib\route-access.test.ts:28:      expect(isPublicRequest("/api/assets/foo.png")).toBe(false);
+src\components\space\editor\asset-palette.tsx:5:interface CompletedAsset {
+src\components\space\editor\asset-palette.tsx:31:  const [assets, setAssets] = useState<CompletedAsset[]>([]);
+src\components\space\editor\asset-palette.tsx:38:    fetch("/api/assets?status=COMPLETED&limit=100")
+src\components\space\editor\asset-palette.tsx:40:      .then((data: { assets: CompletedAsset[] }) => {
+src\features\assets\internal\processor.ts:36:import type { CreateAssetParams, GeneratedAssetMetadata } from "./types";
+src\features\assets\internal\processor.ts:41:): Promise<GeneratedAssetMetadata> {
+src\features\assets\internal\processor.ts:234:  const metadata: GeneratedAssetMetadata = {
+src\features\assets\internal\processor.ts:275:): Promise<GeneratedAssetMetadata> {
+src\features\assets\internal\game-loader.ts:16:    const res = await fetch(`/api/assets/${assetId}`);
+src\features\assets\index.ts:8:  toPublicGeneratedAsset,
+src\features\assets\index.ts:9:  PUBLIC_METADATA_KEYS,
+src\features\assets\index.ts:44:  GeneratedAssetMetadata,
+src\features\assets\internal\public-asset.ts:6: * `GET /api/assets/[id]`는 게임 런타임 로더(game-loader/sprite-generator)와
+src\features\assets\internal\public-asset.ts:11: * (generate/batch 라우트가 `GeneratedAssetMetadata` 전체를 JSON으로 저장).
+src\features\assets\internal\public-asset.ts:20:export const PUBLIC_METADATA_KEYS = [
+src\features\assets\internal\public-asset.ts:82:  for (const key of PUBLIC_METADATA_KEYS) {
+src\features\assets\internal\public-asset.ts:95:export function toPublicGeneratedAsset(
+src\features\assets\internal\public-asset.test.ts:4:  toPublicGeneratedAsset,
+src\features\assets\internal\public-asset.test.ts:5:  PUBLIC_METADATA_KEYS,
+src\features\assets\internal\public-asset.test.ts:11: * metadata는 generate/batch 라우트가 저장하는 `GeneratedAssetMetadata` 전체 형태로,
+src\features\assets\internal\public-asset.test.ts:67:describe("toPublicGeneratedAsset", () => {
+src\features\assets\internal\public-asset.test.ts:69:    const result = toPublicGeneratedAsset(makeAssetRow());
+src\features\assets\internal\public-asset.test.ts:89:    const result = toPublicGeneratedAsset(makeAssetRow()) as unknown as Record<
+src\features\assets\internal\public-asset.test.ts:100:    const { metadata } = toPublicGeneratedAsset(makeAssetRow());
+src\features\assets\internal\public-asset.test.ts:125:    const { metadata } = toPublicGeneratedAsset(makeAssetRow());
+src\features\assets\internal\public-asset.test.ts:126:    // PUBLIC_METADATA_KEYS를 오라클로 쓰지 않고 리터럴 기대값으로 잠근다 —
+src\features\assets\internal\public-asset.test.ts:145:  it("PUBLIC_METADATA_KEYS 상수 자체가 알려진 민감/내부 키를 포함하지 않는다", () => {
+src\features\assets\internal\public-asset.test.ts:157:    const keys = PUBLIC_METADATA_KEYS as readonly string[];
+src\features\assets\internal\public-asset.test.ts:164:    const result = toPublicGeneratedAsset(
+src\features\assets\internal\public-asset.test.ts:171:    const result = toPublicGeneratedAsset(
+src\features\assets\internal\public-asset.test.ts:185:      toPublicGeneratedAsset(makeAssetRow({ metadata: ["a", "b"] })).metadata
+src\features\assets\internal\public-asset.test.ts:188:      toPublicGeneratedAsset(makeAssetRow({ metadata: "raw string" })).metadata
+src\features\assets\internal\public-asset.test.ts:193:    const result = toPublicGeneratedAsset(makeAssetRow());
+src\app\api\assets\[id]\route.ts:5:import { resolveGeneratedAssetPath, toPublicGeneratedAsset } from "@/features/assets";
+src\app\api\assets\[id]\route.ts:11:/** GET /api/assets/[id] - 에셋 상세 + 상태 */
+src\app\api\assets\[id]\route.ts:21:    // userId는 소유권 판정 전용 — 응답 DTO(toPublicGeneratedAsset)에는 미포함.
+src\app\api\assets\[id]\route.ts:54:    return NextResponse.json(toPublicGeneratedAsset(asset));
+src\app\api\assets\[id]\route.ts:66:/** DELETE /api/assets/[id] - 에셋 삭제 */
+src\features\assets\internal\types.ts:74:export interface GeneratedAssetMetadata {
+src\app\api\assets\[id]\route.test.ts:65:describe("GET /api/assets/[id] — 인증/인가 가드", () => {
+src\app\api\assets\[id]\route.test.ts:105:describe("GET /api/assets/[id] — 응답 allowlist", () => {
+src\app\api\assets\[id]\route.test.ts:180:describe("GET /api/assets/[id] — 에러 처리", () => {
+src\app\api\assets\route.ts:5:/** GET /api/assets - 에셋 목록 (필터링) */
+src\features\space\game\internal\asset-loader.ts:20:export function createLoadableAssets(
+src\features\space\game\internal\asset-loader.ts:122:export async function fetchGeneratedAssets(): Promise<LoadableAsset[]> {
+src\features\space\game\internal\asset-loader.ts:124:    const response = await fetch("/api/assets?status=completed&limit=100");
+src\features\space\game\internal\asset-loader.ts:128:    return createLoadableAssets(data.assets);
+src\features\space\game\index.ts:40:  createLoadableAssets,
+src\features\space\game\index.ts:42:  fetchGeneratedAssets,
+src\app\api\assets\generate\route.ts:14:/** POST /api/assets/generate - 에셋 생성 작업 시작 */
+src\app\api\assets\batch\route.ts:16:/** POST /api/assets/batch - 배치 에셋 생성 */
+src\app\api\assets\batch\route.ts:119:/** GET /api/assets/batch?batchId=xxx - 배치 상태 조회 */
+src\features\space\game\internal\scenes\boot-scene.ts:9:import { fetchGeneratedAssets, loadAssetsInScene } from "../asset-loader";
+src\features\space\game\internal\scenes\boot-scene.ts:70:    fetchGeneratedAssets().then((assets) => {
+src\features\space\game\internal\scenes\main-scene.ts:18:import { createLoadableAssets, loadAssetsInScene } from "../asset-loader";
+src\features\space\game\internal\scenes\main-scene.ts:173:    const loadable = createLoadableAssets([
+rg: features: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: specs: 지정된 파일을 찾을 수 없습니다. (os error 2)
+
+codex
+현재 라우트는 설명과 일치합니다. 한 가지 추가로, 파일 주석 인코딩은 깨져 있지만 로직 판단에는 영향 없습니다. 소비처 타입과 테스트 형태까지 확인해서 “무회귀” 주장의 빈틈을 보겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/features/space/game/internal/asset-loader.ts' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/components/space/editor/asset-palette.tsx' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/app/api/assets/[id]/route.test.ts' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path src/app/api/assets/[id]/route.ts' in C:\Team-jane\FlowSpace
+ succeeded in 205ms:
+/**
+ * Phaser Asset Loader
+ *
+ * AssetRegistry ë©”í??°ì´??ê¸°ë°˜?¼ë¡œ Phaser???ì…‹??ë¡œë”©?©ë‹ˆ??
+ * Game Engine contract: ?ì…‹ ë¡œë”©?€ ë°˜ë“œ??AssetRegistry ë©”í??°ì´???„ìˆ˜
+ */
+
+import { eventBridge, GameEvents } from "../events";
+
+/** ?ì…‹ ë©”í??°ì´??(AssetRegistry ?¸í™˜) */
+export interface LoadableAsset {
+  key: string;
+  type: "spritesheet" | "image" | "tileset";
+  url: string;
+  frameWidth?: number;
+  frameHeight?: number;
+}
+
+/** ?ì…‹ ?ˆì??¤íŠ¸ë¦¬ì—??ë¡œë“œ ê°€?¥í•œ ?ì…‹ ëª©ë¡ ?ì„± */
+export function createLoadableAssets(
+  assets: Array<{
+    id: string;
+    type: string;
+    filePath: string;
+    metadata?: Record<string, unknown>;
+  }>
+): LoadableAsset[] {
+  return assets.map((asset) => {
+    const meta = asset.metadata || {};
+
+    switch (asset.type) {
+      case "CHARACTER":
+        return {
+          key: `character_${asset.id}`,
+          type: "spritesheet" as const,
+          url: asset.filePath,
+          frameWidth: (meta.frameWidth as number) || 64,
+          frameHeight: (meta.frameHeight as number) || 64,
+        };
+
+      case "TILESET":
+        return {
+          key: `tileset_${asset.id}`,
+          type: "image" as const,
+          url: asset.filePath,
+        };
+
+      case "OBJECT":
+        return {
+          key: `object_${asset.id}`,
+          type: "image" as const,
+          url: asset.filePath,
+        };
+
+      case "MAP":
+        return {
+          key: `map_${asset.id}`,
+          type: "image" as const,
+          url: asset.filePath,
+        };
+
+      default:
+        return {
+          key: `asset_${asset.id}`,
+          type: "image" as const,
+          url: asset.filePath,
+        };
+    }
+  });
+}
+
+/**
+ * Phaser ?¬ì—???ì…‹ ë¡œë”© ?¤í–‰
+ *
+ * @param scene - Phaser.Scene (preload?ì„œ ?¸ì¶œ)
+ * @param assets - ë¡œë“œ???ì…‹ ëª©ë¡
+ */
+export function loadAssetsInScene(
+  scene: {
+    load: {
+      spritesheet: (
+        key: string,
+        url: string,
+        config: { frameWidth: number; frameHeight: number }
+      ) => void;
+      image: (key: string, url: string) => void;
+      on: (event: string, callback: (...args: unknown[]) => void) => void;
+    };
+  },
+  assets: LoadableAsset[]
+): void {
+  for (const asset of assets) {
+    try {
+      if (asset.type === "spritesheet" && asset.frameWidth && asset.frameHeight) {
+        scene.load.spritesheet(asset.key, asset.url, {
+          frameWidth: asset.frameWidth,
+          frameHeight: asset.frameHeight,
+        });
+      } else {
+        scene.load.image(asset.key, asset.url);
+      }
+    } catch (error) {
+      eventBridge.emit(GameEvents.ASSET_LOAD_ERROR, {
+        assetKey: asset.key,
+        error: error instanceof Error ? error.message : "Failed to load asset",
+      });
+    }
+  }
+
+  // ë¡œë“œ ?ëŸ¬ ?´ë²¤???°ê²°
+  scene.load.on("loaderror", (...args: unknown[]) => {
+    const file = args[0] as { key: string } | undefined;
+    const key = file?.key ?? "unknown";
+    eventBridge.emit(GameEvents.ASSET_LOAD_ERROR, {
+      assetKey: key,
+      error: `Failed to load: ${key}`,
+    });
+  });
+}
+
+/** API?ì„œ ?ì…‹ ëª©ë¡ ì¡°íšŒ */
+export async function fetchGeneratedAssets(): Promise<LoadableAsset[]> {
+  try {
+    const response = await fetch("/api/assets?status=completed&limit=100");
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    return createLoadableAssets(data.assets);
+  } catch {
+    return [];
+  }
+}
+
+ succeeded in 306ms:
+"use client";
+
+import { useState, useEffect } from "react";
+
+interface CompletedAsset {
+  id: string;
+  type: string;
+  name: string;
+  thumbnailPath: string | null;
+  filePath: string | null;
+}
+
+type AssetFilter = "ALL" | "CHARACTER" | "TILESET" | "OBJECT";
+
+const FILTERS: { key: AssetFilter; label: string }[] = [
+  { key: "ALL", label: "?勳泊" },
+  { key: "CHARACTER", label: "旌愲Ν?? },
+  { key: "TILESET", label: "?€?检厠" },
+  { key: "OBJECT", label: "?る笇?濏姼" },
+];
+
+interface AssetPaletteProps {
+  selectedAssetId: string | null;
+  onSelect: (assetId: string | null, objectType: string) => void;
+}
+
+export default function AssetPalette({
+  selectedAssetId,
+  onSelect,
+}: AssetPaletteProps) {
+  const [assets, setAssets] = useState<CompletedAsset[]>([]);
+  const [filter, setFilter] = useState<AssetFilter>("ALL");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/assets?status=COMPLETED&limit=100")
+      .then((res) => (res.ok ? res.json() : { assets: [] }))
+      .then((data: { assets: CompletedAsset[] }) => {
+        if (!cancelled) {
+          setAssets(data.assets);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered =
+    filter === "ALL" ? assets : assets.filter((a) => a.type === filter);
+
+  return (
+    <div className="space-y-2">
+      {/* Type filter */}
+      <div className="flex flex-wrap gap-1">
+        {FILTERS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+              filter === key
+                ? "bg-emerald-600 text-white"
+                : "bg-cream/10 text-ink-light hover:bg-cream/15"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Asset grid */}
+      {loading ? (
+        <div className="py-4 text-center text-xs text-ink-muted">攵堧煬?る姅 欷?..</div>
+      ) : filtered.length === 0 ? (
+        <div className="py-4 text-center text-xs text-ink-muted">?愳厠 ?嗢潓</div>
+      ) : (
+        <div className="grid max-h-[300px] grid-cols-2 gap-1 overflow-y-auto pr-1">
+          {filtered.map((asset) => (
+            <button
+              key={asset.id}
+              onClick={() => {
+                if (selectedAssetId === asset.id) {
+                  onSelect(null, "");
+                } else {
+                  onSelect(asset.id, `asset_${asset.id}`);
+                }
+              }}
+              className={`flex flex-col items-center justify-center rounded border p-1 transition-colors ${
+                selectedAssetId === asset.id
+                  ? "border-emerald-500 bg-emerald-600/30 text-emerald-300"
+                  : "border-cream/15 bg-ink text-ink-light hover:border-cream/20"
+              }`}
+            >
+              {asset.thumbnailPath ? (
+                <img
+                  src={asset.thumbnailPath}
+                  alt={asset.name}
+                  className="h-8 w-8 object-cover"
+                  style={{ imageRendering: "pixelated" }}
+                />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center text-[10px] text-ink-muted">
+                  ?
+                </div>
+              )}
+              <span className="mt-0.5 w-full truncate text-center text-[9px]">
+                {asset.name}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+2026-06-22T11:57:07.386402Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.3 seconds
+Output:
+Get-Content : 지정한 경로 src/app/api/assets/[id]/route.test.ts에 개체가 없거나 -Include 또는 -Exclude 매개 변수로 필터
+링되었습니다.
+위치 줄:2 문자:1
++ Get-Content -Path src/app/api/assets/[id]/route.test.ts
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+ exited 1 in 341ms:
+Get-Content : 지정한 경로 src/app/api/assets/[id]/route.test.ts에 개체가 없거나 -Include 또는 -Exclude 매개 변수로 필터
+링되었습니다.
+위치 줄:2 문자:1
++ Get-Content -Path src/app/api/assets/[id]/route.test.ts
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+2026-06-22T11:57:07.391932Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.3 seconds
+Output:
+Get-Content : 지정한 경로 src/app/api/assets/[id]/route.ts에 개체가 없거나 -Include 또는 -Exclude 매개 변수로 필터링되
+었습니다.
+위치 줄:2 문자:1
++ Get-Content -Path src/app/api/assets/[id]/route.ts
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+ exited 1 in 346ms:
+Get-Content : 지정한 경로 src/app/api/assets/[id]/route.ts에 개체가 없거나 -Include 또는 -Exclude 매개 변수로 필터링되
+었습니다.
+위치 줄:2 문자:1
++ Get-Content -Path src/app/api/assets/[id]/route.ts
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+codex
+PowerShell의 `[]` 경로 해석 때문에 상세 라우트 파일 읽기가 한 번 실패했습니다. `-LiteralPath`로 다시 읽어 테스트 오라클이 무엇을 고정하는지 확인하겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'src/app/api/assets/[id]/route.test.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'src/app/api/assets/[id]/route.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"generatedAsset\\.findMany|GET /api/assets|assets\\?status|shared=true|prompt\" src -S" in C:\Team-jane\FlowSpace
+ succeeded in 212ms:
+import { NextResponse } from "next/server";
+import { unlink } from "fs/promises";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { resolveGeneratedAssetPath, toPublicGeneratedAsset } from "@/features/assets";
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+/** GET /api/assets/[id] - ?愳厠 ?侅劯 + ?來儨 */
+export async function GET(_request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    // ?戨嫷 allowlist (WI-019): raw row ?€??select搿?瓿店皽 ?勲摐毵?fetch.
+    // userId???岇湢甓??愳爼 ?勳毄 ???戨嫷 DTO(toPublicGeneratedAsset)?愲姅 氙疙彫??
+    // metadata??氙缄皭 ?勲摐(prompt/workflow/comfyuiJobId)臧€ 欷戨车 ?€?ル悩氙€搿?    // DTO?愳劀 瓿店皽 ??allowlist搿??曣窚?旐暅??
+    const asset = await prisma.generatedAsset.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        userId: true,
+        type: true,
+        name: true,
+        status: true,
+        filePath: true,
+        thumbnailPath: true,
+        fileSize: true,
+        isShared: true,
+        metadata: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    if (!asset) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    // ?岇湢甓?瓴€歃?(氤胳澑 ?愲姅 superAdmin毵??戧芳 臧€??
+    if (asset.userId !== session.user.id && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    return NextResponse.json(toPublicGeneratedAsset(asset));
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to fetch asset",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/** DELETE /api/assets/[id] - ?愳厠 ??牅 */
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const asset = await prisma.generatedAsset.findUnique({
+      where: { id },
+    });
+
+    if (asset && asset.userId !== session.user.id && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (!asset) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    // ?岇澕 ?滌姢?滌棎???れ牅 ?岇澕 ??牅 (path traversal 氚╈柎: generated 耄姼 氚?瓴诫??unlink ?ろ偟)
+    if (asset.filePath) {
+      const safePath = resolveGeneratedAssetPath(asset.filePath);
+      if (safePath) {
+        await unlink(safePath).catch(() => {});
+      } else {
+        console.warn(
+          `[assets/DELETE] filePath臧€ generated 瓴疥硠毳?氩楈柎??unlink ?ろ偟: assetId=${asset.id}`
+        );
+      }
+    }
+    if (asset.thumbnailPath) {
+      const safeThumb = resolveGeneratedAssetPath(asset.thumbnailPath);
+      if (safeThumb) {
+        await unlink(safeThumb).catch(() => {});
+      } else {
+        console.warn(
+          `[assets/DELETE] thumbnailPath臧€ generated 瓴疥硠毳?氩楈柎??unlink ?ろ偟: assetId=${asset.id}`
+        );
+      }
+    }
+
+    await prisma.generatedAsset.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ message: "Asset deleted" });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to delete asset",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+ succeeded in 214ms:
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { makeSession, readJson } from "@/__tests__/helpers/api-route";
+
+// ============================================
+// auth()/prisma mock ??vi.hoisted + vi.mock?€ ?Œì¼ ë¡œì»¬ ?¸ì´?¤íŒ…?´ë¼
+// ?¼ìš°??import ?„ì— ???Œì¼?ì„œ ì§ì ‘ ? ì–¸?´ì•¼ ?œë‹¤ (?˜ë‹ˆ?¤ë¡œ ì¤‘ì•™??ë¶ˆê?).
+// ============================================
+const { mockAuth, mockPrisma } = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+  mockPrisma: {
+    generatedAsset: { findUnique: vi.fn() },
+  },
+}));
+
+vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
+vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
+
+import { GET } from "./route";
+
+/** params??Promise ??route ?œê·¸?ˆì²˜??ë§žì¶° ?˜í•‘?œë‹¤. */
+function routeCtx(id: string) {
+  return { params: Promise.resolve({ id }) };
+}
+
+/**
+ * prisma.generatedAsset.findUniqueê°€ ë°˜í™˜?˜ëŠ” select ê²°ê³¼ fixture.
+ * ?‘ë‹µ allowlist ?Œê?ë¥??„í•´ metadata??ë¯¼ê° ?„ë“œ(prompt/workflow/comfyuiJobId)ë¥? * ?˜ë„?ìœ¼ë¡?ì¤‘ë³µ ?€?¥í•œ??(generate/batch ?¼ìš°?¸ì˜ ?¤ì œ ?€???•íƒœ ?¬í˜„).
+ */
+function makeAssetSelectRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "asset-1",
+    userId: "owner-1",
+    type: "CHARACTER",
+    name: "?„ì‚¬",
+    status: "COMPLETED",
+    filePath: "/assets/generated/characters/x.png",
+    thumbnailPath: "/assets/generated/thumbnails/x.png",
+    fileSize: 9999,
+    isShared: false,
+    metadata: {
+      width: 1024,
+      height: 1024,
+      frameWidth: 128,
+      frameHeight: 128,
+      format: "png",
+      prompt: "secret prompt",
+      workflow: "character-default",
+      comfyuiJobId: "comfy-job-xyz",
+      accessSecret: "should-never-leak",
+      batchId: "batch-9",
+    },
+    createdAt: new Date("2026-06-22T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-22T00:01:00.000Z"),
+    user: { id: "owner-1", name: "?ê¸¸?? },
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  mockAuth.mockReset();
+  mockPrisma.generatedAsset.findUnique.mockReset();
+});
+
+describe("GET /api/assets/[id] ???¸ì¦/?¸ê? ê°€??, () => {
+  it("ë¯¸ì¸ì¦ì´ë©?401?´ê³  prismaë¥?ê±´ë“œë¦¬ì? ?ŠëŠ”??, async () => {
+    mockAuth.mockResolvedValue(makeSession(null));
+
+    const res = await GET(new Request("http://localhost"), routeCtx("asset-1"));
+
+    expect(res.status).toBe(401);
+    expect(mockPrisma.generatedAsset.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("?ì‚°???†ìœ¼ë©?404", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
+    mockPrisma.generatedAsset.findUnique.mockResolvedValue(null);
+
+    const res = await GET(new Request("http://localhost"), routeCtx("nope"));
+
+    expect(res.status).toBe(404);
+  });
+
+  it("?€???Œìœ  ?ì‚°???¼ë°˜ ?¬ìš©?ê? ?”ì²­?˜ë©´ 403", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "other-user" }));
+    mockPrisma.generatedAsset.findUnique.mockResolvedValue(makeAssetSelectRow());
+
+    const res = await GET(new Request("http://localhost"), routeCtx("asset-1"));
+
+    expect(res.status).toBe(403);
+  });
+
+  it("superAdmin?€ ?€???Œìœ  ?ì‚°??200?¼ë¡œ ì¡°íšŒ?œë‹¤", async () => {
+    mockAuth.mockResolvedValue(
+      makeSession({ id: "admin-1", isSuperAdmin: true })
+    );
+    mockPrisma.generatedAsset.findUnique.mockResolvedValue(makeAssetSelectRow());
+
+    const res = await GET(new Request("http://localhost"), routeCtx("asset-1"));
+
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("GET /api/assets/[id] ???‘ë‹µ allowlist", () => {
+  beforeEach(() => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
+  });
+
+  it("ë³¸ì¸ ?Œìœ  ?ì‚°?€ ?•í™•??ê³µê°œ ??ì§‘í•©ë§?ë°˜í™˜?œë‹¤", async () => {
+    mockPrisma.generatedAsset.findUnique.mockResolvedValue(makeAssetSelectRow());
+
+    const res = await GET(new Request("http://localhost"), routeCtx("asset-1"));
+    const body = await readJson<Record<string, unknown>>(res);
+
+    expect(res.status).toBe(200);
+    expect(Object.keys(body).sort()).toEqual(
+      [
+        "createdAt",
+        "fileSize",
+        "filePath",
+        "id",
+        "isShared",
+        "metadata",
+        "name",
+        "status",
+        "thumbnailPath",
+        "type",
+        "updatedAt",
+        "user",
+      ].sort()
+    );
+  });
+
+  it("ë¯¼ê°/?´ë? ?„ë“œ(userId/prompt/workflow/comfyuiJobId)ë¥??¸ì¶œ?˜ì? ?ŠëŠ”??, async () => {
+    mockPrisma.generatedAsset.findUnique.mockResolvedValue(makeAssetSelectRow());
+
+    const res = await GET(new Request("http://localhost"), routeCtx("asset-1"));
+    const body = await readJson<Record<string, unknown>>(res);
+
+    expect(body.userId).toBeUndefined();
+    expect(body.prompt).toBeUndefined();
+    expect(body.workflow).toBeUndefined();
+    expect(body.comfyuiJobId).toBeUndefined();
+  });
+
+  it("metadata ?ˆì˜ ë¯¼ê° ?„ë“œ???•ê·œ?”ë¡œ ?œê±°?œë‹¤ (?°íšŒ ?¸ì¶œ ì°¨ë‹¨)", async () => {
+    mockPrisma.generatedAsset.findUnique.mockResolvedValue(makeAssetSelectRow());
+
+    const res = await GET(new Request("http://localhost"), routeCtx("asset-1"));
+    const body = await readJson<{ metadata: Record<string, unknown> }>(res);
+
+    expect(body.metadata.frameWidth).toBe(128);
+    expect(body.metadata.prompt).toBeUndefined();
+    expect(body.metadata.workflow).toBeUndefined();
+    expect(body.metadata.comfyuiJobId).toBeUndefined();
+    expect(body.metadata.accessSecret).toBeUndefined();
+    expect(body.metadata.batchId).toBeUndefined();
+  });
+
+  it("findUnique??includeê°€ ?„ë‹Œ selectë¡??¸ì¶œ?˜ê³  userIdë¥?ê¶Œí•œ?ì •?©ìœ¼ë¡?fetch?œë‹¤", async () => {
+    mockPrisma.generatedAsset.findUnique.mockResolvedValue(makeAssetSelectRow());
+
+    await GET(new Request("http://localhost"), routeCtx("asset-1"));
+
+    const arg = mockPrisma.generatedAsset.findUnique.mock.calls[0][0] as {
+      select?: Record<string, unknown>;
+      include?: unknown;
+    };
+    expect(arg.include).toBeUndefined();
+    expect(arg.select).toBeDefined();
+    expect(arg.select?.userId).toBe(true);
+    // ë¯¼ê° ?„ë“œ??? ì´ˆ??select?˜ì? ?ŠëŠ”??(?¬ì¸µ ë°©ì–´)
+    expect(arg.select?.prompt).toBeUndefined();
+    expect(arg.select?.workflow).toBeUndefined();
+    expect(arg.select?.comfyuiJobId).toBeUndefined();
+  });
+});
+
+describe("GET /api/assets/[id] ???ëŸ¬ ì²˜ë¦¬", () => {
+  it("prisma ?ˆì™¸ ??500 ?´ë°±", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
+    mockPrisma.generatedAsset.findUnique.mockRejectedValue(new Error("db down"));
+
+    const res = await GET(new Request("http://localhost"), routeCtx("asset-1"));
+
+    expect(res.status).toBe(500);
+  });
+});
+
+ succeeded in 249ms:
+src\stores\asset-store.ts:12:  prompt: string;
+src\lib\comfyui\types.ts:75:    if (message.includes("workflow") || message.includes("prompt")) {
+src\lib\comfyui\types.ts:93:/** ComfyUI 워크플로우 (prompt API 형식) */
+src\lib\comfyui\types.ts:98:/** POST /prompt 요청 */
+src\lib\comfyui\types.ts:100:  prompt: ComfyUIWorkflow;
+src\lib\comfyui\types.ts:104:/** POST /prompt 응답 */
+src\lib\comfyui\types.ts:106:  prompt_id: string;
+src\lib\comfyui\types.ts:121:  prompt: [number, string, ComfyUIWorkflow, Record<string, unknown>];
+src\lib\comfyui\types.ts:149:  prompt: string;
+src\lib\comfyui\types.ts:159:  promptId: string;
+src\app\api\assets\route.ts:5:/** GET /api/assets - 에셋 목록 (필터링) */
+src\app\api\assets\route.ts:38:      prisma.generatedAsset.findMany({
+src\app\api\assets\route.ts:47:          prompt: true,
+src\app\api\assets\[id]\route.ts:11:/** GET /api/assets/[id] - 에셋 상세 + 상태 */
+src\app\api\assets\[id]\route.ts:22:    // metadata는 민감 필드(prompt/workflow/comfyuiJobId)가 중복 저장되므로
+src\lib\comfyui\client.ts:18: * POST /prompt - 워크플로우 실행 큐 등록
+src\lib\comfyui\client.ts:110:      const response = await fetch(`${this.baseUrl}/prompt`, {
+src\lib\comfyui\client.ts:113:        body: JSON.stringify({ prompt: workflow }),
+src\lib\comfyui\client.ts:135:  async getHistory(promptId: string): Promise<HistoryEntry | null> {
+src\lib\comfyui\client.ts:138:      return this.mockGetHistory(promptId);
+src\lib\comfyui\client.ts:142:      const response = await fetch(`${this.baseUrl}/history/${promptId}`);
+src\lib\comfyui\client.ts:149:      return data[promptId] || null;
+src\lib\comfyui\client.ts:185:    promptId: string,
+src\lib\comfyui\client.ts:192:      const history = await this.getHistory(promptId);
+src\lib\comfyui\client.ts:201:            `ComfyUI execution failed for prompt ${promptId}: ${errorDetails}`,
+src\lib\comfyui\client.ts:215:      `Timeout waiting for prompt ${promptId}`,
+src\lib\comfyui\client.ts:246:      const history = await this.waitForCompletion(queueResult.prompt_id);
+src\lib\comfyui\client.ts:266:        promptId: queueResult.prompt_id,
+src\lib\comfyui\client.ts:273:        promptId: "",
+src\lib\comfyui\client.ts:328:      prompt_id: `mock-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+src\lib\comfyui\client.ts:333:  private mockGetHistory(promptId: string): HistoryEntry {
+src\lib\comfyui\client.ts:335:      prompt: [1, promptId, {}, {}],
+src\app\api\assets\[id]\route.test.ts:27: * 응답 allowlist 회귀를 위해 metadata에 민감 필드(prompt/workflow/comfyuiJobId)를
+src\app\api\assets\[id]\route.test.ts:47:      prompt: "secret prompt",
+src\app\api\assets\[id]\route.test.ts:65:describe("GET /api/assets/[id] — 인증/인가 가드", () => {
+src\app\api\assets\[id]\route.test.ts:105:describe("GET /api/assets/[id] — 응답 allowlist", () => {
+src\app\api\assets\[id]\route.test.ts:135:  it("민감/내부 필드(userId/prompt/workflow/comfyuiJobId)를 노출하지 않는다", async () => {
+src\app\api\assets\[id]\route.test.ts:142:    expect(body.prompt).toBeUndefined();
+src\app\api\assets\[id]\route.test.ts:154:    expect(body.metadata.prompt).toBeUndefined();
+src\app\api\assets\[id]\route.test.ts:174:    expect(arg.select?.prompt).toBeUndefined();
+src\app\api\assets\[id]\route.test.ts:180:describe("GET /api/assets/[id] — 에러 처리", () => {
+src\app\api\assets\generate\route.ts:25:    if (!body.type || !body.name || !body.prompt) {
+src\app\api\assets\generate\route.ts:27:        { error: "type, name, prompt are required" },
+src\app\api\assets\generate\route.ts:47:        prompt: body.prompt,
+src\app\api\assets\generate\route.ts:57:      prompt: body.prompt,
+src\app\api\assets\batch\route.ts:43:      if (!item.type || !item.name || !item.prompt) continue;
+src\app\api\assets\batch\route.ts:51:          prompt: item.prompt,
+src\app\api\assets\batch\route.ts:64:        prompt: item.prompt,
+src\app\api\assets\batch\route.ts:119:/** GET /api/assets/batch?batchId=xxx - 배치 상태 조회 */
+src\app\api\assets\batch\route.ts:132:    const assets = await prisma.generatedAsset.findMany({
+src\components\space\editor\asset-palette.tsx:38:    fetch("/api/assets?status=COMPLETED&limit=100")
+src\features\assets\internal\public-asset.test.ts:12: * 민감 필드(prompt/workflow/comfyuiJobId)가 top-level과 중복 저장됨을 재현한다.
+src\features\assets\internal\public-asset.test.ts:30:    prompt: "secret generation prompt",
+src\features\assets\internal\public-asset.test.ts:88:  it("top-level 민감/내부 필드(prompt/workflow/comfyuiJobId/userId)를 노출하지 않는다", () => {
+src\features\assets\internal\public-asset.test.ts:93:    expect(result.prompt).toBeUndefined();
+src\features\assets\internal\public-asset.test.ts:112:    expect(meta.prompt).toBeUndefined();
+src\features\assets\internal\public-asset.test.ts:147:      "prompt",
+src\features\assets\internal\public-asset.ts:6: * `GET /api/assets/[id]`는 게임 런타임 로더(game-loader/sprite-generator)와
+src\features\assets\internal\public-asset.ts:8: * 내부/민감 필드(prompt·workflow·comfyuiJobId)가 외부로 새 나간다.
+src\features\assets\internal\public-asset.ts:17: * 제외: prompt·workflow·comfyuiJobId(민감), id·type·name·status·filePath·
+src\features\assets\internal\processor.ts:75:    prompt: buildPrompt(params.type, params.prompt, params.seamless),
+src\features\assets\internal\processor.ts:76:    negative_prompt:
+src\features\assets\internal\processor.ts:120:        prompt: params.prompt,
+src\features\assets\internal\processor.ts:235:    id: result.promptId,
+src\features\assets\internal\processor.ts:238:    prompt: params.prompt,
+src\features\assets\internal\processor.ts:250:    comfyuiJobId: result.promptId,
+src\features\assets\internal\processor.ts:310:    const refPrompt = buildChibiPrompt("down", params.prompt);
+src\features\assets\internal\processor.ts:312:      prompt: refPrompt,
+src\features\assets\internal\processor.ts:313:      negative_prompt: params.negativePrompt || CHIBI_NEGATIVE_PROMPT,
+src\features\assets\internal\processor.ts:344:          prompt: params.prompt,
+src\features\assets\internal\processor.ts:436:    const prompt = buildChibiPrompt(direction, params.prompt);
+src\features\assets\internal\processor.ts:438:      prompt,
+src\features\assets\internal\processor.ts:439:      negative_prompt: params.negativePrompt || CHIBI_NEGATIVE_PROMPT,
+src\features\assets\internal\processor.ts:488:          prompt: params.prompt,
+src\features\assets\internal\processor.ts:644:    prompt: params.prompt,
+src\features\assets\internal\types.ts:18:  prompt: string;
+src\features\assets\internal\types.ts:78:  prompt: string;
+src\features\space\game\internal\asset-loader.ts:124:    const response = await fetch("/api/assets?status=completed&limit=100");
+src\features\space\game\events\types.ts:128:  prompt: string;
+
+codex
+소비처 전수 결과는 제시한 두 곳이 맞아 보입니다. 다만 `createLoadableAssets`의 입력 타입은 `filePath: string`인데 팔레트 쪽은 `filePath: string | null`이고 DB도 nullable이라, prompt 제거와 별개인 잠재 런타임 위험이 하나 보입니다.
+codex
+확인 결과, 잠정 결론 **안 A에 동의**합니다. WI-021의 목적이 “목록 응답 누출 차단”이면 `prompt` 제거 + 목록 전용 allowlist DTO가 맞습니다. `toPublicGeneratedAsset` 재사용은 보안 수정으로 포장된 응답 확장입니다. 특히 `shared=true`에서 타인 `user.id/name`, `metadata.seed/generatedAt`, 실제 `frameWidth`까지 새로 노출되고, 게임 로더 동작도 64 폴백에서 실측 프레임으로 바뀝니다. 이건 별도 제품/렌더링 변경으로 다뤄야 합니다.
+
+제3안인 “lean DTO + metadata 일부 포함”은 지금 WI에는 반대합니다. 정말 필요하면 `metadata` 전체 allowlist가 아니라 `frameWidth/frameHeight`만 담는 별도 `loadMetadata` 같은 좁은 계약으로, 소비처 테스트까지 포함해 별 WI로 하는 게 낫습니다. 현재는 scope creep입니다.
+
+`shared=true` 필드 경계는 owner 목록보다 더 타이트해야 합니다. 공유 자산은 “사용 가능”이 핵심이지 “누가 언제 어떤 seed로 만들었는지”가 핵심이 아닙니다. `user:{id,name}`은 목록에서는 빼는 쪽에 찬성합니다. 나중에 attribution이 제품 요구가 되면 `creatorName` 정도를 명시적으로 추가하고, 내부 user id는 피하는 게 낫습니다. metadata도 shared 목록에는 기본 비노출이 맞습니다. 동일 DTO 통일은 편하지만, 권한 경계가 다른 두 목록을 같은 응답으로 묶으면 앞으로 누출 회귀가 쉬워집니다.
+
+`prompt` 제거 자체는 두 라이브 소비처 기준 무회귀로 보입니다. `asset-loader.ts`는 `id/type/filePath/metadata?.frameWidth/frameHeight`, `asset-palette.tsx`는 `id/type/name/thumbnailPath/filePath`만 씁니다. 다만 목록 응답에 metadata가 없어서 현재 로더는 항상 64를 쓰고 있다는 점이 “현 동작”입니다. 이걸 고치는 순간 렌더링 변경입니다.
+
+선재 결함은 분리하는 게 맞습니다. `type.toUpperCase()`/`status.toUpperCase()` enum 무검증, `page/limit` 무상한, offset pagination은 실제 결함이지만 WI-021의 누출 차단과 섞으면 검토 범위가 흐려집니다. 단, `limit` 무상한은 응답 확장과 결합될 때 데이터 대량 노출 면적을 키우므로 별 WI 우선순위는 높게 잡아야 합니다.
+
+테스트는 WI-019 패턴을 미러링하면 충분합니다. 목록 route test에서 `findMany.select`가 정확히 lean key만 포함하고 `prompt/workflow/comfyuiJobId/metadata/user/userId`가 없음을 단언해야 합니다. 응답도 `assets[0]` exact-key-set으로 잠그고, `shared=true` 요청에서 타인 fixture를 반환해도 동일하게 민감/소유자 정보가 빠지는지 확인해야 합니다.
+
+놓친 위험 1가지는 `filePath`입니다. 지금 논의는 prompt 중심인데, `shared=true`는 타인 asset의 `filePath`를 누구에게나 돌려줍니다. 의도된 공유라 해도 `filePath`가 내부 저장 구조, 예측 가능한 경로, 원본 파일 접근 범위를 드러내는 계약입니다. 이미 공개 API로 쓰는 필드라 제거는 어렵지만, 최소한 generated 디렉터리 밖 경로나 서명 없는 민감 파일 경로가 저장될 수 없는지 별도로 검증해야 합니다.
+tokens used
+17,543

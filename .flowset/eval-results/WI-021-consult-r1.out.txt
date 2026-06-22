@@ -1,0 +1,13 @@
+확인 결과, 잠정 결론 **안 A에 동의**합니다. WI-021의 목적이 “목록 응답 누출 차단”이면 `prompt` 제거 + 목록 전용 allowlist DTO가 맞습니다. `toPublicGeneratedAsset` 재사용은 보안 수정으로 포장된 응답 확장입니다. 특히 `shared=true`에서 타인 `user.id/name`, `metadata.seed/generatedAt`, 실제 `frameWidth`까지 새로 노출되고, 게임 로더 동작도 64 폴백에서 실측 프레임으로 바뀝니다. 이건 별도 제품/렌더링 변경으로 다뤄야 합니다.
+
+제3안인 “lean DTO + metadata 일부 포함”은 지금 WI에는 반대합니다. 정말 필요하면 `metadata` 전체 allowlist가 아니라 `frameWidth/frameHeight`만 담는 별도 `loadMetadata` 같은 좁은 계약으로, 소비처 테스트까지 포함해 별 WI로 하는 게 낫습니다. 현재는 scope creep입니다.
+
+`shared=true` 필드 경계는 owner 목록보다 더 타이트해야 합니다. 공유 자산은 “사용 가능”이 핵심이지 “누가 언제 어떤 seed로 만들었는지”가 핵심이 아닙니다. `user:{id,name}`은 목록에서는 빼는 쪽에 찬성합니다. 나중에 attribution이 제품 요구가 되면 `creatorName` 정도를 명시적으로 추가하고, 내부 user id는 피하는 게 낫습니다. metadata도 shared 목록에는 기본 비노출이 맞습니다. 동일 DTO 통일은 편하지만, 권한 경계가 다른 두 목록을 같은 응답으로 묶으면 앞으로 누출 회귀가 쉬워집니다.
+
+`prompt` 제거 자체는 두 라이브 소비처 기준 무회귀로 보입니다. `asset-loader.ts`는 `id/type/filePath/metadata?.frameWidth/frameHeight`, `asset-palette.tsx`는 `id/type/name/thumbnailPath/filePath`만 씁니다. 다만 목록 응답에 metadata가 없어서 현재 로더는 항상 64를 쓰고 있다는 점이 “현 동작”입니다. 이걸 고치는 순간 렌더링 변경입니다.
+
+선재 결함은 분리하는 게 맞습니다. `type.toUpperCase()`/`status.toUpperCase()` enum 무검증, `page/limit` 무상한, offset pagination은 실제 결함이지만 WI-021의 누출 차단과 섞으면 검토 범위가 흐려집니다. 단, `limit` 무상한은 응답 확장과 결합될 때 데이터 대량 노출 면적을 키우므로 별 WI 우선순위는 높게 잡아야 합니다.
+
+테스트는 WI-019 패턴을 미러링하면 충분합니다. 목록 route test에서 `findMany.select`가 정확히 lean key만 포함하고 `prompt/workflow/comfyuiJobId/metadata/user/userId`가 없음을 단언해야 합니다. 응답도 `assets[0]` exact-key-set으로 잠그고, `shared=true` 요청에서 타인 fixture를 반환해도 동일하게 민감/소유자 정보가 빠지는지 확인해야 합니다.
+
+놓친 위험 1가지는 `filePath`입니다. 지금 논의는 prompt 중심인데, `shared=true`는 타인 asset의 `filePath`를 누구에게나 돌려줍니다. 의도된 공유라 해도 `filePath`가 내부 저장 구조, 예측 가능한 경로, 원본 파일 접근 범위를 드러내는 계약입니다. 이미 공개 API로 쓰는 필드라 제거는 어렵지만, 최소한 generated 디렉터리 밖 경로나 서명 없는 민감 파일 경로가 저장될 수 없는지 별도로 검증해야 합니다.
