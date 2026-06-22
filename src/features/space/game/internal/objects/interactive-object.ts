@@ -80,6 +80,10 @@ export class InteractiveObject {
   /** 리소스 정리 */
   destroy(): void {
     this.glowTween?.destroy();
+    // 떠다니는 indicator tween(repeat:-1)은 ref를 보관하지 않아 hideIndicator의
+    // killTweensOf에만 의존한다. object-manager가 setNearby(false) 없이 destroy()를
+    // 직접 호출하면 무한 tween이 파괴된 indicator를 영구 갱신하므로 명시적으로 정리한다.
+    this.scene.tweens.killTweensOf(this.indicator);
     this.graphics.destroy();
     this.indicator.destroy();
   }

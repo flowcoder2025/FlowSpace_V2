@@ -43,10 +43,7 @@ function makeSceneStub() {
       text: vi.fn(() => makeGameObjectStub()),
       ellipse: vi.fn(() => makeGameObjectStub()),
     },
-    tweens: {
-      add: vi.fn((_config: Record<string, unknown>) => ({}) as Record<string, unknown>),
-      killTweensOf: vi.fn(),
-    },
+    tweens: { add: vi.fn(), killTweensOf: vi.fn() },
     anims: {
       exists: vi.fn(() => true),
       create: vi.fn(),
