@@ -3,6 +3,7 @@ import { AssetType, AssetStatus } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parsePageLimit, parsePageNumber } from "@/lib/pagination";
+import { normalizeEnumFilter } from "@/lib/query-filter";
 import { internalErrorResponse } from "@/lib/api-error";
 import { toPublicAssetListItem } from "@/features/assets";
 
@@ -11,29 +12,10 @@ const ASSETS_DEFAULT_LIMIT = 20;
 /**
  * 필터 enum allowlist — Prisma 런타임 enum에서 도출(하드코딩 배열 회피, enum
  * 추가 시 자동 동기화). 값은 모두 대문자라 입력을 정규화(trim+대문자)한 뒤 검증한다.
+ * (`normalizeEnumFilter`는 WI-030에서 `@/lib/query-filter`로 공용 추출)
  */
 const ASSET_TYPE_VALUES = new Set<string>(Object.values(AssetType));
 const ASSET_STATUS_VALUES = new Set<string>(Object.values(AssetStatus));
-
-/**
- * 쿼리 enum 필터를 정규화(trim+대문자)·검증한다.
- * 중복 파라미터(`?type=a&type=b`)의 검증 우회를 막기 위해 `getAll()`로 받은
- * **모든 값**을 검사한다 (`get()`은 첫 값만 봐 invalid 2번째 값이 숨는다).
- * - 빈 배열/공백-only만 → undefined (필터 미적용; trim 후 비면 "미지정"과 동일)
- * - 하나라도 allowlist 불일치 → null (호출부가 400 INVALID_FILTER로 처리)
- * - 전부 유효 → 첫 값(Prisma scalar equality)으로 필터
- */
-function normalizeEnumFilter(
-  values: string[],
-  allowed: Set<string>
-): string | undefined | null {
-  const normalized = values
-    .map((v) => v.trim().toUpperCase())
-    .filter((v) => v.length > 0);
-  if (normalized.length === 0) return undefined;
-  if (normalized.some((v) => !allowed.has(v))) return null;
-  return normalized[0];
-}
 
 /** GET /api/assets - 에셋 목록 (필터링) */
 export async function GET(request: NextRequest) {

@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import { SpaceEventType } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
+import { normalizeEnumFilter, parseDateRangeFilter } from "@/lib/query-filter";
 import { internalErrorResponse } from "@/lib/api-error";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
+
+/** 이벤트 타입 필터 allowlist (Prisma 런타임 enum) */
+const EVENT_TYPE_VALUES = new Set<string>(Object.values(SpaceEventType));
 
 export async function GET(request: Request, { params }: RouteParams) {
   try {
@@ -29,11 +36,28 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const { searchParams } = new URL(request.url);
     const cursor = searchParams.get("cursor");
-    const eventType = searchParams.get("eventType");
-    const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
+    const limit = parsePageLimit(searchParams.get("limit"));
 
-    const where: Record<string, unknown> = { spaceId };
-    if (eventType) where.eventType = eventType;
+    // 고급 필터(WI-030): eventType enum(기존 미검증→전수 검증 보강) + 날짜 범위.
+    // 잘못된 값은 400(무시 시 의도보다 넓은 결과 노출). where가 cursor보다 우선 적용.
+    const eventType = normalizeEnumFilter(
+      searchParams.getAll("eventType"),
+      EVENT_TYPE_VALUES
+    );
+    const dateRange = parseDateRangeFilter(
+      searchParams.get("startDate"),
+      searchParams.get("endDate")
+    );
+    if (eventType === null || dateRange === "invalid") {
+      return NextResponse.json(
+        { error: "Invalid filter", code: "INVALID_FILTER" },
+        { status: 400 }
+      );
+    }
+
+    const where: Prisma.SpaceEventLogWhereInput = { spaceId };
+    if (eventType) where.eventType = eventType as SpaceEventType;
+    if (dateRange) where.createdAt = dateRange;
 
     const logs = await prisma.spaceEventLog.findMany({
       where,
@@ -45,9 +69,8 @@ export async function GET(request: Request, { params }: RouteParams) {
       },
     });
 
-    const hasMore = logs.length > limit;
-    const items = hasMore ? logs.slice(0, limit) : logs;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
+    // 응답 계약 보존: { logs, nextCursor }만 반환(buildCursorPage로 messages와 통일).
+    const { items, nextCursor } = buildCursorPage(logs, limit);
 
     return NextResponse.json({ logs: items, nextCursor });
   } catch (error) {
