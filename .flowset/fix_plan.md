@@ -5,7 +5,7 @@
 > 초기 시드 = 2026-06-19 듀얼 블라인드 검증(codex CLI + Claude) 확정 결함.
 
 ## Active WI
-- **WI-023-fix (500 응답 details 정보 노출 일괄 제거, CWE-209) — VERIFY 통과·develop PR 대기**(2026-06-22). 듀얼 블라인드 1R 수렴 **codex PASS 0 issues·evaluator 9.85**(P0/P1 0, P3×2 defer). impl `d352c45`. 26파일 37곳 중앙 헬퍼 일괄. `.pass` 생성. **다음**: develop PR 머지 → current.json/HANDOFF 갱신. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-024(assets metadata.error 누출)/WI-025(offset 상한). **WI-019/021/022/023 develop만 반영 — main 미승격**(승격은 사용자 승인 게이트).
+- (없음) — **✅ WI-023-fix (500 응답 details 정보 노출 일괄 제거, CWE-209) develop 머지 완료(2026-06-22, PR#25 merge `b788009`)**. 듀얼 블라인드 1R 수렴 **codex PASS 0 issues·evaluator 9.85**(P0/P1 0, P3×2 defer). 26파일 37곳 중앙 헬퍼 일괄. impl `d352c45`. READY 큐 비어 있음. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-024(assets metadata.error 누출)/WI-025(offset 상한). **WI-019/021/022/023 develop만 반영 — main 미승격**(승격은 사용자 승인 게이트).
 - (이전) **✅ develop→main 승격 완료(2026-06-22, PR#18 rebase)** + V1→V2 컷오버 e2e 검증. WI-001~016+020 라이브(Vercel ● Ready + prod DB migrate deploy 적용). **남은 운영작업: OCI 소켓 신코드 수동 SSH 배포(사용자 전용)** + SOCKET_INTERNAL_* prod env.
 
 ## Queue (2026-06-22 승격前 통합감사 발굴 — codex consult + 9축 멀티에이전트 감사 + 적대검증)
