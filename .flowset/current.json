@@ -2,11 +2,11 @@
   "activeWI": null,
   "lastWI": "WI-021-fix",
   "type": null,
-  "status": "WI_021_VERIFIED_PR_PENDING",
+  "status": "WI_021_MERGED_DEVELOP",
   "integrationBranch": "develop",
-  "branch": "fix/WI-021-fix-assets-list-response-allowlist",
+  "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "5cd3f85",
-  "note": "✅ WI-021-fix(assets 목록 GET /api/assets 응답 lean DTO 정형화) 검증 완료·develop PR 대기(2026-06-22, impl 5cd3f85). select의 prompt 제거 + 신규 lean DTO toPublicAssetListItem(8키: id/type/name/status/filePath/thumbnailPath/createdAt/updatedAt). 핵심: shared=true 분기는 owner 게이트 없이 타인 공유자산 반환 → 상세용 toPublicGeneratedAsset 재사용 회피(재사용 시 metadata→game-loader frameWidth 동작 변경 + shared 분기 타인 user 신규 노출 부작용, 설계 codex consult 적출). prompt/workflow/comfyuiJobId(민감)·metadata·user·userId를 select(쿼리단)+transform(응답단) 이중 제외. 설계 codex consult 1R + 듀얼 블라인드 1R 수렴: codex PASS 0 issues · evaluator WARNING 9.81(P0/P1 0, P3x3 defer: enum 무검증·limit 무상한[둘 다 선재→WI-022]·중복 인터페이스 nit, 변이검증 2종 실증). 기계게이트 4/4(tsc0/lint0[선재 LiveKit 경고1·WI무관]/vitest 204·204[+12]/build0). .pass fingerprint d8a1b53f. main 미승격(라이브 미반영, 승격은 사용자 승인 게이트). === 직전: WI-019-fix(assets 상세 GET allowlist) develop 머지(PR#22 221f8df). BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-022(assets 목록 입력 강건화 — enum 검증+limit 상한, WI-021서 발굴). === V1→V2 컷오버 완료·e2e 검증 + WI-020(로그인 로고) 라이브. **남은(사용자 게이트·비코드)**: ①V1 폐기(quarantine·2026-07-06경+공유자원 감사 후) ②WI-005 실시간제재 SOCKET_INTERNAL_* 설정 ③V2 AUTH_SECRET rotation 검토 ④WI-013 prod EXPLAIN."
+  "lastVerifiedCommit": "13c3b55",
+  "note": "✅ WI-021-fix(assets 목록 GET /api/assets 응답 lean DTO 정형화) develop 머지 완료(2026-06-22, PR#23 merge 13c3b55, impl 5cd3f85). select의 prompt 제거 + 신규 lean DTO toPublicAssetListItem(8키: id/type/name/status/filePath/thumbnailPath/createdAt/updatedAt). 핵심: shared=true 분기는 owner 게이트 없이 타인 공유자산 반환 → 상세용 toPublicGeneratedAsset 재사용 회피(재사용 시 metadata→game-loader frameWidth 동작 변경 + shared 분기 타인 user 신규 노출 부작용, 설계 codex consult 적출). prompt/workflow/comfyuiJobId(민감)·metadata·user·userId를 select(쿼리단)+transform(응답단) 이중 제외. 설계 codex consult 1R + 듀얼 블라인드 1R 수렴: codex PASS 0 issues · evaluator WARNING 9.81(P0/P1 0, P3x3 defer: enum 무검증·limit 무상한[둘 다 선재→WI-022]·중복 인터페이스 nit, 변이검증 2종 실증). 기계게이트 4/4(tsc0/lint0[선재 LiveKit 경고1·WI무관]/vitest 204·204[+12]/build0). .pass fingerprint d8a1b53f. main 미승격(라이브 미반영, 승격은 사용자 승인 게이트). === 직전: WI-019-fix(assets 상세 GET allowlist) develop 머지(PR#22 221f8df). BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-022(assets 목록 입력 강건화 — enum 검증+limit 상한, WI-021서 발굴). === V1→V2 컷오버 완료·e2e 검증 + WI-020(로그인 로고) 라이브. **남은(사용자 게이트·비코드)**: ①V1 폐기(quarantine·2026-07-06경+공유자원 감사 후) ②WI-005 실시간제재 SOCKET_INTERNAL_* 설정 ③V2 AUTH_SECRET rotation 검토 ④WI-013 prod EXPLAIN."
 }
