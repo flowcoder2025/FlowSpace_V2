@@ -239,6 +239,113 @@ describe("GET /api/assets — 필터/페이지네이션 전달", () => {
   });
 });
 
+describe("GET /api/assets — 입력 검증 (WI-022)", () => {
+  beforeEach(() => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
+    mockPrisma.generatedAsset.findMany.mockResolvedValue([]);
+    mockPrisma.generatedAsset.count.mockResolvedValue(0);
+  });
+
+  it("잘못된 type → 400 INVALID_FILTER, prisma 미접근", async () => {
+    const res = await GET(buildGetRequest("/api/assets", { type: "weapon" }));
+    const body = await readJson<{ error: string; code: string }>(res);
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe("INVALID_FILTER");
+    expect(mockPrisma.generatedAsset.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.generatedAsset.count).not.toHaveBeenCalled();
+  });
+
+  it("잘못된 status → 400 INVALID_FILTER, prisma 미접근", async () => {
+    const res = await GET(buildGetRequest("/api/assets", { status: "compelted" }));
+    const body = await readJson<{ code: string }>(res);
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe("INVALID_FILTER");
+    expect(mockPrisma.generatedAsset.findMany).not.toHaveBeenCalled();
+  });
+
+  it("소문자 status=completed는 정상 통과한다 (asset-loader 소비처 무회귀)", async () => {
+    const res = await GET(buildGetRequest("/api/assets", { status: "completed" }));
+
+    expect(res.status).toBe(200);
+    const arg = mockPrisma.generatedAsset.findMany.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(arg.where.status).toBe("COMPLETED");
+  });
+
+  it("모든 AssetType enum 값을 허용한다", async () => {
+    for (const t of ["character", "tileset", "object", "map"]) {
+      mockPrisma.generatedAsset.findMany.mockClear();
+      const res = await GET(buildGetRequest("/api/assets", { type: t }));
+      expect(res.status).toBe(200);
+      const arg = mockPrisma.generatedAsset.findMany.mock.calls[0][0] as {
+        where: Record<string, unknown>;
+      };
+      expect(arg.where.type).toBe(t.toUpperCase());
+    }
+  });
+
+  it("앞뒤 공백을 trim 후 검증한다", async () => {
+    const res = await GET(
+      buildGetRequest("/api/assets", { type: "  character  " })
+    );
+
+    expect(res.status).toBe(200);
+    const arg = mockPrisma.generatedAsset.findMany.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(arg.where.type).toBe("CHARACTER");
+  });
+
+  it("limit 미지정 → take 20 (기존 default 보존)", async () => {
+    await GET(buildGetRequest("/api/assets"));
+
+    const arg = mockPrisma.generatedAsset.findMany.mock.calls[0][0] as {
+      take: number;
+    };
+    expect(arg.take).toBe(20);
+  });
+
+  it("과대 limit → 100으로 cap", async () => {
+    await GET(buildGetRequest("/api/assets", { limit: "100000" }));
+
+    const arg = mockPrisma.generatedAsset.findMany.mock.calls[0][0] as {
+      take: number;
+    };
+    expect(arg.take).toBe(100);
+  });
+
+  it("비정수 limit → 20으로 정규화", async () => {
+    await GET(buildGetRequest("/api/assets", { limit: "abc" }));
+
+    const arg = mockPrisma.generatedAsset.findMany.mock.calls[0][0] as {
+      take: number;
+    };
+    expect(arg.take).toBe(20);
+  });
+
+  it("page=0/음수/비정수 → 1로 클램프, skip은 음수가 되지 않는다", async () => {
+    for (const p of ["0", "-5", "abc"]) {
+      mockPrisma.generatedAsset.findMany.mockClear();
+      await GET(buildGetRequest("/api/assets", { page: p, limit: "10" }));
+
+      const arg = mockPrisma.generatedAsset.findMany.mock.calls[0][0] as {
+        skip: number;
+      };
+      expect(arg.skip).toBe(0);
+    }
+  });
+
+  it("응답 pagination.page는 정규화된 page를 반영한다", async () => {
+    const res = await GET(buildGetRequest("/api/assets", { page: "-3" }));
+    const body = await readJson<{ pagination: { page: number } }>(res);
+
+    expect(body.pagination.page).toBe(1);
+  });
+});
+
 describe("GET /api/assets — 에러 처리", () => {
   it("prisma 예외 시 500 폴백", async () => {
     mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
