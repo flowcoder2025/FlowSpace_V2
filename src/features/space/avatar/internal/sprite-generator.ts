@@ -10,7 +10,7 @@ import { PLAYER_WIDTH, PLAYER_HEIGHT, SPRITE_COLS, SPRITE_ROWS } from "@/constan
 import type { AvatarConfig, ClassicAvatarConfig } from "./avatar-types";
 import { getTextureKey, DEFAULT_PARTS_AVATAR } from "./avatar-config";
 import { generatePartsSprite } from "./parts/parts-compositor";
-import { eventBridge, GameEvents } from "../../game/events";
+import { eventBridge, GameEvents } from "@/features/space/game";
 
 const SHEET_WIDTH = PLAYER_WIDTH * SPRITE_COLS;
 const SHEET_HEIGHT = PLAYER_HEIGHT * SPRITE_ROWS;
