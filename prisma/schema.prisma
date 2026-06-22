@@ -152,7 +152,9 @@ model Space {
 
   @@index([ownerId])
   @@index([inviteCode])
-  @@index([status])
+  // GET /api/spaces 핫 쿼리(WI-013): where status=ACTIVE + orderBy [updatedAt desc, id desc] + cursor.
+  // 복합 인덱스 선두 컬럼이 status라 기존 단일 @@index([status])를 대체(중복 제거).
+  @@index([status, updatedAt(sort: Desc), id(sort: Desc)])
 }
 
 enum SpaceAccessType {
