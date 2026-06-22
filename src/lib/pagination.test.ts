@@ -3,6 +3,7 @@ import {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
   parsePageLimit,
+  parsePageNumber,
   buildCursorPage,
 } from "./pagination";
 
@@ -33,6 +34,61 @@ describe("parsePageLimit", () => {
     expect(parsePageLimit("NaN")).toBe(DEFAULT_PAGE_LIMIT);
     // parseInt("12.9") === 12 (소수점 절삭은 JS parseInt 동작 — 허용)
     expect(parsePageLimit("12.9")).toBe(12);
+  });
+
+  // WI-022: 라우트별 기본 페이지 크기 보존을 위한 optional defaultLimit
+  describe("defaultLimit 인자 (WI-022)", () => {
+    it("null/빈값/이상치 → 전달한 defaultLimit", () => {
+      expect(parsePageLimit(null, 20)).toBe(20);
+      expect(parsePageLimit("", 20)).toBe(20);
+      expect(parsePageLimit("0", 20)).toBe(20);
+      expect(parsePageLimit("-5", 20)).toBe(20);
+      expect(parsePageLimit("abc", 20)).toBe(20);
+    });
+
+    it("유효 정수는 defaultLimit과 무관하게 그대로", () => {
+      expect(parsePageLimit("10", 20)).toBe(10);
+      expect(parsePageLimit("75", 20)).toBe(75);
+    });
+
+    it("MAX cap은 defaultLimit과 무관하게 적용", () => {
+      expect(parsePageLimit("100000", 20)).toBe(MAX_PAGE_LIMIT);
+    });
+
+    it("인자 미지정 시 DEFAULT_PAGE_LIMIT (기존 호출부 무영향)", () => {
+      expect(parsePageLimit(null)).toBe(DEFAULT_PAGE_LIMIT);
+    });
+  });
+});
+
+describe("parsePageNumber (WI-022)", () => {
+  it("null/빈값 → 1", () => {
+    expect(parsePageNumber(null)).toBe(1);
+    expect(parsePageNumber("")).toBe(1);
+  });
+
+  it("정상 양의 정수 → 그대로", () => {
+    expect(parsePageNumber("1")).toBe(1);
+    expect(parsePageNumber("2")).toBe(2);
+    expect(parsePageNumber("999")).toBe(999);
+  });
+
+  it("0/음수 → 1 (음수 skip 방지)", () => {
+    expect(parsePageNumber("0")).toBe(1);
+    expect(parsePageNumber("-5")).toBe(1);
+  });
+
+  it("비정수/NaN 유발 입력 → 1", () => {
+    expect(parsePageNumber("abc")).toBe(1);
+    expect(parsePageNumber("NaN")).toBe(1);
+  });
+
+  it("상한 없음 (offset 범위는 데이터 크기에 의존)", () => {
+    expect(parsePageNumber("100000")).toBe(100000);
+  });
+
+  it("소수점 절삭은 parsePageLimit과 동일 시맨틱 (parseInt 일관성)", () => {
+    expect(parsePageNumber("2.9")).toBe(2);
   });
 });
 
