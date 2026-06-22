@@ -17,7 +17,6 @@ import { RemotePlayerSprite } from "./remote-player-sprite";
 
 interface FakeTween {
   config: Record<string, unknown>;
-  remove: ReturnType<typeof vi.fn>;
 }
 
 function makeGameObjectStub() {
@@ -30,7 +29,6 @@ function makeGameObjectStub() {
     setTexture: vi.fn(() => go),
     setFrame: vi.fn(() => go),
     setPosition: vi.fn(() => go),
-    setText: vi.fn(() => go),
     destroy: vi.fn(),
     anims: { play: vi.fn(), stop: vi.fn() },
   };
@@ -46,7 +44,7 @@ function makeSceneStub() {
     },
     tweens: {
       add: vi.fn((config: Record<string, unknown>) => {
-        const t: FakeTween = { config, remove: vi.fn() };
+        const t: FakeTween = { config };
         tweens.push(t);
         return t;
       }),
@@ -64,43 +62,55 @@ function makeSceneStub() {
 
 const INFO = { userId: "u1", nickname: "닉", avatar: "a", x: 10, y: 20, direction: "down" };
 
-describe("RemotePlayerSprite — jump tween 생명주기 (WI-015)", () => {
+describe("RemotePlayerSprite — tween 생명주기 정리 (WI-015)", () => {
   let sceneStub: ReturnType<typeof makeSceneStub>;
 
   beforeEach(() => {
     sceneStub = makeSceneStub();
   });
 
-  it("jump()은 인스턴스(this)를 targets로 하는 tween을 생성한다", () => {
+  it("jump()은 인스턴스(this)를 targets로 하는 tween을 만든다 (GameObject 아님 → Phaser 자동정리 대상 아님)", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rp = new RemotePlayerSprite(sceneStub.scene as any, INFO);
     rp.jump();
 
     const jumpTween = sceneStub.tweens.find((t) => "jumpOffsetY" in t.config);
     expect(jumpTween).toBeDefined();
-    // jump tween의 targets는 GameObject가 아닌 RemotePlayerSprite 인스턴스 → Phaser 자동정리 대상 아님
     expect(jumpTween!.config.targets).toBe(rp);
   });
 
-  it("destroy()는 jump tween을 명시적으로 제거하고 killTweensOf(this)를 호출한다 (stale tween 누수 차단)", () => {
+  it("destroy()는 this·sprite·nameText의 tween을 모두 killTweensOf로 정리한다", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rp = new RemotePlayerSprite(sceneStub.scene as any, INFO);
-    rp.jump();
-    const jumpTween = sceneStub.tweens.find((t) => "jumpOffsetY" in t.config)!;
+    const sprite = sceneStub.scene.add.sprite.mock.results[0].value;
+    const nameText = sceneStub.scene.add.text.mock.results[0].value;
+    rp.jump(); // this-target tween
+    rp.moveTo(99, 99, "left"); // sprite/nameText-target tween
 
     rp.destroy();
 
-    // 변이검증: destroy에서 tween 정리가 빠지면 둘 다 실패
-    expect(jumpTween.remove).toHaveBeenCalledTimes(1);
-    expect(sceneStub.scene.tweens.killTweensOf).toHaveBeenCalledWith(rp);
+    const killed = sceneStub.scene.tweens.killTweensOf.mock.calls.map((c) => c[0]);
+    // 변이검증: 세 target 중 하나라도 killTweensOf에서 빠지면 실패
+    expect(killed).toContain(rp); // jump tween
+    expect(killed).toContain(sprite); // moveTo x/y tween
+    expect(killed).toContain(nameText); // moveTo x tween
+    // GameObject 파괴도 수행
+    expect(sprite.destroy).toHaveBeenCalledTimes(1);
+    expect(nameText.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it("점프 중이 아니어도 destroy()는 killTweensOf(this)로 안전하게 정리한다", () => {
+  it("점프 없이 destroy()해도 모든 target을 안전하게 killTweensOf한다", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rp = new RemotePlayerSprite(sceneStub.scene as any, INFO);
-    // jump 없이 destroy — 잔여 tween이 없어도 killTweensOf는 호출되어야 함(방어적)
+    const sprite = sceneStub.scene.add.sprite.mock.results[0].value;
+    const nameText = sceneStub.scene.add.text.mock.results[0].value;
+
     rp.destroy();
-    expect(sceneStub.scene.tweens.killTweensOf).toHaveBeenCalledWith(rp);
+
+    const killed = sceneStub.scene.tweens.killTweensOf.mock.calls.map((c) => c[0]);
+    expect(killed).toContain(rp);
+    expect(killed).toContain(sprite);
+    expect(killed).toContain(nameText);
   });
 
   it("이미 점프 중이면 jump()는 중복 tween을 만들지 않는다", () => {

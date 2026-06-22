@@ -226,6 +226,13 @@ export class LocalPlayer {
 
   /** 리소스 정리 */
   destroy(): void {
+    // Phaser는 GameObject destroy 시 그 대상을 가리키는 tween을 자동 제거하지 않는다.
+    // startStep은 this(logicalX/Y), jump 궤적은 jumpState(offsetY), 스케일 tween은 sprite를
+    // target으로 하므로 모두 명시적으로 정리한다 — 파괴 도중 진행 중이던 tween의 onComplete가
+    // 파괴된 sprite를 만지거나(crash) this/jumpState를 잡아두는(leak) 것을 차단.
+    this.scene.tweens.killTweensOf(this);
+    this.scene.tweens.killTweensOf(this.jumpState);
+    this.scene.tweens.killTweensOf(this.sprite);
     this.sprite.destroy();
     this.nameText.destroy();
     this.shadow.destroy();
