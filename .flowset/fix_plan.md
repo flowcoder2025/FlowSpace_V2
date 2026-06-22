@@ -5,7 +5,8 @@
 > 초기 시드 = 2026-06-19 듀얼 블라인드 검증(codex CLI + Claude) 확정 결함.
 
 ## Active WI
-- (없음) — **✅ WI-019-fix develop 머지 완료(2026-06-22, PR#22, merge `221f8df`)**. READY 큐 비어 있음. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast)/WI-021(assets 목록 GET 선재누출, WI-019서 발굴). **WI-019는 develop만 반영 — main 미승격**(라이브 미반영, 승격은 사용자 승인 게이트).
+- **WI-021-fix (ACTIVE, 2026-06-22)** — assets 목록 `GET /api/assets` 응답 정형화. `select`의 `prompt: true` 제거(민감 필드 누출 차단), 특히 `shared=true` 분기(타인 공유 자산 조회)의 노출 표면 축소. WI-019 동일 클래스·별 라우트. 설계 codex consult 진행 — 핵심 트레이드오프: lean 목록 DTO vs `toPublicGeneratedAsset` 전체 재사용(후자는 metadata→game-loader frameWidth 동작 변경 + shared 분기 타인 user{id,name} 신규 노출 부작용). 소비처 2곳: game asset-loader(id/type/filePath/metadata.frameWidth·frameHeight) + editor asset-palette(id/type/name/thumbnailPath/filePath).
+- (이전) **✅ WI-019-fix develop 머지 완료(2026-06-22, PR#22, merge `221f8df`)**. BACKLOG: WI-017(소켓토큰 폴백)/WI-018(prod env fail-fast). **WI-019는 develop만 반영 — main 미승격**(라이브 미반영, 승격은 사용자 승인 게이트).
 - (이전) **✅ develop→main 승격 완료(2026-06-22, PR#18 rebase)** + V1→V2 컷오버 e2e 검증. WI-001~016+020 라이브(Vercel ● Ready + prod DB migrate deploy 적용). **남은 운영작업: OCI 소켓 신코드 수동 SSH 배포(사용자 전용)** + SOCKET_INTERNAL_* prod env.
 
 ## Queue (2026-06-22 승격前 통합감사 발굴 — codex consult + 9축 멀티에이전트 감사 + 적대검증)

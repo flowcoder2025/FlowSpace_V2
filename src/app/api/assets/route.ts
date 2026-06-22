@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { toPublicAssetListItem } from "@/features/assets";
 
 /** GET /api/assets - 에셋 목록 (필터링) */
 export async function GET(request: NextRequest) {
@@ -34,6 +35,10 @@ export async function GET(request: NextRequest) {
       where.status = status.toUpperCase();
     }
 
+    // 응답 allowlist (WI-021): 목록은 lean DTO만 반환한다.
+    // shared=true 분기는 owner 게이트 없이 타인 공유 자산을 반환하므로(의도된 공유)
+    // prompt/workflow/comfyuiJobId(민감)·metadata·user는 select하지 않고,
+    // toPublicAssetListItem로 응답 키 집합을 고정한다(심층 방어).
     const [assets, total] = await Promise.all([
       prisma.generatedAsset.findMany({
         where,
@@ -44,7 +49,6 @@ export async function GET(request: NextRequest) {
           id: true,
           type: true,
           name: true,
-          prompt: true,
           status: true,
           filePath: true,
           thumbnailPath: true,
@@ -56,7 +60,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json({
-      assets,
+      assets: assets.map(toPublicAssetListItem),
       pagination: {
         page,
         limit,
