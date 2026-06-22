@@ -6,14 +6,14 @@
  */
 
 import { TILE_SIZE, MAP_COLS, MAP_ROWS } from "@/constants/game-constants";
-import { eventBridge, GameEvents } from "@/features/space/game/events";
+import { eventBridge, GameEvents } from "@/features/space/game";
 import type {
   EditorToolChangePayload,
   EditorTileSelectPayload,
   EditorLayerSelectPayload,
   EditorLayerVisibilityPayload,
   EditorTilePaintRequestPayload,
-} from "@/features/space/game/events";
+} from "@/features/space/game";
 import type { TilemapResult } from "@/features/space/game";
 import { GridOverlay } from "./grid-overlay";
 import { EditorCursor } from "./editor-cursor";

@@ -1,10 +1,39 @@
 // Game Engine - Public API
 export { eventBridge, GameEvents } from "./events";
+// EventBridge 공개 계약의 단일 진입점 — game/events 서브배럴의 payload 타입 전체를 명시 재노출.
+// (WI-012-2 S3) 타 모듈은 반드시 이 배럴(@/features/space/game) 경유 — events 서브배럴 직접
+// import는 ESLint no-restricted-imports로 차단. game 내부(game/internal/**)만 상대경로 ../events 허용.
 export type {
   PlayerPosition,
   RemotePlayerData,
   SceneReadyPayload,
+  SceneErrorPayload,
   ChatFocusPayload,
+  UIOverlayPayload,
+  AssetRegisteredPayload,
+  AssetLoadErrorPayload,
+  AssetGeneratedPayload,
+  AssetGenerationFailedPayload,
+  AssetProcessingProgressPayload,
+  GenerateAssetRequestPayload,
+  ObjectInteractPayload,
+  ObjectPlacedPayload,
+  PartyZoneBounds,
+  PartyZoneData,
+  PartyZonesLoadedPayload,
+  PartyZoneChangedPayload,
+  EditorEnterPayload,
+  EditorToolChangePayload,
+  EditorTileSelectPayload,
+  EditorLayerSelectPayload,
+  EditorLayerVisibilityPayload,
+  EditorTilePaintedPayload,
+  EditorTilePaintRequestPayload,
+  EditorObjectPlacedPayload,
+  EditorObjectMovedPayload,
+  EditorObjectDeletedPayload,
+  EditorObjectSelectedPayload,
+  EditorMapLoadedPayload,
 } from "./events";
 
 export {

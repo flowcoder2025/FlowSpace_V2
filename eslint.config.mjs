@@ -29,6 +29,15 @@ const eslintConfig = defineConfig([
               message:
                 "타 모듈의 internal/* 직접 import 금지 — 해당 모듈의 배럴(index.ts)을 통해 import하세요 (경계 캡슐화).",
             },
+            {
+              // EventBridge 공개 계약 단일 진입점 강제 (WI-012-2 S3):
+              // game/events 서브배럴을 타 모듈이 직접 import 금지 — 최상위 game 배럴(@/features/space/game) 경유.
+              // "**/game/events" glob은 alias(@/features/space/game/events)와 상대(../../game/events)를 모두 차단하며,
+              // game 내부(game/internal/**)의 상대경로 "../events"/"../../events"는 game 세그먼트가 없어 미매칭(영향 0).
+              group: ["**/game/events", "**/game/events/**"],
+              message:
+                "game/events 서브배럴 직접 import 금지 — 최상위 배럴 @/features/space/game 을 통해 import하세요 (공개 계약 단일 진입점). game 내부 파일만 상대경로 ../events 허용.",
+            },
           ],
         },
       ],

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
 
 /** GET /api/spaces/[id]/messages - 채팅 히스토리 (cursor 페이지네이션) */
 export async function GET(
@@ -30,7 +31,7 @@ export async function GET(
 
     const searchParams = request.nextUrl.searchParams;
     const cursor = searchParams.get("cursor");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 100);
+    const limit = parsePageLimit(searchParams.get("limit"));
     const type = searchParams.get("type");
 
     // 필터 조건
@@ -68,12 +69,10 @@ export async function GET(
       },
     });
 
-    const hasMore = messages.length > limit;
-    const results = hasMore ? messages.slice(0, limit) : messages;
-    const nextCursor = hasMore ? results[results.length - 1]?.id : null;
+    const { items, nextCursor, hasMore } = buildCursorPage(messages, limit);
 
     return NextResponse.json({
-      messages: results.map((m) => ({
+      messages: items.map((m) => ({
         id: m.id,
         userId: m.senderId || "unknown",
         nickname: m.senderName,

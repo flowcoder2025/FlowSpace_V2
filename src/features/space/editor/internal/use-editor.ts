@@ -8,8 +8,8 @@
 
 import { useEffect, useCallback, useRef } from "react";
 import { useEditorStore } from "@/stores/editor-store";
-import { eventBridge, GameEvents } from "@/features/space/game/events";
-import type { EditorTilePaintedPayload, EditorObjectSelectedPayload } from "@/features/space/game/events";
+import { eventBridge, GameEvents } from "@/features/space/game";
+import type { EditorTilePaintedPayload, EditorObjectSelectedPayload } from "@/features/space/game";
 import { extractDefaultMapData } from "@/features/space/game";
 import type { EditorTool, EditorLayerName, EditorMapObject } from "./types";
 
