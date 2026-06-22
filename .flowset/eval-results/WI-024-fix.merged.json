@@ -1,0 +1,45 @@
+{
+  "wi": "WI-024-fix",
+  "schemaVersion": 1,
+  "commit": "3cd7d04",
+  "target": "develop (PR 예정)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": {
+      "verdict": "PASS",
+      "issueCount": 0,
+      "rounds": 1,
+      "convergence": "r1 PASS 0 issues. 블라인드 스키마 강제(-o 권위, turn.completed·turn.failed/error 이벤트 0, exit 0). 누출 잔존·기존행 차단 완전성·저장 정규화 정확성·회귀·백필 안전성·테스트 품질·스코프 전 관점 무결 판정."
+    },
+    "evaluator": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.85,
+      "scores": { "completeness": 9.9, "consistency": 9.9, "specificity": 9.8, "actionability": 9.7 },
+      "issueCount": 3,
+      "runs": 1,
+      "note": "독립 채점(codex 산출물 미열람·상호 블라인드 유지). 누출 완전 차단 독립 실측: metadata를 응답에 싣는 경로는 GET /api/assets/[id]가 유일(toPublicGeneratedAsset→toPublicMetadata가 PUBLIC_METADATA_KEYS로 축소, error 제거됨), 목록·batch GET select는 metadata 미포함→잔존 표면 0. A(allowlist 제외)가 기존 raw 행 즉시 차단·B(generic 저장)가 신규 행 근본 차단. WI-023 internalErrorResponse 정책 정합·모듈 경계 준수. 소비처 무회귀(.tsx 어디서도 metadata.error 미참조, 폴링은 status=FAILED로 충족). assets 6 테스트파일 통과. 변이검증 3종 실증·전부 원복: (a)PUBLIC_METADATA_KEYS에 error 복원→public-asset.test 3 FAIL, (b)generate .catch raw 저장 복원→generate.route.test 2 FAIL, (c)console.error 제거→raw 서버로그 보존 테스트 1 FAIL(vacuous 아님). vi.waitFor detached-promise 검증 비-플래키, exact-key 단언 리터럴이라 self-referential 아님. P3x3 전부 defer."
+    }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "비동기 에셋 생성 실패 시 raw error.message가 GeneratedAsset.metadata.error에 저장되고 WI-019 PUBLIC_METADATA_KEYS('error' 포함)를 거쳐 GET /api/assets/[id] 응답으로 도달하던 정보 노출(CWE-209, WI-023 evaluator 발굴·동일 클래스) 차단. 설계 codex consult 1R 수렴 C안(A+B): B 단독은 기존 DB 행이 이미 raw 보유라 불완전→A로 기존·신규 응답 계층 차단 필수. 듀얼 블라인드 1R 수렴: codex PASS 0 issues · evaluator WARNING 9.85(P0/P1 0, fixNow 0, P3x3 전부 defer). 차단 이슈(P0/P1/P2·fixNow) 0. (A) PUBLIC_METADATA_KEYS에서 error 제거(기존 raw 행도 즉시 응답 차단·심층방어). (B) generate/batch .catch가 raw는 console.error 서버 로그에만, DB엔 generic GENERATION_FAILURE_MESSAGE 저장(constants.ts 정의·배럴 노출·하드코딩 회피, internalErrorResponse 정책 정합). 백필 운영 스크립트(dry-run 기본·--apply만 적용·멱등·error 키만 치환·prod=사용자 게이트). 양 검증자 독립으로 응답 누출 0(전 경로: [id]는 DTO 정규화·목록/batch GET은 metadata select 부재)·무회귀(metadata.error 런타임 소비처 부재) 확정 + evaluator 변이검증 3종(6테스트 FAIL/원복 clean) 실증. 기계게이트 4/4(tsc0/lint0err[선재 LiveKit 경고1·WI무관]/vitest 232->238[+6]/build0). -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "초기 구현(A allowlist 제외 + B 저장 정규화 + 백필 스크립트 + 테스트 +6)에 대한 듀얼 블라인드. 차단 결함 0.",
+      "codex": "PASS (0 issues)",
+      "evaluator": "WARNING 9.85 (P0/P1 0, fixNow 0, P3x3 defer, 변이검증 3종 실증)"
+    }
+  ],
+  "resolvedThisWI": [
+    "WI-023 evaluator defer P3 흡수: 비동기 생성 실패 raw error.message가 GeneratedAsset.metadata.error에 저장되고 WI-019 PUBLIC_METADATA_KEYS로 GET /api/assets/[id] 응답에 도달하던 CWE-209 정보 노출 차단.",
+    "응답 계층 차단(A): PUBLIC_METADATA_KEYS에서 error 제거 — 기존 raw 행도 즉시 응답에서 차단(전 응답 경로 metadata.error 노출 0 독립 확인).",
+    "저장 근본 차단(B): generate/batch가 raw를 더는 DB에 저장하지 않고 console.error 서버 로그+generic 저장(향후 행도 깨끗).",
+    "백필 스크립트: 기존 DB 잔존 raw 행 정화 경로 제공(dry-run 기본·멱등, prod=사용자 게이트)."
+  ],
+  "deferred": [
+    "P3 (evaluator) scripts/backfill-failed-asset-error.mjs:28 — .mjs가 TS 상수 GENERATION_FAILURE_MESSAGE를 직접 import 못 해 리터럴 미러링(드리프트 가설). 1회성 운영 스크립트·prod 사용자 게이트·드리프트 시에도 데이터 손상 아닌 불필요 재치환(여전히 generic)에 그침·응답 누출 차단(A)과 독립 완결. 주석으로 동기화 의무 명시.",
+    "P3 (evaluator) generate/route.ts:99-105·batch/route.ts:91-97 — fire-and-forget .catch 내부 prisma.update 2차 실패 시 unhandled rejection. WI-024 이전부터 존재한 선재 구조(diff는 metadata payload만 generic 교체)라 무회귀·신뢰성 별 도메인. 후속 WI에서 2차 update 안전망.",
+    "P3 (evaluator) public-asset.ts PUBLIC_METADATA_KEYS — A안은 응답 allowlist에서 error만 제거하고 DB 기존 raw는 backfill --apply 전까지 잔존(설계가 명시 인지·문서화한 의도된 심층방어 trade-off). 현 전 응답 경로는 metadata.error 미노출 독립 확인. 신규 metadata read 경로 추가 시 toPublicMetadata 경유 강제 필요.",
+    "(codex consult 위험#5·이번 WI 스코프 외) 성공 경로 metadata: JSON.parse(JSON.stringify(metadata)) 전체 저장면 — 현재 allowlist가 응답을 막으나 GeneratedAssetMetadata에 향후 prompt/workflow/local path 등 추가 시 DB 저장면 확대. 저장 metadata public/internal 분리는 별 후속 WI 권고."
+  ]
+}

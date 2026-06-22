@@ -153,6 +153,8 @@ describe("toPublicGeneratedAsset", () => {
       "id",
       "userId",
       "filePath",
+      // WI-024 (CWE-209): error는 raw 내부 정보(경로/스택)를 담을 수 있어 제외
+      "error",
     ];
     const keys = PUBLIC_METADATA_KEYS as readonly string[];
     for (const key of forbidden) {
@@ -167,17 +169,38 @@ describe("toPublicGeneratedAsset", () => {
     expect(result.metadata).toBeNull();
   });
 
-  it("FAILED 자산의 metadata.error는 보존한다 (실패 폴링 계약)", () => {
+  it("FAILED 자산의 metadata.error는 공개되지 않는다 (WI-024, CWE-209 차단)", () => {
+    // 과거 행은 raw error.message(내부 경로/스택 단편 포함 가능)를 metadata.error에
+    // 보유한다 — 저장 정규화(generic) 이전에 쌓인 행도 응답에서 차단되어야 한다.
     const result = toPublicGeneratedAsset(
       makeAssetRow({
         status: "FAILED",
         filePath: null,
-        metadata: { error: "ComfyUI timeout", batchId: "batch-9" },
+        metadata: {
+          error: "ComfyUI internal: ECONNREFUSED http://127.0.0.1:8188 at node 42",
+          batchId: "batch-9",
+          width: 512,
+        },
       })
     );
     const meta = result.metadata as Record<string, unknown>;
-    expect(meta.error).toBe("ComfyUI timeout");
+    // raw 사유는 제거되고(폴링은 status=FAILED로 충분), 비민감 키만 남는다.
+    expect(meta.error).toBeUndefined();
     expect(meta.batchId).toBeUndefined();
+    expect(meta.width).toBe(512);
+  });
+
+  it("generic으로 정규화된 metadata.error(신규 행)도 응답에서 제거된다 (allowlist 제외)", () => {
+    // 저장 정규화 후 행은 generic 메시지를 갖지만, error는 allowlist에서 아예 빠졌으므로
+    // generic 여부와 무관하게 응답에 노출되지 않는다(키 자체 차단).
+    const result = toPublicGeneratedAsset(
+      makeAssetRow({
+        status: "FAILED",
+        filePath: null,
+        metadata: { error: "Asset generation failed" },
+      })
+    );
+    expect(result.metadata).toEqual({});
   });
 
   it("metadata가 배열/문자열 등 비객체면 null을 반환한다", () => {

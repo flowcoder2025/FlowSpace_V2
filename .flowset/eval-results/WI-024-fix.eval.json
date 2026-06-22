@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.9,
+    "consistency": 9.9,
+    "specificity": 9.8,
+    "actionability": 9.7
+  },
+  "weightedTotal": 9.85,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "scripts/backfill-failed-asset-error.mjs:28",
+      "description": "백필 스크립트가 GENERATION_FAILURE_MESSAGE를 TS 상수에서 import하지 못해 리터럴 'Asset generation failed'를 미러링한다(.mjs는 .ts 상수 직접 import 불가). 상수 드리프트(예: 향후 메시지 문구 변경) 시 hasRawError의 멱등성 판정이 조용히 깨져 이미 generic으로 정규화된 행을 'raw'로 오분류·재치환할 수 있다. 주석으로 동기화 의무를 명시하고 있으나 기계적 강제는 없다.",
+      "recommendation": "스크립트 상단에서 GENERATION_FAILURE_MESSAGE를 단일 출처로 강제하거나(예: 빌드 산출물/JSON 상수 공유, 또는 tsx 실행으로 TS 상수 직접 import), 최소한 동기화 검증 테스트/주석 강화. 현재는 1회성 운영 스크립트라 실해 표면 낮음.",
+      "defer": true,
+      "deferRationale": "1회성 운영 스크립트이고 prod 적용은 사용자 승인 게이트다. 현재 GENERATION_FAILURE_MESSAGE는 안정 문구이고 멱등성 검사는 현 시점 정확하다. 드리프트는 미래 가설이며 발생해도 데이터 손상이 아닌 불필요한 재치환(여전히 generic 유지)에 그친다. 응답 누출 차단(A)은 이 스크립트와 독립적으로 완결된다.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/assets/generate/route.ts:99-105, src/app/api/assets/batch/route.ts:91-97",
+      "description": "fire-and-forget .catch 내부의 prisma.generatedAsset.update가 2차 실패(예: 실패 직후 DB 일시 단절)하면 그 거부는 단일 .catch 체인의 terminal handler 뒤라 unhandled rejection이 된다. 본 WI가 신규로 만든 결함은 아니다(WI-024 이전에도 동일 구조 — update 호출/에러 처리 골격은 변경 없이 metadata payload만 generic으로 교체됨). 따라서 무회귀이나 잔존 견고성 부채로 기록.",
+      "recommendation": "후속 WI에서 fire-and-forget 비동기 생성 파이프라인의 2차 update 실패를 .catch(()=>{}) 또는 console.error 안전망으로 흡수. 본 WI 스코프(정보 노출 차단)와 별개 신뢰성 축.",
+      "defer": true,
+      "deferRationale": "WI-024 변경분(metadata 값 정규화) 이전부터 존재한 선재 구조이며 diff가 도입한 회귀가 아니다. 본 WI 수용 기준은 metadata.error 정보 노출 차단으로, 2차 update 신뢰성은 별 신뢰성 도메인이다.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/assets/internal/public-asset.ts:27-38 (PUBLIC_METADATA_KEYS)",
+      "description": "SUSPECTED(없음 확인): A안은 응답 allowlist에서 error 키만 제거할 뿐 DB의 기존 raw metadata.error는 backfill --apply 실행 전까지 그대로 잔존한다. 즉 현 응답 경로(GET /api/assets/[id]·목록·batch GET)는 전수 검증 결과 metadata.error를 더 이상 노출하지 않으나(독립 확인: [id] route만 metadata select, DTO가 error 제거; 목록/batch select는 metadata 미포함), 향후 새 read 경로가 raw metadata를 직접 반환하면 재노출 가능. 설계가 명시적으로 인지·문서화한 trade-off라 결함이 아닌 잔존 표면 기록.",
+      "recommendation": "prod backfill --apply 실행으로 DB 잔존 raw 제거(사용자 게이트). 신규 metadata read 경로 추가 시 반드시 toPublicMetadata 경유 강제(현재 [id] route는 이미 준수).",
+      "defer": true,
+      "deferRationale": "현 전 응답 경로가 metadata.error를 노출하지 않음을 독립 grep+코드로 확인(목록/batch GET은 metadata select 자체 부재, [id]는 DTO 정규화). 응답 계층 누출은 0이고 DB 잔존은 backfill로 별도 정화되는 의도된 심층방어 설계다.",
+      "fixNow": false
+    }
+  ]
+}

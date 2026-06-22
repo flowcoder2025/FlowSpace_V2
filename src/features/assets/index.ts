@@ -27,6 +27,7 @@ export { checkComfyUICapabilities } from "./internal/capability-checker";
 export type { ComfyUICapabilities } from "./internal/capability-checker";
 export { ensurePosesUploaded } from "./internal/pose-manager";
 export {
+  GENERATION_FAILURE_MESSAGE,
   QUALITY_PRESETS,
   SAMPLER_OPTIONS,
   SCHEDULER_OPTIONS,
