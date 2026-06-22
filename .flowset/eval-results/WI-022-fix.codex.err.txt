@@ -1,0 +1,29 @@
+2026-06-22T12:33:12.313488Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.7 seconds
+Output:
+
+> flowspace@0.1.0 test
+> vitest run --run src/lib/pagination.test.ts src/app/api/assets/route.test.ts
+
+[31mfailed to load config from C:\Team-jane\FlowSpace\vitest.config.ts[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Startup Error [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯⎯[39m
+Error: spawn EPERM
+    at ChildProcess.spawn (node:internal/child_process:421:11)
+    at Object.spawn (node:child_process:796:9)
+    at ensureServiceIsRunning (C:\Team-jane\FlowSpace\node_modules\esbuild\lib\main.js:1978:29)
+    at build (C:\Team-jane\FlowSpace\node_modules\esbuild\lib\main.js:1876:26)
+    at bundleConfigFile (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:35808:23)
+    at bundleAndLoadConfigFile (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:35795:24)
+    at loadConfigFromFile (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:35764:179)
+    at resolveConfig (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:35413:28)
+    at _createServer (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:25362:73)
+    at createServer$2 (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:25359:9) {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'spawn'
+}
+
+
+
+

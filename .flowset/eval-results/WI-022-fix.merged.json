@@ -1,0 +1,56 @@
+{
+  "wi": "WI-022-fix",
+  "schemaVersion": 1,
+  "commit": "0cad729",
+  "target": "develop (PR 예정)",
+  "rounds": 3,
+  "reviewers": {
+    "codex": {
+      "verdict": "PASS",
+      "issueCount": 0,
+      "rounds": 3,
+      "convergence": "r1 WARNING(fixNow P3 공백-only enum→400 + defer P3 page 상한) → r2 WARNING(r1 해소 확인, 신규 fixNow P3 중복 파라미터 getAll 검증 우회 + defer P3 page) → r3 PASS 0 issues. 두 fixNow P3를 매 라운드 즉시 해소(trim-first / getAll 전수 검증). page 상한 부재는 3R 내내 defer(설계상 의도, consult 합의). -o 권위, turn.failed/error 이벤트 0."
+    },
+    "evaluator": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.88,
+      "scores": { "completeness": 9.9, "consistency": 9.9, "specificity": 10.0, "actionability": 9.7 },
+      "issueCount": 3,
+      "runs": 1,
+      "note": "최종 HEAD(0cad729) 재채점 WARNING 9.88 (P0/P1 0, P3x3 전부 defer). 세 목표 결함(enum 무검증·limit 무상한·page 음수 skip) 전부 해소 확인. enum 검증은 getAll() 전수 — 중복 파라미터 우회 차단. 무회귀 실측(asset-loader 소문자 completed+limit=100 / asset-palette COMPLETED+limit=100 둘 다 통과·cap 100 정확). parsePageLimit optional defaultLimit이 기존 3 호출부(spaces/messages×2) 무영향, 기존 계약 12.9→12 보존. 변이검증 3종 직접 실행 전부 검출(getAll→get 1 FAIL·invalid enum→undefined 3 FAIL·parsePageNumber→raw parseInt 2 FAIL, 원복 diff0). P3: ①500 details 노출(선재·diff 무변경) ②page 상한 부재(의도·소비처 미사용) ③PublicAssetListItem 타입 중복 nit(WI-021 도입)."
+    }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "GET /api/assets 입력 검증 강건화 WI(WI-021 듀얼검증 발굴, codex consult 별 WI 분리 권고). 듀얼 블라인드 3R 수렴: codex 3R(WARNING→WARNING→PASS 0 issues) · evaluator WARNING 9.88(최종HEAD, P3x3 defer). 차단 이슈(P0/P1/P2·fixNow) 0. 세 결함 해소: ①type/status를 trim+대문자 후 Object.values(AssetType/AssetStatus) allowlist로 getAll() 전수 검증(중복 파라미터 우회 차단), 불일치 400 {error,code:INVALID_FILTER}(WI-009 패턴) ②limit parsePageLimit(raw,20)로 default 20 보존+MAX 100 cap ③page parsePageNumber로 1 클램프(음수 skip→500 차단). 양 검증자 독립으로 무회귀(소문자 completed·limit=100 두 소비처)·검증 우회 없음 확정 + evaluator 변이검증 3종 실증. 기계게이트 4/4(tsc0/lint0[선재 LiveKit 경고1·WI무관]/vitest 204→227[+23]/build0). -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "공백-only enum 값(?type=%20)이 trim 전 truthiness 검사로 필터 미적용이 아닌 400. page 상한 부재.",
+      "codex": "WARNING (fixNow P3 whitespace + defer P3 page)",
+      "evaluator": "WARNING 9.83 (P3x3 defer, 변이검증 5종)"
+    },
+    {
+      "round": 2,
+      "issue": "r1 whitespace 해소(trim-first). 신규: searchParams.get()이 첫 값만 봐 중복 파라미터(?type=character&type=weapon)의 invalid 2번째 값이 검증 우회.",
+      "codex": "WARNING (r1 해소 확인, 신규 fixNow P3 중복 파라미터 + defer P3 page)",
+      "evaluator": "(r1 기준, 재실행은 r3 최종HEAD)"
+    },
+    {
+      "round": 3,
+      "issue": "r2 해소(getAll 전수 검증). 잔여는 선재(500 details)·설계 의도(page 상한)·타입 nit — 전부 defer.",
+      "codex": "PASS (0 issues)",
+      "evaluator": "WARNING 9.88 (최종HEAD 재채점, P3x3 defer, 변이검증 3종)"
+    }
+  ],
+  "resolvedThisWI": [
+    "WI-021 evaluator defer P3(route.ts type/status enum 무검증·type.toUpperCase() 직접 주입, GET/spaces INVALID_FILTER 비대칭) 해소 — getAll 전수 allowlist 검증 + 400 INVALID_FILTER.",
+    "WI-021 evaluator defer P3(limit 무상한·NaN 미정규화) 해소 — parsePageLimit(raw,20) default 보존 + MAX 100 cap.",
+    "추가 발굴·해소: page NaN/0/음수 → 음수 skip(500) — parsePageNumber 1 클램프(backlog 미등록이나 동일 입력 강건화 표면).",
+    "codex r1/r2 fixNow P3 2건 즉시 해소(공백-only trim-first / 중복 파라미터 getAll 전수 검증)."
+  ],
+  "deferred": [
+    "P3 (evaluator) src/app/api/assets/route.ts:124 — 500 폴백 details: error.message 정보 노출. 선재(diff 무변경)·인증 게이트 하 저위험·spaces 라우트와 비대칭. 정보위생 일괄 별 WI 후보(spaces/messages 정렬).",
+    "P3 (codex+evaluator 수렴) src/lib/pagination.ts parsePageNumber — page 상한 부재로 큰 offset(deep pagination) 스케일 비효율. 설계상 의도(주석 '상한 없음·데이터 크기 의존'), 소비처 page 미사용으로 실표면 0. 큰 offset 상한/cursor 전환은 후속 perf 항목.",
+    "P3 (evaluator) src/features/assets/internal/public-asset.ts:126-147 — PublicAssetListItem↔GeneratedAssetForListItem 동일 8필드 중복 타입 nit. WI-021 도입분·WI-022 무변경·런타임/보안 영향 없음."
+  ]
+}
