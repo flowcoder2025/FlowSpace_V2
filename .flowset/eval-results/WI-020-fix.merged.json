@@ -1,0 +1,31 @@
+{
+  "wi": "WI-020-fix",
+  "schemaVersion": 1,
+  "commit": "b849a77",
+  "target": "develop (PR 예정)",
+  "rounds": 1,
+  "reviewers": {
+    "codex": {
+      "verdict": "WARNING",
+      "issueCount": 2,
+      "rounds": 1,
+      "convergence": "r1 WARNING — 차단 결함 0. P3×2 defer/fixNow:false: ① route-access.ts:29 `/_next`·`/favicon` prefix를 전부 public 처리(WI-001 선재 inherited 동작·실 우회경로 부재) ② route-access.test.ts 가 순수 분류기만 검증하고 실제 미들웨어 HTTP 응답은 미검증(요청한 4 behavior는 함수 레벨로 커버). 인증 우회 재개방·회귀 미해소 등 P0/P1 없음."
+    },
+    "evaluator": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.78,
+      "scores": { "completeness": 9.7, "consistency": 9.9, "specificity": 10.0, "actionability": 9.6 },
+      "issueCount": 3,
+      "runs": 1,
+      "note": "구버전 미들웨어 대조로 인라인 로직 verbatim 이관 + PUBLIC_FILES.has 단일 추가 확인. public/ 루트=Logo.png 단독 실측, login/page.tsx:21 미인증 렌더 → 회귀 정조준 해소. 변이검증 5종 전부 검출(allowlist 제거 2fail/블랭킷 확장자 3fail/prefix no-op 1fail/루트 no-op 5fail/대소문자 수용 1fail). 기계게이트 독립 재현 green(vitest 174). P3×3 defer: allowlist 완전성 드리프트(현재 Logo.png 단독 완전·향후 robots/og 동기화 부채, 주석이 절차 명시) / `_next`·favicon prefix 비대칭(Next 예약·선재) / callbackUrl open-redirect(변경 밖 선재·표면 무증가·후속 백로그)."
+    }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "미들웨어 인증경계 회귀 fix. 양 검증자 1R 수렴: codex WARNING(P3×2 defer) · evaluator WARNING 9.78(P3×3 defer). 차단 이슈(P0/P1/P2·fixNow) 0. 핵심: 미인증 /Logo.png 이 /login 307 리다이렉트되던 회귀(WI-001 strict화 부작용·승격으로 라이브화) 해소 — 인라인 분류를 순수함수 src/lib/route-access.ts(isPublicRequest + PUBLIC_FILES allowlist=['/Logo.png'])로 추출, 미들웨어가 호출. 설계 codex consult 1R 권고대로 **확장자 전체 통과 거부·명시 allowlist 채택**(/api/spaces/foo.png 등 확장자 우회 표면 회피, deny-by-default 보존). evaluator 변이검증 5종 전부 검출(allowlist 제거/블랭킷 확장자/prefix·루트 no-op/대소문자 수용)로 테스트 보호 실증. 양측 P3는 동일 클래스(inherited _next/favicon 비대칭·함수레벨 테스트·callbackUrl 선재)로 회귀·보안 영향 0. 기계게이트 4/4(tsc0/lint0[선재 LiveKit 경고1]/vitest 174·174[+9]/next build0). -> .pass 생성.",
+  "deferred": [
+    "route-access 순수함수 테스트는 미들웨어 HTTP 응답 e2e 미포함(NextAuth 런타임 목 필요·build로 컴파일 검증) — codex P3",
+    "_next/favicon prefix를 전부 public(WI-001 선재 inherited) — 양측 P3",
+    "callbackUrl open-redirect 검증(consult 위험 E·변경 밖 선재) — 후속 백로그",
+    "PUBLIC_FILES allowlist 완전성 드리프트(향후 robots/og/manifest 추가 시 동기화) — evaluator P3, 주석이 절차 명시"
+  ]
+}

@@ -1,0 +1,15 @@
+WI=WI-020-fix
+commit=b849a77
+sourceFingerprint=b0757a19a771b9a5dacf661c87c87d4e72d5bf0d0257ca0f03889b5440a02ee1
+fingerprintScope=src 변경 diff(sha256) — src/middleware.ts + 신규 src/lib/route-access.ts + src/lib/route-access.test.ts
+codex=.flowset/eval-results/WI-020-fix.codex.json
+evaluator=.flowset/eval-results/WI-020-fix.eval.json
+merged=.flowset/eval-results/WI-020-fix.merged.json
+gates=tsc,lint,vitest,build
+gatesEvidence=tsc 0 / lint 0(선재 LiveKit 경고 1·WI 무관) / vitest 174·174(+9) / next build 0
+codexVerdict=WARNING(P3×2 defer/fixNow:false — _next·favicon prefix inherited / 테스트 순수함수레벨)
+evaluatorVerdict=WARNING 9.78(P3×3 defer, 변이검증 5종 전부 검출)
+gateDecision=PASS
+designConsult=codex 1R (확장자 전체통과 거부·명시 allowlist 채택·회귀테스트 4종·callbackUrl 위험 지적)
+target=develop (PR 예정) → 이후 main 승격 + 라이브 재배포(로고 회귀 라이브 수정)
+createdAt=2026-06-22T19:55:00+09:00

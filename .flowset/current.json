@@ -2,11 +2,11 @@
   "activeWI": "WI-020-fix",
   "lastWI": "WI-016-chore",
   "type": "fix",
-  "status": "VERIFYING",
+  "status": "VERIFIED_PR_PENDING",
   "integrationBranch": "develop",
   "branch": "fix/WI-020-fix-middleware-public-asset",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "",
+  "lastVerifiedCommit": "b849a77",
   "note": "WI-020-fix 미들웨어 public 정적에셋 회귀 — 미인증 시 /Logo.png 이 /login 으로 307 리다이렉트(WI-001 strict화 부작용, 승격으로 라이브화)돼 로그인 페이지 로고 깨짐. 수정: 인라인 분류를 순수함수 src/lib/route-access.ts(isPublicRequest + PUBLIC_FILES allowlist=['/Logo.png'])로 추출, 미들웨어가 호출. 확장자 전체 통과(/\\.\\w+$/) 대신 명시 allowlist(codex 적대 설계 협의 권고 — /api/spaces/foo.png 확장자 우회 표면 회피, deny-by-default 보존). 회귀테스트 9(route-access.test.ts). 기계게이트 4/4(tsc0/lint0/vitest 174·174[+9]/build0). 설계 codex consult 1R(WI-020-consult). 듀얼검증 중."
 }
