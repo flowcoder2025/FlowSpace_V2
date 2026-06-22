@@ -147,16 +147,21 @@ export async function POST(request: Request) {
           },
         },
       },
-      include: {
+      // 응답 select — accessSecret/inviteCode 등 민감 Space 스칼라를 애초에 fetch하지 않음
+      // (app.md 서버 불변식 #2 "필요한 필드만").
+      select: {
+        id: true,
+        name: true,
         template: { select: { key: true, name: true } },
       },
     });
 
+    // 응답 allowlist — inviteCode 등 민감/내부 필드 미반환(GET 목록·상세 정책과 정합).
+    // 클라이언트(create-space-form)는 본문을 쓰지 않고 /my-spaces로 이동만 한다.
     return NextResponse.json(
       {
         id: space.id,
         name: space.name,
-        inviteCode: space.inviteCode,
         template: space.template,
       },
       { status: 201 }

@@ -218,9 +218,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       data.restrictedReason = body.restrictedReason || null;
     }
 
+    // 응답 allowlist — restrictedBy/restrictedReason/restrictedUntil 등 관리 메타와
+    // userId/guestSessionId 식별자 미반환 (GET 멤버 매핑 정책과 정합).
     const updated = await prisma.spaceMember.update({
       where: { id: target.id },
       data,
+      select: { id: true, role: true, restriction: true },
     });
 
     return NextResponse.json(updated);

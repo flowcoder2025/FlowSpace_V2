@@ -29,9 +29,19 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // 응답 allowlist — restrictedBy/restrictedReason/restrictedUntil 관리 메타와
+    // guestSessionId/spaceId 내부 스칼라 미반환. PATCH 정형화가 onRefresh GET로
+    // 무력화되지 않도록 동일 리소스의 GET도 정형화한다 (소비처: member-table·media-management).
+    // userId는 media-management가 스포트라이트 대상 선택에 사용(이미 user.id로 노출됨).
     const members = await prisma.spaceMember.findMany({
       where: { spaceId },
-      include: {
+      select: {
+        id: true,
+        role: true,
+        restriction: true,
+        displayName: true,
+        userId: true,
+        createdAt: true,
         user: { select: { id: true, name: true, email: true, image: true } },
         guestSession: { select: { id: true, nickname: true } },
       },
@@ -174,9 +184,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       updateData.restrictedBy = session.user.id;
     }
 
+    // 응답 allowlist — restrictedBy 등 관리 메타·식별자 미반환(member-table는 본문 미사용).
     const updated = await prisma.spaceMember.update({
       where: { id: memberId },
       data: updateData,
+      select: { id: true, role: true, restriction: true },
     });
 
     // 이벤트 로그 기록

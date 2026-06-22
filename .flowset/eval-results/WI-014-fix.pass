@@ -1,0 +1,15 @@
+WI=WI-014-fix
+commit=45b67ae
+sourceFingerprint=2ac6070e552276d506af907da88ff49bc31ace2893b40e39795a82b7e8de2464
+fingerprintScope=changeset(8 source files vs develop: spaces route.ts + [id]/route.ts + [id]/members/route.ts + [id]/admin/members/route.ts + 4 route.test.ts). 검증된 changeset 감사 기록. 커밋 후 워킹트리 clean이라 Stop 게이트는 changed=0으로 통과. eval-results .json/.md/.pass는 소스 fingerprint 범위 외(.ts/.tsx/.prisma만 추적).
+codex=.flowset/eval-results/WI-014-fix.codex.json
+evaluator=.flowset/eval-results/WI-014-fix.eval.json
+merged=.flowset/eval-results/WI-014-fix.merged.json
+gates=tsc,lint,vitest,build
+gatesEvidence=tsc 0 / lint 0(기존 LiveKit 경고 1) / vitest 157·157 / next build 0
+codexVerdict=r1 FAIL(P1 fixNow GET raw + P3 create include) -> r2 PASS(0 issues)
+evaluatorVerdict=r1 WARNING(9.72 P3x3) -> r2 WARNING(9.79 P3x2 defer)
+gateDecision=PASS
+followUp=assets/[id] GET raw row 응답 정형화(동일 클래스·별 도메인) 신규 WI 후보 / POST create select arg 단언 보강(선택)
+target=develop (PR 예정)
+createdAt=2026-06-22T15:03:52+09:00

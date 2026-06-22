@@ -340,11 +340,12 @@ describe("POST /api/spaces — superAdmin 생성 가드", () => {
     expect(mockPrisma.space.create).not.toHaveBeenCalled();
   });
 
-  it("정상 생성 시 201 + create가 ownerId/OWNER 멤버로 호출되고 응답 키 보존", async () => {
+  it("정상 생성 시 201 + create가 ownerId/OWNER 멤버로 호출되고 응답 allowlist(inviteCode 미노출)", async () => {
     mockAuth.mockResolvedValue(
       makeSession({ id: "sa-1", isSuperAdmin: true, name: "관리자" })
     );
     mockPrisma.template.findUnique.mockResolvedValue({ id: "tpl-1", key: "OFFICE" });
+    // raw row에 inviteCode가 있어도 응답으로 새지 않아야 한다 (WI-014 allowlist 회귀 가드).
     mockPrisma.space.create.mockResolvedValue({
       id: "sp-new",
       name: "새 공간",
@@ -361,11 +362,12 @@ describe("POST /api/spaces — superAdmin 생성 가드", () => {
 
     expect(res.status).toBe(201);
     const body = await readJson<Record<string, unknown>>(res);
-    expect(Object.keys(body).sort()).toEqual(["id", "inviteCode", "name", "template"]);
+    // 응답 키 집합 — inviteCode 등 민감 필드 미노출 (GET 목록 allowlist 정책과 정합)
+    expect(Object.keys(body).sort()).toEqual(["id", "name", "template"]);
+    expect(body).not.toHaveProperty("inviteCode");
     expect(body).toMatchObject({
       id: "sp-new",
       name: "새 공간",
-      inviteCode: "INV-1",
       template: { key: "OFFICE", name: "오피스" },
     });
 
