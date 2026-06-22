@@ -1,0 +1,31 @@
+직접 확인한 결론: **C가 맞습니다. B 단독은 기존 DB 행 때문에 불완전합니다.**
+
+**결정**
+`metadata.error`는 공개 metadata에서 제거하고, 신규 저장값도 generic으로 정규화하세요.
+
+즉:
+
+1. `generate` / `batch`의 fire-and-forget `.catch`:
+   - raw error는 `console.error("[assets/generate]", error)` 식으로 서버 로그에만 남김
+   - DB에는 고정값 저장: `metadata: { error: "Asset generation failed" }`
+   - batch는 `{ batchId, error: "Asset generation failed" }`
+
+2. `PUBLIC_METADATA_KEYS`에서 `"error"` 제거
+   - 기존 raw `metadata.error` 행이 즉시 응답에서 차단됨
+   - 신규 read 경로가 `toPublicGeneratedAsset`을 쓰는 한 재노출 방지
+   - 테스트 L170은 “FAILED 자산의 metadata.error는 공개되지 않는다”로 뒤집는 게 맞음
+
+3. 가능하면 별도 백필도 수행
+   - 보안상 응답 차단은 allowlist 제거로 즉시 해결
+   - 그래도 DB에 raw 내부정보가 남는 것은 운영자 UI, export, debug API, 향후 코드에서 재노출될 수 있으므로 후속 백필 권장
+   - 백필은 schema migration보다는 운영 스크립트/one-off로 `status=FAILED`이고 `metadata.error` 존재 시 generic으로 치환하는 쪽이 적절합니다.
+
+**질문별 답**
+1. generic error 문자열을 응답에 남길 가치는 현재 코드 기준으로 낮습니다. 런타임 소비처가 없고 `status=FAILED`만으로 폴링 계약은 충분합니다. 그래서 C.  
+   카테고리 분류도 지금은 보류하세요. `processAssetGeneration`에 `result.error` raw throw가 있고 ComfyUI/파일/프롬프트 조각이 섞일 수 있어서 분류 실수 자체가 CWE-209 회귀 지점입니다.
+
+2. 네, **기존 행 때문에 B 단독은 결정적 허점**입니다. 신규 저장만 정규화하면 과거 raw `metadata.error`가 그대로 `GET /api/assets/[id]`에 도달합니다. 그래서 최소 조치는 A+B, 즉 C입니다. 백필은 심층방어로 추가.
+
+3. 사용자 입력 검증 실패는 생성 요청 시작 전에 `400`으로 끝나는 현재 route-level validation에 두는 게 좋습니다. 비동기 `processAssetGeneration` 실패는 전부 generic으로 뭉개세요. 사용자에게 유용한 실패 사유가 정말 필요해지면 raw message가 아니라 별도 enum, 예: `failureCode: "MODEL_UNAVAILABLE" | "GENERATION_FAILED"`처럼 서버가 통제하는 안전한 코드만 공개해야 합니다.
+
+4. 놓칠 위험 1가지: **완료 성공 경로의 `metadata: JSON.parse(JSON.stringify(metadata))`도 metadata 전체를 DB에 저장합니다.** 지금 allowlist가 막고 있지만 `GeneratedAssetMetadata`에 나중에 prompt, workflow, local path, ComfyUI node output 같은 필드가 추가되면 DB 저장면이 계속 넓어집니다. 실패 error만 고치고 끝내면 “metadata는 내부정보를 담아도 된다”는 관성이 남습니다. 장기적으로는 저장 metadata도 public/runtime 필요 필드와 internal/debug 필드를 분리하는 게 더 안전합니다.
