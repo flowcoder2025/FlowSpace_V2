@@ -1,0 +1,74 @@
+OpenAI Codex v0.141.0
+--------
+workdir: C:\Team-jane\FlowSpace
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019ef0dc-1382-7ec0-a301-ccdd487aecf8
+--------
+user
+# WI-031 협의 r2 — codex 블라인드 검증 P2 처분 확정
+
+너는 설계 협의자다. 직전 codex 블라인드 검증(r1)이 WARNING + fixNow P2×2 + defer P3×2를 냈다. 산문으로 답하라.
+
+## codex r1 지적 4건
+- **P2-A (fixNow)**: `logsToCsv`가 payload 전체를 Details 셀에 JSON.stringify — ADMIN_ACTION payload의 `targetMemberId`/`messageId` 등 내부 식별자가 CSV로 누출. 정보위생(WI-014/019/021) 위반.
+- **P2-B (fixNow)**: 멤버 이름 폴백이 `??`(nullish)인데 MemberTable/filterMembers는 `||`(truthy) — 이름이 빈 문자열이면 CSV가 화면과 다른 빈 Name을 낸다.
+- **P3-C (defer)**: `downloadCsv`가 try/finally 없음 — click/제거 throw 시 앵커 잔존·objectURL 미해제.
+- **P3-D (defer)**: codex 샌드박스에서 vitest EPERM으로 미실행(환경 제약, 결함 아님).
+
+## 내가 이미 적용한 수정
+- **P2-B 수정**: `m.user?.name || m.guestSession?.nickname || m.displayName || "Unknown"`로 변경(MemberTable와 동일 표시 우선순위·최종 "Unknown"). 빈 문자열 폴백 변이검출 테스트 추가. → 동의?
+- **P3-C 수정**: `downloadCsv`에 try/finally — `a.remove()` + `URL.revokeObjectURL(url)`를 finally에서 보장. → 동의?
+- P3-D: 로컬에서 vitest 전체 362 통과(363 예정)로 해소. 동의?
+
+## P2-A 처분 — 핵심 쟁점(증거 제시, 재평가 요청)
+실측 증거:
+1. `src/components/dashboard/event-log-table.tsx:54`는 **이미 화면 Details 컬럼에 `JSON.stringify(log.payload)` 전체를 렌더링**한다(현행). 즉 admin은 지금도 targetMemberId/messageId를 화면에서 본다.
+2. `GET /api/spaces/[id]/admin/logs`는 payload를 **raw로 반환**(정형화 없음) — 데이터가 이미 admin 브라우저에 도달.
+3. 뷰어는 항상 space admin(`requireSpaceAdmin`: OWNER/STAFF/superAdmin).
+4. payload 실내용 전수: members `{action,targetMemberId,targetName}`/`{action:"kick",targetName}`, announce `{action,messageId}`, messages `{action,messageId,senderName}`, livekit `{trackType,trackSource,participantName}`. → 내부 cuid 식별자(targetMemberId/messageId)와 표시명. **자격증명(accessSecret/inviteCode/email-of-others/prompt) 아님.**
+5. WI-014/019/021 정보위생은 **API 응답이 권한 밖 당사자에게 비밀을 노출**하던 케이스. 여기 데이터는 (a)이미 admin 화면 노출, (b)이미 API 응답, (c)operational ID(비밀 아님), (d)admin-scoped.
+
+내 판단: **CSV는 admin 전용 화면 Details를 그대로 미러링** — 신규 노출 아님. CSV만 sanitize하면 (i)화면≠CSV 불일치(네가 consult r1 Q1/Q5에서 "export what you see" 승인), (ii)실제 노출 미감소, (iii)로그 표시 의미론으로 스코프 확대.
+
+**질문**: P2-A를 (옵션1) "화면 미러링·admin-scoped·operational ID라 신규 노출 아님 → defer(문서화)"로 처분하는 게 타당한가? 아니면 (옵션2) CSV가 portable artifact라 화면 발산을 감수하고 내부 식별자 키(targetMemberId/messageId/memberId/spaceId/userId/guestSessionId) recursive omit을 해야 하나? 후자라면 그 근거(화면은 그대로 두면서 CSV만 줄이는 것이 정합적인 이유)는?
+
+**마지막에 "내가 놓칠 위험 1가지"를 지적하라.**
+
+codex
+동의한다.
+
+P2-B는 `MemberTable` 표시 우선순위와 CSV가 맞아졌고, 빈 문자열 폴백 테스트까지 있으면 충분히 fixNow 해소로 본다. P3-C도 `try/finally`로 DOM 제거와 objectURL 해제를 보장했으니 적절하다. P3-D는 로컬 전체 vitest 통과 증거가 있으면 환경 제약으로 닫아도 된다.
+
+P2-A는 제시한 증거 기준으로는 **옵션1, defer + 문서화**가 더 타당하다. 이유는 단순하다. CSV가 새로운 권한 경계나 새로운 데이터 원천을 만든 것이 아니라, 이미 admin 전용 API가 내려주고 admin 화면 Details가 그대로 렌더링하는 payload를 다른 형식으로 내보내는 것이다. `targetMemberId`/`messageId`가 자격증명, 초대 코드, access secret, 타인의 이메일, prompt 같은 WI-014/019/021류의 민감 비밀도 아니고, admin-scoped operational ID라면 “fixNow P2 정보누출”이라고 보기 어렵다.
+
+다만 defer 항목에는 명확히 남기는 게 좋다. 예를 들면:
+
+“Admin event log CSV는 화면 Details와 동일한 raw payload를 export한다. payload에는 operational ID가 포함될 수 있으나, admin 전용 API/화면에 이미 노출되는 데이터이며 비밀값은 포함하지 않는다는 현재 로그 계약에 근거해 WI-031에서는 sanitize하지 않는다. 향후 CSV를 외부 공유용 산출물로 정의하거나 payload에 secret/PII가 들어가면 UI/API/CSV를 함께 정형화한다.”
+
+옵션2도 완전히 말이 안 되는 것은 아니다. CSV는 파일로 저장되고 전달되기 쉬운 portable artifact라서, “화면에서 볼 수 있음”과 “파일로 반출됨”을 별도 위험으로 보는 정책이라면 CSV만 줄이는 것이 방어적으로 정합화될 수 있다. 하지만 그 경우 근거는 “신규 노출”이 아니라 “export artifact의 재배포 위험 완화”여야 한다. 그리고 그 정책을 택하면 화면과 CSV가 달라지는 예외를 명시해야 하며, 장기적으로는 화면 Details도 structured/sanitized view로 맞추는 쪽이 더 일관적이다.
+
+따라서 지금 처분은 **P2-A를 fixNow에서 내리고, 문서화된 P3/defer 또는 accepted-risk로 전환**이 맞다.
+
+내가 놓칠 위험 1가지: 현재 payload에는 secret/PII가 없다는 전수 결과가 맞더라도, 앞으로 새 event type이 payload에 `email`, `inviteCode`, `accessSecret`, prompt-like text를 추가하면 CSV와 화면이 동시에 raw로 노출된다. 즉 이번 판단은 “현재 payload 계약”에 의존하므로, 로그 payload 추가 시 금지 키/민감값 리뷰 또는 테스트가 필요하다.
+tokens used
+13,604
+동의한다.
+
+P2-B는 `MemberTable` 표시 우선순위와 CSV가 맞아졌고, 빈 문자열 폴백 테스트까지 있으면 충분히 fixNow 해소로 본다. P3-C도 `try/finally`로 DOM 제거와 objectURL 해제를 보장했으니 적절하다. P3-D는 로컬 전체 vitest 통과 증거가 있으면 환경 제약으로 닫아도 된다.
+
+P2-A는 제시한 증거 기준으로는 **옵션1, defer + 문서화**가 더 타당하다. 이유는 단순하다. CSV가 새로운 권한 경계나 새로운 데이터 원천을 만든 것이 아니라, 이미 admin 전용 API가 내려주고 admin 화면 Details가 그대로 렌더링하는 payload를 다른 형식으로 내보내는 것이다. `targetMemberId`/`messageId`가 자격증명, 초대 코드, access secret, 타인의 이메일, prompt 같은 WI-014/019/021류의 민감 비밀도 아니고, admin-scoped operational ID라면 “fixNow P2 정보누출”이라고 보기 어렵다.
+
+다만 defer 항목에는 명확히 남기는 게 좋다. 예를 들면:
+
+“Admin event log CSV는 화면 Details와 동일한 raw payload를 export한다. payload에는 operational ID가 포함될 수 있으나, admin 전용 API/화면에 이미 노출되는 데이터이며 비밀값은 포함하지 않는다는 현재 로그 계약에 근거해 WI-031에서는 sanitize하지 않는다. 향후 CSV를 외부 공유용 산출물로 정의하거나 payload에 secret/PII가 들어가면 UI/API/CSV를 함께 정형화한다.”
+
+옵션2도 완전히 말이 안 되는 것은 아니다. CSV는 파일로 저장되고 전달되기 쉬운 portable artifact라서, “화면에서 볼 수 있음”과 “파일로 반출됨”을 별도 위험으로 보는 정책이라면 CSV만 줄이는 것이 방어적으로 정합화될 수 있다. 하지만 그 경우 근거는 “신규 노출”이 아니라 “export artifact의 재배포 위험 완화”여야 한다. 그리고 그 정책을 택하면 화면과 CSV가 달라지는 예외를 명시해야 하며, 장기적으로는 화면 Details도 structured/sanitized view로 맞추는 쪽이 더 일관적이다.
+
+따라서 지금 처분은 **P2-A를 fixNow에서 내리고, 문서화된 P3/defer 또는 accepted-risk로 전환**이 맞다.
+
+내가 놓칠 위험 1가지: 현재 payload에는 secret/PII가 없다는 전수 결과가 맞더라도, 앞으로 새 event type이 payload에 `email`, `inviteCode`, `accessSecret`, prompt-like text를 추가하면 CSV와 화면이 동시에 raw로 노출된다. 즉 이번 판단은 “현재 payload 계약”에 의존하므로, 로그 payload 추가 시 금지 키/민감값 리뷰 또는 테스트가 필요하다.

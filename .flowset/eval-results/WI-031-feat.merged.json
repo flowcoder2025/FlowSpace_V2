@@ -1,0 +1,57 @@
+{
+  "wi": "WI-031-feat",
+  "schemaVersion": 1,
+  "commit": "056ce56",
+  "target": "develop (PR 예정)",
+  "rounds": 3,
+  "reviewers": {
+    "codex": {
+      "verdict": "PASS",
+      "issueCount": 2,
+      "rounds": 3,
+      "convergence": "r1 WARNING(fixNow P2×2: 멤버 이름 폴백 ?? vs MemberTable ||, logs payload Details raw / defer P3×2) → r2 FAIL(fixNow P2×1: FORMULA_INJECTION_PREFIXES에 \\t·\\r은 있고 \\n 누락) → r3 PASS(fixNow 0, defer 2). 블라인드 스키마 강제(-o 권위, turn.completed·error/turn.failed 0, exit 0). r2에서 payload Details defer 동의(화면 event-log-table가 이미 JSON.stringify(payload) 렌더·admin-scoped·비밀 아님). r3 잔여 2건 모두 defer."
+    },
+    "evaluator": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.85,
+      "scores": { "completeness": 10, "consistency": 10, "specificity": 10, "actionability": 10 },
+      "issueCount": 2,
+      "runs": 1,
+      "note": "독립 채점(codex 산출물 미열람·상호 블라인드 유지). r2 HEAD(d106a4b) 채점. 인젝션 중화→quoting 순서 계약을 변이검증으로 실증: M1(집합에서 '-' 제거)→csv.test '-' 중화 FAIL, M3(quoting을 중화보다 먼저)→'중화 후 구분자 함께 감쌈' FAIL. analytics 날짜 union·결측 0·정렬 정확(M2 ?? 0 default 변이 검출). r2 이름 폴백 수정 실증: M5(||→?? 회귀)→빈 문자열 폴백 테스트 FAIL. 정보위생 clean: CSV는 member-table·event-log-table 화면 표시와 정확히 동일(user.id/image/식별자 누출 없음, admin email export는 의도). 경계 clean(lib 순수/dashboard 도메인+DOM, internal 위반 0, 상수 분리). P3×2 전부 defer."
+    }
+  },
+  "gateDecision": "PASS",
+  "gateRationale": "어드민 대시보드 멤버/로그/analytics 클라이언트 측 CSV 내보내기. 순수 직렬화(src/lib/csv.ts: RFC4180 이스케이프 + 수식 인젝션 중화[선두 = + - @ \\t \\r \\n → ' prefix, neutralize→quote 순서] + CSV_BOM) + 대시보드 도메인 매퍼·다운로드(csv-export.ts) + 공용 ExportCsvButton. 로그는 클라 로드 분량만(라벨에 건수 노출), 멤버는 visibleMembers(화면 필터=내보내기), analytics는 두 시계열 날짜 union 머지(결측 0·오름차순). 설계 codex consult 1R + 듀얼 블라인드 3R 수렴. 차단 이슈(P0/P1/P2 fixNow) 0. 양 검증자 독립으로 동일 결함(선두 LF 비대칭) 수렴 발견(codex P2/evaluator P3)→r3 즉시 해소(WI-011 교훈). 기계게이트 4/4(tsc0/lint0err[선재 LiveKit 경고1·WI무관]/vitest 333->364[+31]/build0). -> .pass 생성.",
+  "convergence": [
+    {
+      "round": 1,
+      "issue": "초기 구현(788ea0e: csv.ts·csv-export.ts·ExportCsvButton·3페이지 배선·테스트 +29) 듀얼 블라인드.",
+      "codex": "WARNING (fixNow P2×2: 이름 폴백 ?? / logs payload Details raw 누출 / defer P3×2: downloadCsv finally·vitest EPERM)",
+      "evaluator": "WARNING 9.85 (P0/P1 0, fixNow 0, P3×2 defer: 선두 LF 비대칭·csvFilename UTC date label, 변이검증 다수 실증)"
+    },
+    {
+      "round": 2,
+      "issue": "r2(d106a4b): P2-B 이름 폴백 ??→|| +Unknown(MemberTable 일치)·빈문자열 변이검출 테스트, P3-C downloadCsv try/finally, P2-A(payload) consult r2 합의로 defer.",
+      "codex": "FAIL (fixNow P2×1: 선두 LF(\\n) 미중화 — \\t·\\r 대비 비대칭. P2-B/P3-C 해소·P2-A defer 동의 확인)",
+      "evaluator": "(r2 HEAD 채점) WARNING 9.85 (fixNow 0, 동일 LF 비대칭을 P3 defer로 독립 지목 + csvFilename UTC P3 defer)"
+    },
+    {
+      "round": 3,
+      "issue": "r3(056ce56): FORMULA_INJECTION_PREFIXES에 \\n 추가(공백류 \\t·\\r·\\n 대칭)+회귀 테스트(\\n=SUM(1)). 두 검증자 수렴 발견 즉시 강화.",
+      "codex": "PASS (fixNow 0; defer P2 payload accepted-risk·defer P3 vitest EPERM env-only)",
+      "evaluator": "(r2 채점 유효 — r3는 evaluator가 defer로 지목한 LF를 해소한 additive 강화라 점수 불변·9.85)"
+    }
+  ],
+  "resolvedThisWI": [
+    "사용자 선택 '대시보드 완성' 범위 2/2(CSV 내보내기) 완료 — WI-029(품질 마감)·WI-030(고급 필터)에 이은 마지막.",
+    "멤버/로그/analytics 3페이지 CSV 내보내기: 순수 직렬화(lib/csv.ts) + 도메인 매퍼·다운로드(csv-export.ts) + 공용 버튼.",
+    "CSV/수식 인젝션 중화(선두 = + - @ \\t \\r \\n → ' prefix) + RFC4180 이스케이프 + UTF-8 BOM(Excel 한글).",
+    "이름 폴백을 MemberTable/filterMembers와 동일 표시 우선순위(|| 체인 + Unknown)로 통일(화면=CSV 일관)."
+  ],
+  "deferred": [
+    "P2 (codex, accepted-risk·문서화) logsToCsv payload Details raw JSON — CSV는 admin 전용 화면 Details(event-log-table.tsx:54가 이미 JSON.stringify(payload) 렌더)와 동일 데이터를 미러링. admin-scoped(requireSpaceAdmin)·payload는 operational ID(targetMemberId/messageId)+표시명뿐, 비밀(accessSecret/inviteCode/타인 email/prompt) 아님. CSV만 sanitize하면 화면≠CSV 발산·실노출 미감소. consult r2에서 codex 동의. 향후 payload에 PII/secret 추가 시 UI/API/CSV 동시 정형화(아래 backlog).",
+    "P3 (evaluator) csvFilename UTC date label — date.toISOString().slice(0,10)이 파일명 날짜를 UTC로 생성, KST 로컬 09:00 이전엔 하루 이를 수 있음. CSV 데이터/인코딩 무관·파일명 cosmetics 한정. 테스트가 UTC 계약 명시 고정(회귀 위험 0).",
+    "P3 (codex) vitest EPERM — codex read-only 샌드박스가 esbuild spawn EPERM으로 vitest 미실행(환경 제약). 로컬 전체 vitest 364 통과로 해소·제품 결함 아님.",
+    "(codex consult r2 위험·WI 스코프 외) 로그 payload 계약 의존 — 향후 새 event type이 payload에 email/inviteCode/accessSecret/prompt-like 추가 시 화면+CSV 동시 raw 노출. payload 작성 시 금지 키 리뷰/테스트 또는 화면·CSV 공동 정형화 → 별 후속 WI(WI-032 후보)."
+  ]
+}

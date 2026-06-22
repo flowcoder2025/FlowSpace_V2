@@ -8,6 +8,8 @@ import {
   type MemberRoleFilter,
 } from "@/components/dashboard/member-table";
 import { filterMembers } from "@/components/dashboard/member-filter";
+import { ExportCsvButton } from "@/components/dashboard/export-csv-button";
+import { membersToCsv, downloadCsv, csvFilename } from "@/components/dashboard/csv-export";
 
 const ROLE_FILTERS: { value: MemberRoleFilter; label: string }[] = [
   { value: "ALL", label: "All Roles" },
@@ -55,10 +57,21 @@ export default function MembersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-ink">Members</h1>
-        <span className="text-sm text-ink-muted">
-          {visibleMembers.length}
-          {visibleMembers.length !== members.length ? ` / ${members.length}` : ""} members
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-ink-muted">
+            {visibleMembers.length}
+            {visibleMembers.length !== members.length ? ` / ${members.length}` : ""} members
+          </span>
+          <ExportCsvButton
+            disabled={visibleMembers.length === 0}
+            onExport={() =>
+              downloadCsv(
+                csvFilename("members", spaceId, new Date()),
+                membersToCsv(visibleMembers)
+              )
+            }
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
