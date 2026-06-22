@@ -1,0 +1,23 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 9.9,
+    "specificity": 9.8,
+    "actionability": 9.5
+  },
+  "weightedTotal": 9.8,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/lib/pagination.ts:19-23 (parsePageLimit) ↔ src/app/api/spaces/[id]/admin/messages/route.ts:32, src/app/api/spaces/[id]/messages/route.ts:34",
+      "description": "S5 헬퍼 통일은 응답 계약을 보존하나 limit 파싱 시맨틱이 엣지에서 미세 변동한다(전부 개선·무회귀, 실증). 독립 검증: 비-admin 구코드 Math.min(parseInt(raw||'50',10),100)는 raw='abc'/' ' → take:NaN(Prisma에 NaN 전달, 잠재 결함), raw='0' → take:1(degenerate). admin 구코드 Math.min(Number(raw)||50,100)는 raw='-5' → take:-4(역순 시맨틱), raw='0x10' → 16. parsePageLimit은 이 모든 케이스를 DEFAULT/cap으로 정규화(NaN·음수·0 제거)하므로 두 라우트의 잠재 take:NaN/음수 버그를 제거하고 동작을 일치시킨다. 회귀 아님 — 오히려 강화. 다만 'admin raw=0x10 → 16에서 50으로' 같은 임의값 변경은 클라이언트가 비표준 입력에 의존하지 않는 한 무영향(현 호출부는 정수 limit만 전송).",
+      "recommendation": "현 상태 유지로 충분(개선·무회귀). limit 정규화 시맨틱(0 이하/비정수 → 기본 50, >100 → cap 100)은 src/lib/pagination.ts에 명문화되어 있어 추후 라우트의 일관 기준점으로 사용 가능.",
+      "defer": true,
+      "deferRationale": "응답 계약(비-admin {messages 매핑,nextCursor,hasMore}; admin {messages,nextCursor} hasMore 미추가)은 정확히 보존되며, limit 파싱 변동은 전 케이스 strict improvement(잠재 take:NaN/음수 제거)로 실증됨. 회귀 없음 → P3 관찰.",
+      "fixNow": false
+    }
+  ]
+}

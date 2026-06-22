@@ -1,12 +1,12 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-012-2-refactor",
   "lastWI": "WI-012-1-refactor",
   "type": "refactor",
-  "status": "MERGED",
+  "status": "VERIFY",
   "integrationBranch": "develop",
-  "branch": "develop",
+  "branch": "refactor/WI-012-2-refactor-cleanup",
   "startedAt": "2026-06-22",
-  "requiredGates": ["tsc", "lint", "vitest", "build", "esbuild-server", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "84ea3d8",
-  "note": "WI-012-1-refactor(WI-012 분할 1/2, codex consult D6) develop 머지 완료 — PR#12, merge 84ea3d8(impl 3dac762). S1 protocol 모듈 분리 + S2 소켓상수 물리이동. 신규 src/features/space/protocol(socket-events 타입 + socket-constants RECONNECTION_*/MOVE_THROTTLE_MS + 순수 배럴). socket/internal/types.ts 삭제→socket/index.ts facade(소비자 4개소 무변경). server 9개소·Dockerfile.socket·deploy-socket.yml·communication.md/event-protocol.md/스펙 갱신. enforce 잔류·DEFAULT_NICKNAME chat 잔류. 선재 P1 해소: server/middleware/auth.ts가 런타임 import하는 src/lib/auth-secret.ts(WI-001 도입)가 Dockerfile COPY 누락이던 것 추가(esbuild metafile로 서버 번들 런타임 src 입력 3개[chat-constants·enforce contract·auth-secret] 전수 COPY 실증 — socket-events.ts는 type-only라 elide). 기계게이트 5/5(tsc 0/lint 0/vitest 128·128/build 0/서버 esbuild 0). 듀얼검증 codex 3R 수렴 PASS(r1 P3-doc→r2 P1-authsecret+P3-원장→r3 PASS 0 issues)·evaluator 10.0(run2 최종HEAD WARNING 10.0 P3-스펙표[806d07b 해소]) + .pass(2fc1cc67). 큐 잔여: WI-012-2-refactor(S3~S6 cleanup, READY)/WI-013-perf(인덱스, DB승인필요). 승격 미실행 부채: WI-001~012-1 develop만 반영, main(라이브) 미반영."
+  "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
+  "lastVerifiedCommit": "94a21a5",
+  "note": "WI-012-2-refactor(WI-012 분할 2/2 cleanup, codex consult D3~D5) VERIFY: S3 EventBridge 단일진입점(game 배럴 30 payload 명시노출 + editor/avatar 통일 + ESLint **/game/events 차단) + S4 useScreenRecorder close() L263+L357 .catch 4경로 통일(+AudioContext 스텁 변이검증 2건) + S5 messages 2라우트 cursor를 src/lib/pagination.ts 헬퍼 통일(응답계약 보존, admin hasMore 미추가 D5, +라우트 테스트 11) + S6 POST/api/spaces 커버리지 201/401/400/404/500+GET500(테스트전용, route.ts 무변경). 기계게이트 4/4(tsc 0/lint 0/vitest 128→147/build 0). 듀얼검증 codex r1 PASS 0 issues·evaluator 9.8(P3x1 defer parsePageLimit 엣지=strict improvement) + .pass(16c001a0). 양측 변이검증 실증. 직전 WI-012-1 develop 머지(PR#12, 84ea3d8)."
 }
