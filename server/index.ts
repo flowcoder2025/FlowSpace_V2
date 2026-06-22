@@ -12,10 +12,19 @@ import { handleEditor } from "./handlers/editor";
 import { handleMedia } from "./handlers/media";
 import { handleAvatar } from "./handlers/avatar";
 import { handleInternalHttp } from "./handlers/enforce";
+import { validateSocketStartupConfig } from "../src/lib/socket-startup";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from "../src/features/space/protocol/internal/socket-events";
+
+// 부팅 전 필수 env 검증 (WI-018, fail-fast) — listen 전에 수행해야
+// AUTH_SECRET 오설정 컨테이너가 포트를 열고 healthcheck를 통과하지 못한다.
+// production에서 AUTH_SECRET 미설정/단문이면 throw → 프로세스가 뜨지 않는다.
+const startupReport = validateSocketStartupConfig();
+for (const warning of startupReport.warnings) {
+  console.warn(`[Socket.io] ⚠️  ${warning}`);
+}
 
 const PORT = parseInt(process.env.SOCKET_PORT || "3001", 10);
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || process.env.AUTH_URL || "http://localhost:3000")
