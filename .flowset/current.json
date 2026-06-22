@@ -1,12 +1,12 @@
 {
-  "activeWI": "WI-013-perf",
-  "lastWI": "WI-012-2-refactor",
+  "activeWI": null,
+  "lastWI": "WI-013-perf",
   "type": "perf",
-  "status": "VERIFY",
+  "status": "MERGED",
   "integrationBranch": "develop",
-  "branch": "perf/WI-013-perf-space-index",
+  "branch": "develop",
   "startedAt": "2026-06-22",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "a390df8",
-  "note": "WI-013-perf VERIFY: GET /api/spaces 핫 쿼리용 Space 복합 인덱스. schema @@index([status]) 제거→@@index([status, updatedAt(Desc), id(Desc)]) + 마이그레이션 20260622120000_space_hot_query_index(CREATE→DROP 순, force-add). 설계 codex consult D1~D5(단일 복합·Prisma 네이티브 full·redundant status 제거·prod CONCURRENTLY via direct). 로컬검증 prisma validate/migrate diff/기계게이트 5/5(prisma generate 0/tsc 0/lint 0/vitest 147·147/build 0). 듀얼검증 codex r1 PASS 0 issues·evaluator 9.78(P3x2: #1 migration순서[eca0ff2 해소]·#2 D2 joined 보류[의도된 prod-gate 후속]) + .pass(c206e20b). **prod 적용 + 프로덕션 EXPLAIN(cursor seek 효율)은 사용자 승인 게이트(미실행)**. 직전 WI-012-2 develop 머지(PR#13, 986747a)."
+  "lastVerifiedCommit": "f8f4ede",
+  "note": "WI-013-perf develop 머지 완료 — PR#14, merge f8f4ede(impl 5a45b6d/r2 eca0ff2). GET /api/spaces 핫 쿼리용 Space 복합 인덱스 @@index([status, updatedAt(Desc), id(Desc)])(기존 단일 status 인덱스 대체) + 마이그레이션 20260622120000_space_hot_query_index. 설계 codex consult D1~D5. 듀얼검증 codex PASS·evaluator 9.78 + .pass(c206e20b). **큐 전부 소진** — WI-001~013 develop 반영 완료, P3 부채 0. **미해결 승인 항목: (1) WI-013 prod 마이그레이션 적용 + 프로덕션 EXPLAIN(cursor seek 효율) — 사용자 승인 게이트. (2) develop→main 승격(WI-001~013 라이브 반영) — 사용자 승인 필요(process 07), WI-012-1 OCI 소켓 재배포 포함. 라이브=구버전 main+WI-007만.** WI-005 운영: OCI .env SOCKET_INTERNAL_SECRET + Vercel SOCKET_INTERNAL_URL/SECRET 필요. 다음: 사용자 승인 대기 또는 신규 WI 발굴."
 }
