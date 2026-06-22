@@ -1,0 +1,16 @@
+WI=WI-021-fix
+commit=5cd3f85
+sourceFingerprint=d8a1b53f7cdd49865eaa2cd6a8e03c63bf5d2f7f2dc7b3cc785e5df0fcc32534
+fingerprintScope=changeset(4 source files vs develop: api/assets/route.ts + route.test.ts + features/assets/index.ts + internal/public-asset.ts). 검증된 changeset 감사 기록. 커밋 후 워킹트리 clean이라 Stop 게이트는 changed=0(EmitFingerprint empty e3b0c44)으로 통과. eval-results .json/.md/.pass는 소스 fingerprint 범위 외(.ts/.tsx/.prisma만 추적).
+codex=.flowset/eval-results/WI-021-fix.codex.json
+evaluator=.flowset/eval-results/WI-021-fix.eval.json
+merged=.flowset/eval-results/WI-021-fix.merged.json
+consult=.flowset/eval-results/WI-021-consult-r1.out.txt
+gates=tsc,lint,vitest,build
+gatesEvidence=tsc 0 / lint 0(선재 LiveKit 경고 1·WI무관) / vitest 204·204(+12) / next build 0
+codexVerdict=r1 PASS 0 issues (목록 lean DTO 정형화 누출 경로 없음·shared 분기 포함, 설계/scope/테스트 적출 결함 0)
+evaluatorVerdict=r1 WARNING 9.81 (P0/P1 0, P3x3 defer: enum 무검증·limit 무상한[둘 다 선재→WI-022]·중복 인터페이스 nit, 변이검증 2종 실증)
+gateDecision=PASS
+followUp=WI-022 후보 — assets 목록 입력 강건화: type/status enum allowlist 검증(400 code:INVALID_FILTER, GET/spaces 패턴) + limit 상한·NaN 정규화(src/lib/pagination.ts parsePageLimit). codex consult가 '별 WI 분리' 권고(limit 무상한 우선순위 높게).
+target=develop (PR 예정)
+createdAt=2026-06-22T21:10:00+09:00
