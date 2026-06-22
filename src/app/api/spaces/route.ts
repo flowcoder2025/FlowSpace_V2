@@ -147,7 +147,11 @@ export async function POST(request: Request) {
           },
         },
       },
-      include: {
+      // 응답 select — accessSecret/inviteCode 등 민감 Space 스칼라를 애초에 fetch하지 않음
+      // (app.md 서버 불변식 #2 "필요한 필드만").
+      select: {
+        id: true,
+        name: true,
         template: { select: { key: true, name: true } },
       },
     });
