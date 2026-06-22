@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.9,
+    "consistency": 9.9,
+    "specificity": 10,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.85,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/dashboard/spaces/[id]/logs/page.tsx:12-23, src/app/dashboard/spaces/[id]/messages/page.tsx:21-27",
+      "description": "필터 드롭다운의 표시용 타입 목록(EVENT_TYPES 9개·MESSAGE_TYPE_OPTIONS 5개)이 클라이언트에 하드코딩된 리터럴 배열. 현재 Prisma SpaceEventType/MessageType enum과 정확히 일치함을 grep으로 실측 확인. 서버는 Prisma 런타임 enum(Object.values)으로 검증(SSOT)이라 enum 추가/변경 시 드리프트가 발생해도 누락 옵션은 단지 UI 드롭다운에서 빠질 뿐이고, 임의 값은 서버 normalizeEnumFilter가 400 INVALID_FILTER로 거부 — 보안/정합 결함 아님. 유지보수 nit.",
+      "recommendation": "장기적으로 enum 표시 목록을 서버 enum에서 도출하거나 공유 상수로 추출. 단 기존 대시보드의 하드코딩 카피 패턴(app.md#9는 값/URL 대상, enum 표시 라벨은 관행적 허용)과 일관이라 즉시 강제 불요.",
+      "defer": true,
+      "deferRationale": "서버 enum이 SSOT이고 잘못된 값은 400으로 거부됨. 현재 enum과 일치(실측). 기존 대시보드 표시 라벨 하드코딩 패턴과 동일 클래스로 i18n 미도입 상태. 회귀 위험 0.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/dashboard/spaces/[id]/logs/page.tsx:70,85,93 / messages/page.tsx:67,82,91 (UI 카피·에러 메시지)",
+      "description": "UI 라벨/에러 카피('Event Logs','All Events','로그를 불러오지 못했습니다.' 등)가 컴포넌트에 하드코딩. i18n 레이어 부재. 기존 대시보드(WI-029 포함) 전반의 패턴과 동일.",
+      "recommendation": "i18n 도입 시 일괄 추출. 현 시점 단독 처리 불요.",
+      "defer": true,
+      "deferRationale": "기존 대시보드 전역 패턴과 일관. i18n 미도입 프로젝트 상태에서 이 WI만 분리 처리할 근거 없음. 동작 결함 아님.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/query-filter.ts:45-64 (parseDateRangeFilter)",
+      "description": "날짜 범위 span에 상한이 없어 매우 넓은 createdAt 범위(예: 수년)도 허용. 다만 결과는 cursor 페이지네이션(take limit+1, 기본 50)으로 항상 절단되어 단일 응답 폭증 표면은 닫혀 있음. start>=end는 invalid로 거부됨. 스케일 비효율은 WI-025(offset 상한) 계열의 저우선 부채와 동일 클래스.",
+      "recommendation": "데이터 증가 후 필요 시 MAX_RANGE 또는 인덱스 EXPLAIN과 함께 다룸. 현재 표면 제한적.",
+      "defer": true,
+      "deferRationale": "cursor 페이지네이션이 응답 크기를 제한하고 where가 cursor보다 선적용되어 권한 경계도 보존. 실표면 작고 WI-013 인덱스(status,updatedAt,id)와 무관한 createdAt 정렬이라 별도 인덱스 검토는 데이터 증가 후가 적절.",
+      "fixNow": false
+    }
+  ]
+}
