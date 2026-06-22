@@ -82,4 +82,15 @@ describe("parseDateRangeFilter", () => {
     };
     expect(r.gte).toBeInstanceOf(Date);
   });
+
+  it("달력 무효 instant → invalid (JS Date 롤오버 보정 차단)", () => {
+    expect(parseDateRangeFilter("2026-02-31T00:00:00.000Z", null)).toBe("invalid");
+    expect(parseDateRangeFilter("2026-13-01T00:00:00.000Z", null)).toBe("invalid");
+    expect(parseDateRangeFilter("2026-06-23T25:00:00.000Z", null)).toBe("invalid");
+  });
+
+  it("윤년 2/29는 유효 / 평년 2/29는 invalid", () => {
+    expect(parseDateRangeFilter("2028-02-29T00:00:00.000Z", null)).not.toBe("invalid");
+    expect(parseDateRangeFilter("2026-02-29T00:00:00.000Z", null)).toBe("invalid");
+  });
 });

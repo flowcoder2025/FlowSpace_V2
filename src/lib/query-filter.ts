@@ -67,15 +67,33 @@ export function parseDateRangeFilter(
  * ISO 8601 datetime **instant**(날짜+시간+TZ 지정자 Z 또는 ±HH:MM)만 허용한다.
  * date-only(`2026-06-23`)나 offsetless(`...T00:00:00`)는 서버에서 UTC/로컬로 모호하게
  * 해석되므로 계약에서 거부(클라이언트는 `.toISOString()`으로 항상 instant 전송).
+ * 캡처 그룹: 1=year 2=month 3=day 4=hour 5=min 6=sec(opt) — 달력/시간 범위를 직접
+ * 검증해 JS Date의 조용한 보정(`02-31`→3월)을 차단한다(offset instant는 UTC 비교로
+ * 검증 불가 → 작성된 컴포넌트를 직접 검사).
  */
 const ISO_INSTANT_RE =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function parseInstant(raw: string | null): Date | undefined | "invalid" {
   if (raw === null) return undefined;
   const trimmed = raw.trim();
   if (trimmed.length === 0) return undefined;
-  if (!ISO_INSTANT_RE.test(trimmed)) return "invalid";
+
+  const m = ISO_INSTANT_RE.exec(trimmed);
+  if (!m) return "invalid";
+
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const second = m[6] !== undefined ? Number(m[6]) : 0;
+  // 달력/시간 범위 검증(JS Date 롤오버 보정 차단)
+  if (month < 1 || month > 12) return "invalid";
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day < 1 || day > daysInMonth) return "invalid";
+  if (hour > 23 || minute > 59 || second > 59) return "invalid";
+
   const d = new Date(trimmed);
   if (Number.isNaN(d.getTime())) return "invalid";
   return d;
