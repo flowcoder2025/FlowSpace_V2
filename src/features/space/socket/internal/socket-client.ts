@@ -140,11 +140,23 @@ function getSocketUrl(): string {
   return `${window.location.protocol}//${window.location.hostname}:${port}`;
 }
 
+/**
+ * 진행 중(in-flight)인 소켓 생성 promise. 토큰 발급(재시도 포함) await 윈도우
+ * 동안 들어오는 동시 getSocketClient() 호출이 중복 fetch/중복 io()를 만들지
+ * 않도록 동일 promise를 공유한다(마지막 생성분만 남고 나머지가 누수되는 race 차단).
+ */
+let pendingClient: Promise<TypedSocket> | null = null;
+
 /** 소켓 클라이언트 인스턴스 (싱글턴) */
 export async function getSocketClient(): Promise<TypedSocket> {
   // 이미 연결됐거나 연결 중인 소켓 재사용
   if (socket && (socket.connected || socket.active)) {
     return socket;
+  }
+
+  // 생성이 진행 중이면 동일 promise 공유 (중복 fetch/io 방지)
+  if (pendingClient) {
+    return pendingClient;
   }
 
   // 이전 소켓이 있으면 정리
@@ -154,23 +166,35 @@ export async function getSocketClient(): Promise<TypedSocket> {
     socket = null;
   }
 
-  // 토큰 발급 (일시적 실패는 재시도, 원인별 SocketTokenError로 실패)
-  const token = await fetchSocketToken();
+  const pending = (async (): Promise<TypedSocket> => {
+    // 토큰 발급 (일시적 실패는 재시도, 원인별 SocketTokenError로 실패)
+    const token = await fetchSocketToken();
 
-  const url = getSocketUrl();
-  console.log("[Socket] Connecting to:", url);
+    const url = getSocketUrl();
+    console.log("[Socket] Connecting to:", url);
 
-  socket = io(url, {
-    auth: { token },
-    transports: ["websocket", "polling"],
-    reconnection: true,
-    reconnectionAttempts: RECONNECTION_ATTEMPTS,
-    reconnectionDelay: RECONNECTION_DELAY,
-    reconnectionDelayMax: RECONNECTION_DELAY_MAX,
-    timeout: RECONNECTION_TIMEOUT,
-  });
+    const next = io(url, {
+      auth: { token },
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: RECONNECTION_ATTEMPTS,
+      reconnectionDelay: RECONNECTION_DELAY,
+      reconnectionDelayMax: RECONNECTION_DELAY_MAX,
+      timeout: RECONNECTION_TIMEOUT,
+    });
+    socket = next;
+    return next;
+  })();
 
-  return socket;
+  pendingClient = pending;
+  try {
+    return await pending;
+  } finally {
+    // 더 새로운 생성이 시작됐다면 그 pending을 덮어쓰지 않는다
+    if (pendingClient === pending) {
+      pendingClient = null;
+    }
+  }
 }
 
 /** 소켓 연결 해제 */

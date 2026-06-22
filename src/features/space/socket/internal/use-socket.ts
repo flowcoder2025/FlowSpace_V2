@@ -207,6 +207,9 @@ export function useSocket({
   const [socketError, setSocketError] = useState<string | null>(null);
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const socketRef = useRef<TypedSocket | null>(null);
+  // connect effect 세대(generation) 카운터 — 비동기 토큰 발급 중 effect가
+  // 교체/언마운트됐는지 식별해 stale effect가 후속 effect의 소켓을 끊지 않게 한다.
+  const connectAttemptRef = useRef(0);
   const lastMoveRef = useRef(0);
   const playersMapRef = useRef(new Map<string, PlayerData>());
 
@@ -269,6 +272,7 @@ export function useSocket({
 
   useEffect(() => {
     let mounted = true;
+    const attemptId = ++connectAttemptRef.current;
 
     function syncPlayers() {
       setPlayers(Array.from(playersMapRef.current.values()));
@@ -277,7 +281,17 @@ export function useSocket({
     async function connect() {
       try {
         const sock = await getSocketClient();
-        if (!mounted) return;
+
+        // 토큰 발급(재시도 포함) 중 언마운트/effect 교체가 일어났을 수 있다.
+        if (!mounted) {
+          // 후속 effect가 시작되지 않았을 때만(=내가 마지막 시도) orphan 소켓 정리.
+          // deps 변경으로 새 effect가 시작됐다면 그 effect가 동일 소켓을 이어 쓰므로 끊지 않는다.
+          if (connectAttemptRef.current === attemptId) {
+            disconnectSocket();
+          }
+          return;
+        }
+        if (connectAttemptRef.current !== attemptId) return;
 
         socketRef.current = sock;
 
@@ -488,7 +502,7 @@ export function useSocket({
         }
       } catch (err) {
         console.error("[Socket] Connection failed:", err);
-        if (!mounted) return;
+        if (!mounted || connectAttemptRef.current !== attemptId) return;
         setSocketError(
           err instanceof SocketTokenError
             ? socketTokenErrorMessage(err.code)
