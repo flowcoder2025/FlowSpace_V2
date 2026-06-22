@@ -8,11 +8,30 @@ import type {
   PlayerData,
   MovementData,
 } from "@/features/space/protocol";
-import { getSocketClient, disconnectSocket } from "./socket-client";
+import {
+  getSocketClient,
+  disconnectSocket,
+  SocketTokenError,
+  type SocketTokenErrorCode,
+} from "./socket-client";
 import { MOVE_THROTTLE_MS } from "@/features/space/protocol";
 import { DEFAULT_NICKNAME } from "@/features/space/chat";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+
+/** 소켓 토큰 발급 실패 코드를 사용자 안내 메시지로 매핑한다. */
+function socketTokenErrorMessage(code: SocketTokenErrorCode): string {
+  switch (code) {
+    case "UNAUTHORIZED":
+      return "세션이 만료되었습니다. 다시 로그인해 주세요.";
+    case "NETWORK_FAILURE":
+      return "실시간 서버 인증에 연결하지 못했습니다. 네트워크를 확인하고 다시 시도해 주세요.";
+    case "TEMPORARY_FAILURE":
+      return "실시간 연결 인증 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.";
+    case "INVALID_RESPONSE":
+      return "실시간 연결 인증 응답이 올바르지 않습니다. 잠시 후 다시 시도해 주세요.";
+  }
+}
 
 interface ChatMessageData {
   id?: string;
@@ -469,7 +488,12 @@ export function useSocket({
         }
       } catch (err) {
         console.error("[Socket] Connection failed:", err);
-        setSocketError("소켓 연결에 실패했습니다.");
+        if (!mounted) return;
+        setSocketError(
+          err instanceof SocketTokenError
+            ? socketTokenErrorMessage(err.code)
+            : "소켓 연결에 실패했습니다."
+        );
       }
     }
 
