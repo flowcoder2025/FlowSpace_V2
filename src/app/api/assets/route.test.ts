@@ -299,6 +299,17 @@ describe("GET /api/assets — 입력 검증 (WI-022)", () => {
     expect(arg.where.type).toBe("CHARACTER");
   });
 
+  it("공백-only 값은 미지정과 동일 취급(필터 미적용, 400 아님)", async () => {
+    // codex r1: trim 후 비면 빈값처럼 필터 미적용 — 400으로 거절하지 않는다.
+    const res = await GET(buildGetRequest("/api/assets", { type: "   " }));
+
+    expect(res.status).toBe(200);
+    const arg = mockPrisma.generatedAsset.findMany.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(arg.where.type).toBeUndefined();
+  });
+
   it("limit 미지정 → take 20 (기존 default 보존)", async () => {
     await GET(buildGetRequest("/api/assets"));
 
