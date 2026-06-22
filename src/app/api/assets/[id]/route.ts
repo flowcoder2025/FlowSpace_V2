@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { unlink } from "fs/promises";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { resolveGeneratedAssetPath } from "@/features/assets";
+import { resolveGeneratedAssetPath, toPublicGeneratedAsset } from "@/features/assets";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -17,9 +17,25 @@ export async function GET(_request: Request, { params }: RouteParams) {
     }
 
     const { id } = await params;
+    // 응답 allowlist (WI-019): raw row 대신 select로 공개 필드만 fetch.
+    // userId는 소유권 판정 전용 — 응답 DTO(toPublicGeneratedAsset)에는 미포함.
+    // metadata는 민감 필드(prompt/workflow/comfyuiJobId)가 중복 저장되므로
+    // DTO에서 공개 키 allowlist로 정규화한다.
     const asset = await prisma.generatedAsset.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        type: true,
+        name: true,
+        status: true,
+        filePath: true,
+        thumbnailPath: true,
+        fileSize: true,
+        isShared: true,
+        metadata: true,
+        createdAt: true,
+        updatedAt: true,
         user: {
           select: { id: true, name: true },
         },
@@ -35,7 +51,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    return NextResponse.json(asset);
+    return NextResponse.json(toPublicGeneratedAsset(asset));
   } catch (error) {
     return NextResponse.json(
       {

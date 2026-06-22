@@ -4,6 +4,14 @@ export { validateAssetMetadata, validateAssetFilename } from "./internal/validat
 export { loadWorkflowTemplate, injectWorkflowParams } from "./internal/workflow-loader";
 export { ASSET_SPECS, ASSET_STORAGE_PATHS, generateAssetFilename } from "./internal/specs";
 export { resolveGeneratedAssetPath } from "./internal/safe-path";
+export {
+  toPublicGeneratedAsset,
+  PUBLIC_METADATA_KEYS,
+} from "./internal/public-asset";
+export type {
+  PublicGeneratedAsset,
+  GeneratedAssetForPublic,
+} from "./internal/public-asset";
 export { loadAssetToPhaser, loadAssetsToPhaser } from "./internal/game-loader";
 export {
   removeBackground,
