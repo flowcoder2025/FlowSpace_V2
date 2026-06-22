@@ -1,0 +1,1613 @@
+OpenAI Codex v0.141.0
+--------
+workdir: C:\Team-jane\FlowSpace
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019eef75-78cb-70f1-90d1-90e03a9ad99a
+--------
+user
+# 설계 협의 — 다음 작업 우선순위 + 스코프 (FlowSpace, develop 브랜치)
+
+당신은 FlowSpace(Next.js 15 + Phaser 3 메타버스)의 독립 설계 파트너입니다. 메인 구현자는 Claude이고, 당신은 설계 협의(consult)와 검증에 등장합니다. **이 라운드는 설계 협의 — 코드를 바꾸지 말고, 우선순위 결정·스코프·위험만 판단하세요.**
+
+## 상황
+READY 큐가 비었습니다. develop은 WI-001~022까지 머지 완료(보안/안정성/경계/성능 다수). 이제 BACKLOG 3건 중 무엇을 다음 WI로 할지, 그리고 그 스코프를 정해야 합니다. 라이브 반영(main 승격)은 별도 사용자 승인 게이트이며, 지금은 develop 정상 플로우(분기→기계게이트→듀얼 블라인드 검증→.pass→develop PR 머지) 작업입니다.
+
+## BACKLOG 후보 (실측 코드 첨부)
+
+### 후보 A — WI-023: 500 에러 details 정보 노출 + offset 상한 (원래 "선택/저우선"으로 등록됨)
+원래 등록 시 전제: "`assets/route.ts:124`의 500 폴백 `details:error.message`를 spaces/messages 라우트와 정렬(=그것들은 안전하다 가정)".
+
+**그러나 실측 결과 이 전제가 틀렸습니다.** 전수 grep:
+```
+details: error instanceof Error ? error.message : undefined
+→ 26개 API 라우트 파일, 37곳에서 발견
+```
+대상에 `spaces/route.ts`(2), `spaces/[id]/route.ts`(3), `spaces/[id]/messages/route.ts`(1), `spaces/[id]/members/route.ts`(3), `spaces/[id]/admin/*`(stats/announce/logs/analytics/members/messages/media 등), `spaces/join/[inviteCode]`(2), `spaces/[id]/map/*`, `assets/*`(generate/batch/[id]/목록), `workflows`, `guest`, `auth/register` 전부 포함. 즉 거의 전 API 표면이 500 시 내부 에러 메시지(Prisma 에러는 DB 스키마/컬럼/제약명, 파일 경로 등 포함 가능)를 클라이언트에 그대로 반환합니다. **CWE-209(정보 노출).**
+예외(details 미노출): `livekit/webhook`, `livekit/token`, `socket/token`.
+
+현재 assets 목록 500 핸들러:
+```ts
+} catch (error) {
+  return NextResponse.json(
+    { error: "Failed to fetch assets",
+      details: error instanceof Error ? error.message : undefined },
+    { status: 500 }
+  );
+}
+```
+추가 곁가지: `parsePageNumber`는 page 상한이 없음(큰 page → 큰 offset skip). 단 현재 소비처는 page 파라미터를 보내지 않아 실표면 0.
+
+### 후보 B — WI-017: 소켓 토큰 획득 실패 폴백 (UX 방어, 승격 차단 아님)
+`src/features/space/socket/internal/socket-client.ts`:
+```ts
+const res = await fetch("/api/socket/token");
+if (!res.ok) throw new Error("Failed to get socket token");
+const { token } = await res.json();
+```
+`/api/socket/token`이 !ok면 즉시 throw. retry/백오프/오프라인 폴백 없음. 토큰 엔드포인트 일시 장애(네트워크 순단, 콜드스타트 타임아웃) 시 메타버스 진입이 전면 실패. 단 AUTH_SECRET 영구 오설정 같은 비-일시 장애는 retry로 안 풀림(throw가 맞을 수 있음). socket.io 자체 reconnection은 토큰 획득 **이후** 단계에만 적용됨(토큰 fetch는 그 앞).
+
+### 후보 C — WI-018: prod env fail-fast (운영 안전망, 승격 차단 아님)
+`src/features/space/enforce/internal/dispatch.ts`: `SOCKET_INTERNAL_URL/SECRET` 미설정 시 production이면 console.error 후 `{enforced:false}`로 graceful degrade(throw 안 함). `server/handlers/enforce.ts`: 시크릿 없으면 요청당 503. 둘 다 "조용히 degrade" — startup에 검증해 fail-fast 하자는 제안. 단 현재 graceful degrade는 의도된 동작(실시간 제재는 선택 기능, 미설정 시 DB만 반영). fail-fast로 바꾸면 미설정 환경에서 소켓 서버/배포가 기동 거부 → 양날의 검.
+
+## 결정 요청
+1. **다음 WI 1건**: A / B / C 중 무엇을 먼저? 근거(보안 영향 × 실표면 × 위험 × 무회귀성).
+2. **선택한 WI의 스코프**:
+   - A를 택하면: 26파일 37곳 일괄(중앙 에러 헬퍼 도입)이 옳은가, assets만 좁게가 옳은가? 중앙 헬퍼 설계(server-side 로깅 유지 + client에 generic 메시지, `{error, code?}` app.md 불변식 #4 준수, dev에서는 details 유지할지)? Prisma 에러/`NextResponse.json` 기존 계약(테스트가 못박은 응답 키)과의 회귀 위험은? offset 상한도 같이? 별도?
+   - B를 택하면: 토큰 fetch retry 정책(횟수/백오프), 비-일시 장애 구분, 기존 reconnection 상수 재사용 여부, throw 계약을 깨는지(호출부 영향).
+   - C를 택하면: fail-fast 위치(어디서 검증), prod-only 게이팅, graceful degrade 의도와의 충돌 해소.
+3. **내가 놓치고 있는 위험 1가지** (반드시 1개 이상).
+
+간결하고 단정적으로. "검토 필요"가 아니라 결정과 근거로.
+
+codex
+설계 협의로만 처리하겠습니다. 코드는 건드리지 않고, 현재 라우트 패턴과 프로젝트 불변식만 읽어서 우선순위와 스코프 판단을 고정하겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg --files -g "*app.md" -g "*APP.md" -g "AGENTS.md" -g "*.md"' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"details: error instanceof Error \\? error\\.message : undefined|NextResponse\\.json|app\\.md|APP\\.md\" -S ." in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "parsePageNumber|socket/token|Failed to get socket token|SOCKET_INTERNAL_URL|SOCKET_INTERNAL_SECRET|enforced:false" -S src' in C:\Team-jane\FlowSpace
+ succeeded in 210ms:
+.\src\app\api\workflows\route.ts:10:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\workflows\route.ts:38:    return NextResponse.json({ workflows });
+.\src\app\api\workflows\route.ts:40:    return NextResponse.json(
+.\src\app\api\workflows\route.ts:43:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\guest\route.ts:15:      return NextResponse.json(
+.\src\app\api\guest\route.ts:22:      return NextResponse.json(
+.\src\app\api\guest\route.ts:35:      return NextResponse.json(
+.\src\app\api\guest\route.ts:42:      return NextResponse.json(
+.\src\app\api\guest\route.ts:51:        return NextResponse.json(
+.\src\app\api\guest\route.ts:60:    return NextResponse.json(guest, { status: 201 });
+.\src\app\api\guest\route.ts:62:    return NextResponse.json(
+.\src\app\api\guest\route.ts:65:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\guest\route.ts:78:    return NextResponse.json(
+.\src\app\api\guest\route.ts:87:    return NextResponse.json(
+.\src\app\api\guest\route.ts:93:  return NextResponse.json({
+.\src\app\api\users\me\route.ts:10:    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\users\me\route.ts:27:    return NextResponse.json({ error: "User not found" }, { status: 404 });
+.\src\app\api\users\me\route.ts:30:  return NextResponse.json(user);
+.\src\app\api\users\me\route.ts:48:    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\users\me\route.ts:61:      return NextResponse.json(
+.\src\app\api\users\me\route.ts:70:    return NextResponse.json(
+.\src\app\api\users\me\route.ts:89:  return NextResponse.json(user);
+.\src\app\api\comfyui\status\route.ts:7:  return NextResponse.json(status);
+.\src\app\api\comfyui\capabilities\route.ts:10:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\comfyui\capabilities\route.ts:14:    return NextResponse.json(capabilities);
+.\src\app\api\comfyui\capabilities\route.ts:16:    return NextResponse.json(
+.\src\app\api\assets\[id]\route.ts:16:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\assets\[id]\route.ts:46:      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+.\src\app\api\assets\[id]\route.ts:51:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\assets\[id]\route.ts:54:    return NextResponse.json(toPublicGeneratedAsset(asset));
+.\src\app\api\assets\[id]\route.ts:56:    return NextResponse.json(
+.\src\app\api\assets\[id]\route.ts:59:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\[id]\route.ts:71:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\assets\[id]\route.ts:80:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\assets\[id]\route.ts:84:      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+.\src\app\api\assets\[id]\route.ts:113:    return NextResponse.json({ message: "Asset deleted" });
+.\src\app\api\assets\[id]\route.ts:115:    return NextResponse.json(
+.\src\app\api\assets\[id]\route.ts:118:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\route.ts:42:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\assets\route.ts:60:      return NextResponse.json(
+.\src\app\api\assets\route.ts:111:    return NextResponse.json({
+.\src\app\api\assets\route.ts:121:    return NextResponse.json(
+.\src\app\api\assets\route.ts:124:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\generate\route.ts:19:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\assets\generate\route.ts:26:      return NextResponse.json(
+.\src\app\api\assets\generate\route.ts:33:      return NextResponse.json(
+.\src\app\api\assets\generate\route.ts:107:    return NextResponse.json(
+.\src\app\api\assets\generate\route.ts:116:    return NextResponse.json(
+.\src\app\api\assets\generate\route.ts:119:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\route.ts:14:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\route.ts:46:      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\route.ts:54:      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\route.ts:57:    return NextResponse.json({
+.\src\app\api\spaces\[id]\route.ts:74:    return NextResponse.json(
+.\src\app\api\spaces\[id]\route.ts:77:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\route.ts:89:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\route.ts:96:      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\route.ts:99:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\route.ts:142:    return NextResponse.json(updated);
+.\src\app\api\spaces\[id]\route.ts:144:    return NextResponse.json(
+.\src\app\api\spaces\[id]\route.ts:147:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\route.ts:159:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\route.ts:166:      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\route.ts:169:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\route.ts:177:    return NextResponse.json({ message: "Space archived" });
+.\src\app\api\spaces\[id]\route.ts:179:    return NextResponse.json(
+.\src\app\api\spaces\[id]\route.ts:182:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\batch\route.ts:21:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\assets\batch\route.ts:27:      return NextResponse.json({ error: "items array required" }, { status: 400 });
+.\src\app\api\assets\batch\route.ts:31:      return NextResponse.json(
+.\src\app\api\assets\batch\route.ts:100:    return NextResponse.json(
+.\src\app\api\assets\batch\route.ts:109:    return NextResponse.json(
+.\src\app\api\assets\batch\route.ts:112:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\batch\route.ts:124:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\assets\batch\route.ts:129:      return NextResponse.json({ error: "batchId required" }, { status: 400 });
+.\src\app\api\assets\batch\route.ts:154:    return NextResponse.json({
+.\src\app\api\assets\batch\route.ts:163:    return NextResponse.json(
+.\src\app\api\assets\batch\route.ts:166:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\auth\register\route.ts:17:      return NextResponse.json(
+.\src\app\api\auth\register\route.ts:24:      return NextResponse.json(
+.\src\app\api\auth\register\route.ts:32:      return NextResponse.json(
+.\src\app\api\auth\register\route.ts:54:    return NextResponse.json(user, { status: 201 });
+.\src\app\api\auth\register\route.ts:56:    return NextResponse.json(
+.\src\app\api\auth\register\route.ts:59:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\messages\route.ts:14:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\messages\route.ts:29:      return NextResponse.json({ error: "Not a member of this space" }, { status: 403 });
+.\src\app\api\spaces\[id]\messages\route.ts:74:    return NextResponse.json({
+.\src\app\api\spaces\[id]\messages\route.ts:87:    return NextResponse.json(
+.\src\app\api\spaces\[id]\messages\route.ts:90:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\join\[inviteCode]\route.ts:28:      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+.\src\app\api\spaces\join\[inviteCode]\route.ts:31:    return NextResponse.json({
+.\src\app\api\spaces\join\[inviteCode]\route.ts:37:    return NextResponse.json(
+.\src\app\api\spaces\join\[inviteCode]\route.ts:40:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\join\[inviteCode]\route.ts:52:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\join\[inviteCode]\route.ts:63:      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+.\src\app\api\spaces\join\[inviteCode]\route.ts:68:        return NextResponse.json(
+.\src\app\api\spaces\join\[inviteCode]\route.ts:82:      return NextResponse.json({ spaceId: space.id, message: "Already a member" });
+.\src\app\api\spaces\join\[inviteCode]\route.ts:89:      return NextResponse.json({ error: "Space is full" }, { status: 409 });
+.\src\app\api\spaces\join\[inviteCode]\route.ts:101:    return NextResponse.json(
+.\src\app\api\spaces\join\[inviteCode]\route.ts:106:    return NextResponse.json(
+.\src\app\api\spaces\join\[inviteCode]\route.ts:109:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\members\route.ts:20:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\members\route.ts:33:        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\members\route.ts:57:    return NextResponse.json({ members: result });
+.\src\app\api\spaces\[id]\members\route.ts:59:    return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:62:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\members\route.ts:74:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\members\route.ts:82:      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\members\route.ts:87:      return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:95:        return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:108:      return NextResponse.json({ message: "Already a member", role: existing.role });
+.\src\app\api\spaces\[id]\members\route.ts:114:      return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:129:    return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:134:    return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:137:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\members\route.ts:149:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\members\route.ts:162:      return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:174:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\members\route.ts:180:      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+.\src\app\api\spaces\[id]\members\route.ts:183:      return NextResponse.json({ error: "Invalid restriction" }, { status: 400 });
+.\src\app\api\spaces\[id]\members\route.ts:192:      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\members\route.ts:197:      return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:208:        return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:229:    return NextResponse.json(updated);
+.\src\app\api\spaces\[id]\members\route.ts:231:    return NextResponse.json(
+.\src\app\api\spaces\[id]\members\route.ts:234:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\map\tiles\route.ts:14:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\map\tiles\route.ts:30:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\map\tiles\route.ts:36:      return NextResponse.json(
+.\src\app\api\spaces\[id]\map\tiles\route.ts:48:    return NextResponse.json({ id: updated.id, saved: true });
+.\src\app\api\spaces\[id]\map\tiles\route.ts:50:    return NextResponse.json(
+.\src\app\api\spaces\[id]\map\tiles\route.ts:53:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\map\route.ts:14:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\map\route.ts:25:      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\map\route.ts:33:        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\map\route.ts:63:      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\map\route.ts:66:    return NextResponse.json({
+.\src\app\api\spaces\[id]\map\route.ts:71:    return NextResponse.json(
+.\src\app\api\spaces\[id]\map\route.ts:74:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\livekit\token\route.ts:102:        return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:112:      return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:122:      return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:132:      return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:139:      return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:146:      return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:174:          return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:209:          return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:216:          return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:224:          return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:240:        return NextResponse.json(
+.\src\app\api\livekit\token\route.ts:281:    return NextResponse.json({
+.\src\app\api\livekit\token\route.ts:288:    return NextResponse.json(
+.\src\app\api\socket\token\route.ts:11:    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\socket\token\route.ts:20:    return NextResponse.json(
+.\src\app\api\socket\token\route.ts:34:  return NextResponse.json({ token });
+.\src\app\api\livekit\webhook\route.ts:92:        return NextResponse.json(
+.\src\app\api\livekit\webhook\route.ts:101:        return NextResponse.json(
+.\src\app\api\livekit\webhook\route.ts:107:      return NextResponse.json(
+.\src\app\api\livekit\webhook\route.ts:129:      return NextResponse.json({ received: true });
+.\src\app\api\livekit\webhook\route.ts:134:      return NextResponse.json({ received: true });
+.\src\app\api\livekit\webhook\route.ts:189:    return NextResponse.json({ received: true });
+.\src\app\api\livekit\webhook\route.ts:192:    return NextResponse.json(
+.\src\app\api\spaces\route.ts:16:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\route.ts:36:      return NextResponse.json(
+.\src\app\api\spaces\route.ts:78:    return NextResponse.json({ spaces: result, nextCursor, hasMore });
+.\src\app\api\spaces\route.ts:80:    return NextResponse.json(
+.\src\app\api\spaces\route.ts:83:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\route.ts:95:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\route.ts:100:      return NextResponse.json(
+.\src\app\api\spaces\route.ts:116:      return NextResponse.json(
+.\src\app\api\spaces\route.ts:127:      return NextResponse.json(
+.\src\app\api\spaces\route.ts:151:      // (app.md 서버 불변식 #2 "필요한 필드만").
+.\src\app\api\spaces\route.ts:161:    return NextResponse.json(
+.\src\app\api\spaces\route.ts:170:    return NextResponse.json(
+.\src\app\api\spaces\route.ts:173:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\admin\analytics\route.ts:18:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\analytics\route.ts:28:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\analytics\route.ts:31:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\analytics\route.ts:58:    return NextResponse.json({
+.\src\app\api\spaces\[id]\admin\analytics\route.ts:69:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\analytics\route.ts:70:      { error: "Failed to fetch analytics", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\stats\route.ts:13:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\stats\route.ts:25:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\stats\route.ts:28:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\stats\route.ts:50:    return NextResponse.json({
+.\src\app\api\spaces\[id]\admin\stats\route.ts:57:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\stats\route.ts:58:      { error: "Failed to fetch stats", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\announce\route.ts:13:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\announce\route.ts:23:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\announce\route.ts:26:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\announce\route.ts:33:      return NextResponse.json({ error: "Content is required" }, { status: 400 });
+.\src\app\api\spaces\[id]\admin\announce\route.ts:62:    return NextResponse.json({ message });
+.\src\app\api\spaces\[id]\admin\announce\route.ts:64:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\announce\route.ts:65:      { error: "Failed to send announcement", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\media\route.ts:14:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\media\route.ts:25:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\media\route.ts:28:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\media\route.ts:49:    return NextResponse.json({ grants: enrichedGrants });
+.\src\app\api\spaces\[id]\admin\media\route.ts:51:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\media\route.ts:52:      { error: "Failed to fetch media data", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\media\route.ts:63:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\media\route.ts:74:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\media\route.ts:77:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\media\route.ts:87:      return NextResponse.json({ error: "targetUserId is required" }, { status: 400 });
+.\src\app\api\spaces\[id]\admin\media\route.ts:95:      return NextResponse.json({ error: "Target user is not a member" }, { status: 400 });
+.\src\app\api\spaces\[id]\admin\media\route.ts:112:    return NextResponse.json({ grant }, { status: 201 });
+.\src\app\api\spaces\[id]\admin\media\route.ts:114:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\media\route.ts:115:      { error: "Failed to create grant", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:14:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:30:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:40:      return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:86:    return NextResponse.json(updated);
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:88:    return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:91:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:103:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:119:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:128:      return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:136:    return NextResponse.json({ deleted: true });
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:138:    return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:141:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\map\objects\route.ts:15:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\map\objects\route.ts:31:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\map\objects\route.ts:47:      return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\route.ts:83:    return NextResponse.json(mapObject, { status: 201 });
+.\src\app\api\spaces\[id]\map\objects\route.ts:85:    return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\route.ts:88:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\admin\members\route.ts:16:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:26:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:29:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:51:    return NextResponse.json({ members });
+.\src\app\api\spaces\[id]\admin\members\route.ts:53:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\members\route.ts:54:      { error: "Failed to fetch members", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\members\route.ts:64:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:75:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:78:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:90:      return NextResponse.json({ error: "memberId and action are required" }, { status: 400 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:98:      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:103:      return NextResponse.json({ error: "Cannot modify the space owner" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:109:      return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\members\route.ts:123:          return NextResponse.json({ error: "role is required for changeRole" }, { status: 400 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:127:          return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:131:          return NextResponse.json({ error: "Only superAdmin can assign OWNER role" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:135:          return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\members\route.ts:174:        return NextResponse.json({ message: "Member kicked", realtimeEnforced });
+.\src\app\api\spaces\[id]\admin\members\route.ts:177:        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+.\src\app\api\spaces\[id]\admin\members\route.ts:223:    return NextResponse.json({ member: updated, realtimeEnforced });
+.\src\app\api\spaces\[id]\admin\members\route.ts:225:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\members\route.ts:226:      { error: "Failed to update member", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:14:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:25:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:28:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:37:      return NextResponse.json({ error: "Grant not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:42:    return NextResponse.json({ success: true });
+.\src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:44:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:45:      { error: "Failed to delete grant", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\logs\route.ts:13:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\logs\route.ts:23:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\logs\route.ts:26:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\logs\route.ts:51:    return NextResponse.json({ logs: items, nextCursor });
+.\src\app\api\spaces\[id]\admin\logs\route.ts:53:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\logs\route.ts:54:      { error: "Failed to fetch logs", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\messages\route.ts:14:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\messages\route.ts:24:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\messages\route.ts:27:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\messages\route.ts:44:    return NextResponse.json({ messages: items, nextCursor });
+.\src\app\api\spaces\[id]\admin\messages\route.ts:46:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\messages\route.ts:47:      { error: "Failed to fetch messages", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:14:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:30:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:36:      return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:43:      return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:62:      return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:97:    return NextResponse.json({
+.\src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:103:    return NextResponse.json(
+.\src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:106:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:13:      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+.\src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:23:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:26:      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+.\src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:33:      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+.\src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:56:    return NextResponse.json({ message: "Message deleted" });
+.\src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:58:    return NextResponse.json(
+.\src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:59:      { error: "Failed to delete message", details: error instanceof Error ? error.message : undefined },
+
+ succeeded in 495ms:
+CLAUDE.md
+plan.md
+
+ succeeded in 505ms:
+src\lib\auth-secret.ts:4: * 소켓 JWT 서명(src/app/api/socket/token)과 검증(server/middleware/auth)에서 공통 사용.
+src\lib\pagination.ts:4: * - `parsePageLimit`/`parsePageNumber`: 쿼리스트링 limit/page를 안전한 정수로 정규화.
+src\lib\pagination.ts:9: * offset 페이지네이션(`skip`/`take`) 라우트는 `parsePageNumber`+`parsePageLimit`만,
+src\lib\pagination.ts:43:export function parsePageNumber(raw: string | null): number {
+src\lib\pagination.test.ts:6:  parsePageNumber,
+src\lib\pagination.test.ts:64:describe("parsePageNumber (WI-022)", () => {
+src\lib\pagination.test.ts:66:    expect(parsePageNumber(null)).toBe(1);
+src\lib\pagination.test.ts:67:    expect(parsePageNumber("")).toBe(1);
+src\lib\pagination.test.ts:71:    expect(parsePageNumber("1")).toBe(1);
+src\lib\pagination.test.ts:72:    expect(parsePageNumber("2")).toBe(2);
+src\lib\pagination.test.ts:73:    expect(parsePageNumber("999")).toBe(999);
+src\lib\pagination.test.ts:77:    expect(parsePageNumber("0")).toBe(1);
+src\lib\pagination.test.ts:78:    expect(parsePageNumber("-5")).toBe(1);
+src\lib\pagination.test.ts:82:    expect(parsePageNumber("abc")).toBe(1);
+src\lib\pagination.test.ts:83:    expect(parsePageNumber("NaN")).toBe(1);
+src\lib\pagination.test.ts:87:    expect(parsePageNumber("100000")).toBe(100000);
+src\lib\pagination.test.ts:91:    expect(parsePageNumber("2.9")).toBe(2);
+src\features\space\socket\internal\socket-client.ts:40:  const res = await fetch("/api/socket/token");
+src\features\space\socket\internal\socket-client.ts:41:  if (!res.ok) throw new Error("Failed to get socket token");
+src\features\space\enforce\internal\dispatch.ts:29: * SOCKET_INTERNAL_URL/SECRET 미설정 시: 프로덕션은 loud error 로그 후 미반영,
+src\features\space\enforce\internal\dispatch.ts:33:  const baseUrl = process.env.SOCKET_INTERNAL_URL;
+src\features\space\enforce\internal\dispatch.ts:34:  const secret = process.env.SOCKET_INTERNAL_SECRET;
+src\features\space\enforce\internal\dispatch.ts:39:        "[enforce] SOCKET_INTERNAL_URL/SECRET 미설정 — 실시간 제재 전파 불가(프로덕션). DB만 반영됨."
+src\app\api\assets\route.ts:5:import { parsePageLimit, parsePageNumber } from "@/lib/pagination";
+src\app\api\assets\route.ts:67:    const page = parsePageNumber(searchParams.get("page"));
+src\app\api\socket\token\route.ts:6:/** GET /api/socket/token - 소켓 접속용 토큰 발급 */
+src\app\api\socket\token\route.ts:19:    console.error("[socket/token]", error);
+
+codex
+grep 결과상 A는 `assets` 단건 문제가 아니라 API 전반의 동일 패턴입니다. 이제 `CLAUDE.md`와 관련 유틸/테스트를 확인해, 응답 계약과 페이지네이션 회귀 위험까지 같이 판단하겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\lib\\pagination.ts" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw CLAUDE.md' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\features\\space\\socket\\internal\\socket-client.ts" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw server\\handlers\\enforce.ts" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\lib\\pagination.test.ts" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\features\\space\\enforce\\internal\\dispatch.ts" in C:\Team-jane\FlowSpace
+ succeeded in 254ms:
+/**
+ * ?˜ì´ì§€?¤ì´??ì¿¼ë¦¬ ?Œì‹± + ë³€??ê³µìš© ?¬í¼ (?œìˆ˜ ?¨ìˆ˜ ??Prisma/React ë¬´ì˜ì¡?.
+ *
+ * - `parsePageLimit`/`parsePageNumber`: ì¿¼ë¦¬?¤íŠ¸ë§?limit/pageë¥??ˆì „???•ìˆ˜ë¡??•ê·œ??
+ * - `buildCursorPage`: cursor ?˜ì´ì§€?¤ì´?˜ì˜ `take: limit + 1` ?¨í„´
+ *   (`src/app/api/spaces/[id]/messages/route.ts` ê´€ë¡€)??ìº¡ìŠ????limitë³´ë‹¤ 1ê±??? *   ê°€?¸ì˜¨ ?‰ì„ ?˜ë¼ `hasMore`/`nextCursor`ë¥??„ì¶œ?œë‹¤.
+ *
+ * offset ?˜ì´ì§€?¤ì´??`skip`/`take`) ?¼ìš°?¸ëŠ” `parsePageNumber`+`parsePageLimit`ë§?
+ * cursor ?˜ì´ì§€?¤ì´???¼ìš°?¸ëŠ” `parsePageLimit`+`buildCursorPage`ë¥??¬ìš©?œë‹¤.
+ */
+
+/** limit ë¯¸ì????´ìƒì¹???ê¸°ë³¸ ?˜ì´ì§€ ?¬ê¸° */
+export const DEFAULT_PAGE_LIMIT = 50;
+/** ?´ë¼?´ì–¸?¸ê? ?”ì²­ ê°€?¥í•œ ìµœë? ?˜ì´ì§€ ?¬ê¸° (?„ì—­ ëª©ë¡ ??£¼ ë°©ì?) */
+export const MAX_PAGE_LIMIT = 100;
+
+/**
+ * ì¿¼ë¦¬?¤íŠ¸ë§?`limit` ê°’ì„ ?ˆì „???•ìˆ˜ ?˜ì´ì§€ ?¬ê¸°ë¡??•ê·œ?”í•œ??
+ * - null/ë¹ˆê°’/ë¹„ì •??0 ?´í•˜ ??`defaultLimit`
+ * - MAX_PAGE_LIMIT ì´ˆê³¼ ??MAX_PAGE_LIMITë¡??ˆìƒ(cap)
+ *
+ * @param defaultLimit limit ë¯¸ì????´ìƒì¹???ê¸°ë³¸ê°??¼ìš°?¸ë³„ ê¸°ë³¸ ?˜ì´ì§€ ?¬ê¸°ë¥? *   ë³´ì¡´?˜ê¸° ?„í•œ ? íƒ ?¸ìž, ë¯¸ì?????DEFAULT_PAGE_LIMIT).
+ */
+export function parsePageLimit(
+  raw: string | null,
+  defaultLimit: number = DEFAULT_PAGE_LIMIT
+): number {
+  const n = parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n) || n <= 0) return defaultLimit;
+  return Math.min(n, MAX_PAGE_LIMIT);
+}
+
+/**
+ * ì¿¼ë¦¬?¤íŠ¸ë§?`page`(1-base offset ?˜ì´ì§€ ë²ˆí˜¸)ë¥??ˆì „???‘ì˜ ?•ìˆ˜ë¡??•ê·œ?”í•œ??
+ * - null/ë¹ˆê°’/ë¹„ì •??1 ë¯¸ë§Œ ??1
+ * - ?í•œ ?†ìŒ (offset ?˜ì´ì§€ ë²”ìœ„???°ì´???¬ê¸°???˜ì¡´)
+ *
+ * offset ?¼ìš°?¸ì—??`skip: (page - 1) * limit` ê³„ì‚° ??pageê°€ NaN/0/?Œìˆ˜ë©? * ?Œìˆ˜ skip???˜ì–´ Prismaê°€ throw(??00)?˜ë˜ ê²ƒì„ ë°©ì??œë‹¤.
+ */
+export function parsePageNumber(raw: string | null): number {
+  const n = parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return n;
+}
+
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/**
+ * `take: limit + 1`ë¡?ì¡°íšŒ????ë°°ì—´???˜ì´ì§€ë¡?ë³€?˜í•œ??
+ * ?‰ì´ limitë³´ë‹¤ ë§Žìœ¼ë©?ë§ˆì?ë§??¬ë¶„) 1ê±´ì„ ?˜ë¼?´ê³  ê·?ì§ì „ ?‰ì˜ idë¥? * ?¤ìŒ cursorë¡??¬ìš©?œë‹¤.
+ *
+ * @param rows  limit + 1 ë§Œí¼ ì¡°íšŒ?????•ë ¬ ?„ë£Œ ?íƒœ, ê°??‰ì? ê³ ìœ  `id` ë³´ìœ )
+ * @param limit ?˜ì´ì§€ ?¬ê¸°
+ */
+export function buildCursorPage<T extends { id: string }>(
+  rows: T[],
+  limit: number
+): CursorPage<T> {
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+  return { items, nextCursor, hasMore };
+}
+
+
+ succeeded in 255ms:
+# ? ï¸ MANDATORY: Session Start Protocol
+
+> **Claude??ëª¨ë“  ?‘ì—… ?œìž‘ ?????¹ì…˜??ë°˜ë“œ???•ì¸?´ì•¼ ??*
+
+## ?„ì—­ ê·œì¹™ ì°¸ì¡° (?„ìˆ˜)
+?¤ìŒ ?„ì—­ CLAUDE.md (`~/.claude/CLAUDE.md`) ê·œì¹™??ì¤€??
+- Git ì»¤ë°‹ ì»¨ë²¤?? ?ì–´ prefix + ?œê? ë³¸ë¬¸ (?? `feat: ?¸ì¦ ?œìŠ¤??ì¶”ê?`)
+- Memory System: ?¬ìš©?ê? `/mem:load` ?”ì²­ ???¤í–‰
+- Epic > Phase > Task ê³„ì¸µ ì¶”ì 
+- DocOps: Phase ?„ë£Œ ???¤íŽ™ ë¬¸ì„œ ?ì„±
+
+## ?„ë¡œ?íŠ¸ ê·œì¹™ ì²´í¬ë¦¬ìŠ¤??(?„ìˆ˜)
+?‘ì—… ?œìž‘ ???¤ìŒ ??ª© ?•ì¸:
+- [ ] **ê²½ê³„ ë¶„ë¦¬**: ë³€ê²???"??ì½”ë“œ??ê²½ê³„??ë¬´ì—‡?¸ê??" ?•ì˜
+- [ ] **ëª¨ë“ˆ??*: `module/index.ts` + `module/internal/` êµ¬ì¡° ì¤€??- [ ] **ìº¡ìŠ??*: `index.ts`ë§??¸ë? ?¸ì¶œ, `internal/*` ì§ì ‘ import ê¸ˆì?
+- [ ] **ì»´í¬?ŒíŠ¸ ?¬ì‚¬??*: 2???´ìƒ ë°˜ë³µ ??ë¶„ë¦¬
+- [ ] **?˜ë“œì½”ë”© ê¸ˆì?**: ?ìˆ˜??`constants/`ë¡?ë¶„ë¦¬
+- [ ] **UTF-8**: ëª¨ë“  ?Œì¼ UTF-8 (BOM ?†ìŒ)
+
+---
+
+# Project Rules
+
+## Architecture Flow (Core)
+
+```
+ê²½ê³„ ë¶„ë¦¬(ê°œë…) ??ëª¨ë“ˆ??êµ¬ì¡°) ??ìº¡ìŠ???‘ê·¼?œì–´)
+```
+
+### 1. ê²½ê³„ ë¶„ë¦¬ (Boundary)
+- ë³€ê²???"??ì½”ë“œ??ê²½ê³„??ë¬´ì—‡?¸ê??" ë¨¼ì? ?•ì˜
+- ??ì½”ë“œ??ë°˜ë“œ???¹ì • ê²½ê³„???Œì†
+
+### 2. ëª¨ë“ˆ??(Module)
+- ê²½ê³„ = ëª¨ë“ˆ ?´ë”
+- êµ¬ì¡°: `module/index.ts` + `module/internal/`
+
+### 3. ìº¡ìŠ??(Encapsulation)
+- `index.ts`ë§??¸ë? ?¸ì¶œ (Public API)
+- `internal/*` ?¸ë? import ê¸ˆì?
+
+## Structure
+```
+moduleA/
+  index.ts        # Public API
+  internal/       # Private
+```
+
+---
+
+## Code Quality Rules
+
+### ì»´í¬?ŒíŠ¸ ?¬ì‚¬??(Component Reuse)
+- **ê°™ì? UI/ë¡œì§??2ë²??´ìƒ ?˜ì˜¤ë©?ì»´í¬?ŒíŠ¸ë¡?ë¶„ë¦¬**
+- ê¸°ì¡´ ì»´í¬?ŒíŠ¸ ?•ì¸ ???ˆë¡œ ë§Œë“¤ê¸?(ì¤‘ë³µ ?ì„± ê¸ˆì?)
+- ê³µí†µ ì»´í¬?ŒíŠ¸??`shared/` ?ëŠ” `common/` ëª¨ë“ˆ??ë°°ì¹˜
+
+```
+??ë³µë¶™?´ì„œ ?¬ëŸ¬ ê³³ì— ê°™ì? ì½”ë“œ
+??ì»´í¬?ŒíŠ¸????import?´ì„œ ?¬ì‚¬??```
+
+### ?˜ë“œì½”ë”© ê¸ˆì? (No Hardcoding)
+- **ë¬¸ìž?? ?«ìž, URL ??ì§ì ‘ ì½”ë“œ??ë°•ì? ?Šê¸°**
+- ?ìˆ˜??`constants/` ?ëŠ” ?¤ì • ?Œì¼ë¡?ë¶„ë¦¬
+- ?˜ê²½ë³?ê°’ì? ?˜ê²½ë³€???¬ìš©
+
+### UTF-8 ?¸ì½”??(Encoding)
+- **ëª¨ë“  ?Œì¼?€ UTF-8 (BOM ?†ìŒ) ?€??*
+- ?Œì¼ ?½ê¸°/?°ê¸° ??`utf-8` ëª…ì‹œ
+- HTML?€ `<meta charset="UTF-8">` ?„ìˆ˜
+
+---
+
+## PR Checklist
+- [ ] ê²½ê³„(ëª¨ë“ˆ)??
+- [ ] internal ì§ì ‘ import ?†ìŒ?
+- [ ] ê³µê°œ API ìµœì†Œ??
+- [ ] ì¤‘ë³µ ì»´í¬?ŒíŠ¸ ?†ì´ ?¬ì‚¬??
+- [ ] ?˜ë“œì½”ë”©??ê°??†ìŒ?
+
+
+ succeeded in 253ms:
+// Enforcement Handler ??socket ?œë²„ ì¸?(WI-005)
+//
+// Next API route(dashboard ?œìž¬)ê°€ ë³´ë‚¸ HMAC ?œëª… ?”ì²­??ë°›ì•„, ?´ì•„?ˆëŠ” ?Œì¼“ ?°ê²°??// ban/kick/mute/unmute/role ??ì¦‰ì‹œ ë°˜ì˜?œë‹¤. socket.io ?€ ?™ì¼??httpServer ??// non-socket.io ?”ì²­ ê²½ë¡œ(POST /internal/enforce)ë¡??¤ì–´?¨ë‹¤.
+//
+// ë³´ì•ˆ ?¤ì¸µ ë°©ì–´(?¤ê³„ codex consult):
+//  1) SOCKET_INTERNAL_SECRET HMAC ?œëª… ê²€ì¦?+ replay window
+//  2) body size limit + ?¤í‚¤ë§?ê²€ì¦?//  3) DB postcondition ?¬í™•?????œí¬ë¦?? ì¶œ/Next ?¸ë“¤??ë²„ê·¸ê°€ ê³§ë°”ë¡??„ì˜ ì¶”ë°©?¼ë¡œ
+//     ?•ë??˜ëŠ” ê²ƒì„ ì°¨ë‹¨(?? ban?´ë©´ ?´ë‹¹ ë©¤ë²„ê°€ ?¤ì œ BANNED?¸ì? ?•ì¸ ???Šê¸°)
+
+import type { IncomingMessage, ServerResponse } from "http";
+import type { Server, Socket } from "socket.io";
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+} from "../../src/features/space/protocol/internal/socket-events";
+import {
+  ENFORCE_PATH,
+  ENFORCE_SIGNATURE_HEADER,
+  ENFORCE_TIMESTAMP_HEADER,
+  ENFORCE_MAX_BODY_BYTES,
+  verifyEnforceSignature,
+  isFreshTimestamp,
+  parseEnforceRequest,
+  type EnforceRequest,
+} from "../../src/features/space/enforce/internal/contract";
+import { spacePlayersMap, detachSocketFromSpace, removeUserPresence } from "./room";
+import { getPrisma } from "../lib/prisma";
+
+type IO = Server<ClientToServerEvents, ServerToClientEvents>;
+type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+
+// space:error emit ???´ë¼?´ì–¸?¸ì— ?„ë‹¬?????Šê¸° ?„í•œ ì§§ì? grace.
+// ì¦‰ì‹œ disconnect(true) ?˜ë©´ ì§ì „ emit ??flush ?˜ì? ?Šì„ ???ˆë‹¤(codex).
+const DISCONNECT_GRACE_MS = 250;
+
+/** spaceId room ?ì„œ ?´ë‹¹ userId ??ëª¨ë“  ?Œì¼“(?¤ì¤‘ ?? */
+function socketsForUser(io: IO, spaceId: string, userId: string): TypedSocket[] {
+  const ids = io.sockets.adapter.rooms.get(spaceId);
+  if (!ids) return [];
+  const out: TypedSocket[] = [];
+  for (const id of ids) {
+    const s = io.sockets.sockets.get(id) as TypedSocket | undefined;
+    if (s && s.data.userId === userId) out.push(s);
+  }
+  return out;
+}
+
+/**
+ * DB postcondition ?¬í™•?? Next ?¸ë“¤?¬ê? ?¤ì œë¡?ê·??íƒœë¥?ë§Œë“¤?ˆëŠ”ì§€ ?•ì¸???¤ì—ë§? * ?Œì¼“??ì¡°ìž‘?œë‹¤. ë¶ˆì¼ì¹??ëŠ” ê²€ì¦??¤ë¥˜)ë©?false ???¸ì¶œì¸¡ì´ 409 ë¡?ê±°ë?.
+ */
+async function verifyPostcondition(req: EnforceRequest): Promise<boolean> {
+  const prisma = await getPrisma();
+  const member = await prisma.spaceMember.findUnique({
+    where: { spaceId_userId: { spaceId: req.spaceId, userId: req.userId } },
+    select: { restriction: true, role: true },
+  });
+  switch (req.action) {
+    case "ban":
+      return member?.restriction === "BANNED";
+    case "kick":
+      return member === null; // kick = row ?? œ??    case "mute":
+      return member?.restriction === "MUTED";
+    case "unmute":
+      return member?.restriction === "NONE";
+    case "role":
+      return member?.role === req.role;
+    default:
+      return false;
+  }
+}
+
+/**
+ * ê²€ì¦ëœ enforce ?”ì²­???Œì¼“???ìš©. ?í–¥ë°›ì? ?Œì¼“ ??ë°˜í™˜(?¤í”„?¼ì¸?´ë©´ 0=no-op).
+ */
+export function applyEnforcement(io: IO, req: EnforceRequest): number {
+  const targets = socketsForUser(io, req.spaceId, req.userId);
+  if (targets.length === 0) return 0;
+
+  const players = spacePlayersMap.get(req.spaceId);
+  const nickname = players?.get(req.userId)?.nickname ?? "Unknown";
+  const actor = req.actorName ?? "ê´€ë¦¬ìž";
+
+  if (req.action === "ban" || req.action === "kick") {
+    const code = req.action === "ban" ? "BANNED" : "KICKED";
+    const message =
+      req.action === "ban"
+        ? "ê´€ë¦¬ìž???˜í•´ ??ê³µê°„?ì„œ ì°¨ë‹¨?˜ì—ˆ?µë‹ˆ??"
+        : "ê´€ë¦¬ìž???˜í•´ ??ê³µê°„?ì„œ ì¶”ë°©?˜ì—ˆ?µë‹ˆ??";
+
+    // 1) ê°??€ê²??Œì¼“: ?¬ìœ  ?µì? ??**?™ê¸° ê¶Œí•œ ?Œìˆ˜**(detachSocketFromSpace).
+    //    ëª¨ë“  ?´ë²¤???¸ë“¤?¬ëŠ” socket.data.spaceId ë¡??¸ê??˜ë?ë¡? ëª¨ë“  room(ê³µê°„ + ?Œí‹°)
+    //    ?´íƒˆ + socket.data ë¬´íš¨?”ë¡œ grace ?™ì•ˆ??ê¶Œí•œ ?”ì¡´(?…ì˜??chat/admin/editor/media
+    //    ?„ì†¡, ?Œí‹° ë©”ì‹œì§€ ?˜ì‹ )??ì¦‰ì‹œ ?«ížŒ?? ??join ?€ WI-001 join ê²Œì´?¸ê? ì°¨ë‹¨.
+    //    ë¬¼ë¦¬ disconnect ë§?grace ?„ë¡œ ë¯¸ë¤„ space:error ?¨í‚· flush ë¥?ë³´ìž¥.
+    for (const s of targets) {
+      s.emit("space:error", { code, message });
+      detachSocketFromSpace(s);
+      setTimeout(() => s.disconnect(true), DISCONNECT_GRACE_MS);
+    }
+
+    // 2) presence ?•ë¦¬ + ì£¼ë? ?Œë¦¼?€ **?¬ìš©???¨ìœ„ 1??*(?¤ì¤‘ ??ì¤‘ë³µ player:left ë°©ì?).
+    //    ?€ê²Ÿì? ?´ë? ë¶„ë¦¬?ìœ¼ë¯€ë¡??ê¸° ?ì‹ ??member:kicked/player:left ë¥?ë°›ì? ?Šê³ ,
+    //    spaceId ë¥?ë¹„ì› ?¼ë?ë¡?ì§€?°ëœ disconnect ?¸ë“¤?¬ì˜ leaveSpace ???¬ì‹¤?‰ë˜ì§€ ?ŠëŠ”??
+    io.to(req.spaceId).emit("member:kicked", { memberId: req.userId, nickname, kickedBy: actor });
+    removeUserPresence(io, req.spaceId, req.userId);
+  } else if (req.action === "mute" || req.action === "unmute") {
+    const restriction = req.action === "mute" ? "MUTED" : "NONE";
+    for (const s of targets) s.data.restriction = restriction;
+    if (req.action === "mute") {
+      io.to(req.spaceId).emit("member:muted", { memberId: req.userId, nickname, mutedBy: actor });
+    } else {
+      io.to(req.spaceId).emit("member:unmuted", { memberId: req.userId, nickname, unmutedBy: actor });
+    }
+  } else if (req.action === "role" && req.role) {
+    // ê¶Œí•œ ?Œìˆ˜/ë³€ê²????¸ë©”ëª¨ë¦¬ role ìºì‹œ ê°±ì‹ (ê°•ë“± ??admin ?´ë²¤??ì°¨ë‹¨)
+    for (const s of targets) s.data.role = req.role;
+  }
+
+  return targets.length;
+}
+
+function headerStr(req: IncomingMessage, name: string): string | null {
+  const v = req.headers[name];
+  if (Array.isArray(v)) return v[0] ?? null;
+  return v ?? null;
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { "content-type": "application/json" });
+  res.end(JSON.stringify(body));
+}
+
+/**
+ * /internal/enforce ?”ì²­ ì²˜ë¦¬. ??ê²½ë¡œê°€ ?„ë‹ˆë©?false(?¸ì¶œì¸¡ì´ 404 ì²˜ë¦¬).
+ * ì²˜ë¦¬?ˆìœ¼ë©?true.
+ */
+export async function handleInternalHttp(
+  io: IO,
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<boolean> {
+  const pathname = (req.url ?? "").split("?")[0];
+  if (pathname !== ENFORCE_PATH) return false;
+
+  if (req.method !== "POST") {
+    sendJson(res, 405, { error: "Method not allowed" });
+    return true;
+  }
+
+  const secret = process.env.SOCKET_INTERNAL_SECRET;
+  if (!secret) {
+    console.error("[enforce] SOCKET_INTERNAL_SECRET ë¯¸ì„¤????enforce ë¹„í™œ???”ì²­ ê±°ë?)");
+    sendJson(res, 503, { error: "Enforcement not configured" });
+    return true;
+  }
+
+  // body ?˜ì§‘ (byte ?¨ìœ„ size limit ì´ˆê³¼ ??ì¦‰ì‹œ ì¤‘ë‹¨ ??ë©€?°ë°”?´íŠ¸ UTF-8 ?•í™• ì¸¡ì •)
+  let raw = "";
+  let receivedBytes = 0;
+  let tooLarge = false;
+  for await (const chunk of req) {
+    receivedBytes += (chunk as Buffer).length; // chunk ?€ Buffer ??.length ê°€ byte ??    if (receivedBytes > ENFORCE_MAX_BODY_BYTES) {
+      tooLarge = true;
+      break;
+    }
+    raw += chunk;
+  }
+  if (tooLarge) {
+    sendJson(res, 413, { error: "Body too large" });
+    return true;
+  }
+
+  const signature = headerStr(req, ENFORCE_SIGNATURE_HEADER);
+  const timestamp = headerStr(req, ENFORCE_TIMESTAMP_HEADER);
+  if (!signature || !timestamp) {
+    sendJson(res, 401, { error: "Missing signature" });
+    return true;
+  }
+  if (!isFreshTimestamp(timestamp, Date.now())) {
+    sendJson(res, 401, { error: "Stale timestamp" });
+    return true;
+  }
+  if (!verifyEnforceSignature(secret, timestamp, raw, signature)) {
+    sendJson(res, 403, { error: "Invalid signature" });
+    return true;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    sendJson(res, 400, { error: "Invalid JSON" });
+    return true;
+  }
+  const enforceReq = parseEnforceRequest(parsed);
+  if (!enforceReq) {
+    sendJson(res, 400, { error: "Invalid request" });
+    return true;
+  }
+
+  try {
+    const ok = await verifyPostcondition(enforceReq);
+    if (!ok) {
+      sendJson(res, 409, { error: "Postcondition not met" });
+      return true;
+    }
+    const affectedSockets = applyEnforcement(io, enforceReq);
+    sendJson(res, 200, { enforced: true, affectedSockets });
+  } catch (err) {
+    console.error("[enforce] ì²˜ë¦¬ ?¤ë¥˜:", err);
+    sendJson(res, 500, { error: "Enforcement failed" });
+  }
+  return true;
+}
+
+
+ succeeded in 265ms:
+import { describe, it, expect } from "vitest";
+import {
+  DEFAULT_PAGE_LIMIT,
+  MAX_PAGE_LIMIT,
+  parsePageLimit,
+  parsePageNumber,
+  buildCursorPage,
+} from "./pagination";
+
+describe("parsePageLimit", () => {
+  it("null/牍堦皰 ??旮半掣臧?, () => {
+    expect(parsePageLimit(null)).toBe(DEFAULT_PAGE_LIMIT);
+    expect(parsePageLimit("")).toBe(DEFAULT_PAGE_LIMIT);
+  });
+
+  it("?曥儊 ?曥垬 ??攴鸽?搿?, () => {
+    expect(parsePageLimit("10")).toBe(10);
+    expect(parsePageLimit("50")).toBe(50);
+    expect(parsePageLimit("100")).toBe(MAX_PAGE_LIMIT);
+  });
+
+  it("MAX 齑堦臣 ??MAX搿??堨儊", () => {
+    expect(parsePageLimit("101")).toBe(MAX_PAGE_LIMIT);
+    expect(parsePageLimit("100000")).toBe(MAX_PAGE_LIMIT);
+  });
+
+  it("0/?岇垬 ??旮半掣臧?, () => {
+    expect(parsePageLimit("0")).toBe(DEFAULT_PAGE_LIMIT);
+    expect(parsePageLimit("-5")).toBe(DEFAULT_PAGE_LIMIT);
+  });
+
+  it("牍勳爼??NaN ?犽皽 ?呺牓 ??旮半掣臧?, () => {
+    expect(parsePageLimit("abc")).toBe(DEFAULT_PAGE_LIMIT);
+    expect(parsePageLimit("NaN")).toBe(DEFAULT_PAGE_LIMIT);
+    // parseInt("12.9") === 12 (?岇垬???堨偔?€ JS parseInt ?欖瀾 ???堨毄)
+    expect(parsePageLimit("12.9")).toBe(12);
+  });
+
+  // WI-022: ?检毎?鸽硠 旮半掣 ?橃澊歆€ ?赴 氤挫〈???勴暅 optional defaultLimit
+  describe("defaultLimit ?胳瀽 (WI-022)", () => {
+    it("null/牍堦皰/?挫儊旃????勲嫭??defaultLimit", () => {
+      expect(parsePageLimit(null, 20)).toBe(20);
+      expect(parsePageLimit("", 20)).toBe(20);
+      expect(parsePageLimit("0", 20)).toBe(20);
+      expect(parsePageLimit("-5", 20)).toBe(20);
+      expect(parsePageLimit("abc", 20)).toBe(20);
+    });
+
+    it("?犿毃 ?曥垬??defaultLimit瓿?氍搓??橁矊 攴鸽?搿?, () => {
+      expect(parsePageLimit("10", 20)).toBe(10);
+      expect(parsePageLimit("75", 20)).toBe(75);
+    });
+
+    it("MAX cap?€ defaultLimit瓿?氍搓??橁矊 ?侅毄", () => {
+      expect(parsePageLimit("100000", 20)).toBe(MAX_PAGE_LIMIT);
+    });
+
+    it("?胳瀽 氙胳?????DEFAULT_PAGE_LIMIT (旮办〈 ?胳稖攵€ 氍挫榿??", () => {
+      expect(parsePageLimit(null)).toBe(DEFAULT_PAGE_LIMIT);
+    });
+  });
+});
+
+describe("parsePageNumber (WI-022)", () => {
+  it("null/牍堦皰 ??1", () => {
+    expect(parsePageNumber(null)).toBe(1);
+    expect(parsePageNumber("")).toBe(1);
+  });
+
+  it("?曥儊 ?戩潣 ?曥垬 ??攴鸽?搿?, () => {
+    expect(parsePageNumber("1")).toBe(1);
+    expect(parsePageNumber("2")).toBe(2);
+    expect(parsePageNumber("999")).toBe(999);
+  });
+
+  it("0/?岇垬 ??1 (?岇垬 skip 氚╈?)", () => {
+    expect(parsePageNumber("0")).toBe(1);
+    expect(parsePageNumber("-5")).toBe(1);
+  });
+
+  it("牍勳爼??NaN ?犽皽 ?呺牓 ??1", () => {
+    expect(parsePageNumber("abc")).toBe(1);
+    expect(parsePageNumber("NaN")).toBe(1);
+  });
+
+  it("?來暅 ?嗢潓 (offset 氩旍渼???办澊???赴???橃〈)", () => {
+    expect(parsePageNumber("100000")).toBe(100000);
+  });
+
+  it("?岇垬???堨偔?€ parsePageLimit瓿??欖澕 ?滊Ж??(parseInt ?缄???", () => {
+    expect(parsePageNumber("2.9")).toBe(2);
+  });
+});
+
+describe("buildCursorPage", () => {
+  const make = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i}` }));
+
+  it("????<= limit ??毵堨?毵??橃澊歆€(hasMore=false, nextCursor=null)", () => {
+    const rows = make(3);
+    const page = buildCursorPage(rows, 5);
+    expect(page.items).toHaveLength(3);
+    expect(page.hasMore).toBe(false);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("????== limit ??毵堨?毵??橃澊歆€(?秳 ?嗢潓)", () => {
+    const rows = make(5);
+    const page = buildCursorPage(rows, 5);
+    expect(page.items).toHaveLength(5);
+    expect(page.hasMore).toBe(false);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("????== limit + 1 ??hasMore=true, ?秳 1瓯??堧嫧, nextCursor=毵堨?毵??胳稖??id", () => {
+    const rows = make(6); // limit 5 + 1
+    const page = buildCursorPage(rows, 5);
+    expect(page.items).toHaveLength(5);
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).toBe("s4"); // items[4].id
+    expect(page.items.map((r) => r.id)).not.toContain("s5"); // ?秳 氙鸽吀於?  });
+
+  it("牍?氚办棿 ??hasMore=false, nextCursor=null, items=[]", () => {
+    const page = buildCursorPage<{ id: string }>([], 5);
+    expect(page.items).toEqual([]);
+    expect(page.hasMore).toBe(false);
+    expect(page.nextCursor).toBeNull();
+  });
+});
+
+
+ succeeded in 267ms:
+// Enforcement Dispatch ??Next API route ??socket ?œë²„ ?„íŒŒ (WI-005, Next ì¸?
+//
+// DB ê°±ì‹  ?±ê³µ ???¸ì¶œ. ?Œì¼“ ?œë²„ ?´ë? ?”ë“œ?¬ì¸?¸ì— HMAC ?œëª…???”ì²­??ë³´ë‚¸??
+// serverless(Vercel)?ì„œ fire-and-forget?€ ? ë¢°?????†ìœ¼ë¯€ë¡??‘ë‹µ ?„ì— await?˜ë˜,
+// ì§§ì? timeout?¼ë¡œ dashboard ?¡ì…˜ ?ì²´ë¥?ë§‰ì? ?ŠëŠ”?? ?¤íŒ¨?´ë„ throw?˜ì? ?Šê³ 
+// EnforceResult.enforced=false ë¡??œí˜„ ??DB???´ë? ë°˜ì˜?ê³  ?¬ì ‘?ì? join ê²Œì´?¸ê? ì°¨ë‹¨.
+
+import {
+  ENFORCE_PATH,
+  ENFORCE_SIGNATURE_HEADER,
+  ENFORCE_TIMESTAMP_HEADER,
+  computeEnforceSignature,
+  type EnforceRequest,
+} from "./contract";
+
+const ENFORCE_TIMEOUT_MS = 2000;
+
+export interface EnforceResult {
+  /** ?Œì¼“ ?œë²„ê°€ ?¤ì‹œê°?ë°˜ì˜?ˆëŠ”ì§€ */
+  enforced: boolean;
+  /** ?í–¥ë°›ì? ?Œì¼“ ???¤ì¤‘ ???¬í•¨). ?¤í”„?¼ì¸?´ë©´ 0 */
+  affectedSockets?: number;
+  /** ë¯¸ë°˜???¬ìœ (ë¡œê¹…/?”ë²„ê¹…ìš©) */
+  reason?: string;
+}
+
+/**
+ * ?Œì¼“ ?œë²„???¤ì‹œê°??œìž¬ë¥??„íŒŒ?œë‹¤.
+ * SOCKET_INTERNAL_URL/SECRET ë¯¸ì„¤???? ?„ë¡œ?•ì…˜?€ loud error ë¡œê·¸ ??ë¯¸ë°˜??
+ * ê·???ë¡œì»¬/?¨ì¼ ?„ë¡œ?¸ìŠ¤ dev)??ì¡°ìš©??ë¯¸ë°˜???Œì¼“ ?œë²„ê°€ ?†ì„ ???ˆìŒ).
+ */
+export async function dispatchEnforcement(req: EnforceRequest): Promise<EnforceResult> {
+  const baseUrl = process.env.SOCKET_INTERNAL_URL;
+  const secret = process.env.SOCKET_INTERNAL_SECRET;
+
+  if (!baseUrl || !secret) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[enforce] SOCKET_INTERNAL_URL/SECRET ë¯¸ì„¤?????¤ì‹œê°??œìž¬ ?„íŒŒ ë¶ˆê?(?„ë¡œ?•ì…˜). DBë§?ë°˜ì˜??"
+      );
+    }
+    return { enforced: false, reason: "not_configured" };
+  }
+
+  const rawBody = JSON.stringify(req);
+  const timestamp = String(Date.now());
+  const signature = computeEnforceSignature(secret, timestamp, rawBody);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ENFORCE_TIMEOUT_MS);
+  try {
+    const url = new URL(ENFORCE_PATH, baseUrl).toString();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [ENFORCE_SIGNATURE_HEADER]: signature,
+        [ENFORCE_TIMESTAMP_HEADER]: timestamp,
+      },
+      body: rawBody,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      console.error(`[enforce] socket ?œë²„ ?‘ë‹µ ${res.status}`);
+      return { enforced: false, reason: `status_${res.status}` };
+    }
+    const data = (await res.json().catch(() => ({}))) as { affectedSockets?: number };
+    return { enforced: true, affectedSockets: data.affectedSockets };
+  } catch (err) {
+    console.error("[enforce] socket ?œë²„ ?¸ì¶œ ?¤íŒ¨:", err instanceof Error ? err.message : err);
+    return { enforced: false, reason: "request_failed" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+
+ succeeded in 269ms:
+import { io, Socket } from "socket.io-client";
+import type { ClientToServerEvents, ServerToClientEvents } from "@/features/space/protocol";
+import {
+  RECONNECTION_ATTEMPTS,
+  RECONNECTION_DELAY,
+  RECONNECTION_DELAY_MAX,
+  RECONNECTION_TIMEOUT,
+} from "@/features/space/protocol";
+
+type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+
+let socket: TypedSocket | null = null;
+
+function getSocketUrl(): string {
+  if (typeof window === "undefined") return "";
+  // ?꾨줈?뺤뀡: 蹂꾨룄 ?쒕툕?꾨찓??(e.g. https://v2-socket.flow-coder.com)
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+    return process.env.NEXT_PUBLIC_SOCKET_URL;
+  }
+  // 媛쒕컻: 媛숈? ?몄뒪?몄쓽 ?ㅻⅨ ?ы듃
+  const port = process.env.NEXT_PUBLIC_SOCKET_PORT || "3001";
+  return `${window.location.protocol}//${window.location.hostname}:${port}`;
+}
+
+/** ?뚯폆 ?대씪?댁뼵???몄뒪?댁뒪 (?깃??? */
+export async function getSocketClient(): Promise<TypedSocket> {
+  // ?대? ?곌껐?먭굅???곌껐 以묒씤 ?뚯폆 ?ъ궗??  if (socket && (socket.connected || socket.active)) {
+    return socket;
+  }
+
+  // ?댁쟾 ?뚯폆???덉쑝硫??뺣━
+  if (socket) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
+  }
+
+  // ?좏겙 諛쒓툒
+  const res = await fetch("/api/socket/token");
+  if (!res.ok) throw new Error("Failed to get socket token");
+  const { token } = await res.json();
+
+  const url = getSocketUrl();
+  console.log("[Socket] Connecting to:", url);
+
+  socket = io(url, {
+    auth: { token },
+    transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionAttempts: RECONNECTION_ATTEMPTS,
+    reconnectionDelay: RECONNECTION_DELAY,
+    reconnectionDelayMax: RECONNECTION_DELAY_MAX,
+    timeout: RECONNECTION_TIMEOUT,
+  });
+
+  return socket;
+}
+
+/** ?뚯폆 ?곌껐 ?댁젣 */
+export function disconnectSocket() {
+  if (socket) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
+  }
+}
+
+
+codex
+현재 확인한 바로는 `parsePageNumber`는 의도적으로 상한 없음이 테스트에 박혀 있고, C는 주석상 graceful degrade가 명시 설계입니다. 최종 답변은 이 전제를 깨지 않는 쪽으로 정리하겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"details|Failed to fetch|Failed to get socket token|parsePageNumber\\(\\\"100000\\\"\\)|not_configured|realtimeEnforced|Enforcement not configured\" -S src server tests __tests__ ." in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"불변식|invariant|server invariant|error, code|code\\?|app\\.md|details\" -S ." in C:\Team-jane\FlowSpace
+2026-06-22T13:12:14.161451Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.2 seconds
+Output:
+rg: regex parse error:
+    (?:details|Failed to fetch|Failed to get socket token|parsePageNumber\(" 100000\\)|not_configured|realtimeEnforced|Enforcement)
+                                                                                                                                  ^
+error: unopened group
+
+ exited 1 in 211ms:
+rg: regex parse error:
+    (?:details|Failed to fetch|Failed to get socket token|parsePageNumber\(" 100000\\)|not_configured|realtimeEnforced|Enforcement)
+                                                                                                                                  ^
+error: unopened group
+
+ succeeded in 238ms:
+.\package-lock.json:622:    "node_modules/@epic-web/invariant": {
+.\package-lock.json:624:      "resolved": "https://registry.npmjs.org/@epic-web/invariant/-/invariant-1.0.0.tgz",
+.\package-lock.json:5549:        "@epic-web/invariant": "^1.0.0",
+.\server\handlers\room.ts:110:    // 클라이언트가 보낸 spaceId 는 신뢰하지 않는다(communication invariant #3) —
+.\src\lib\space-role.ts:4: * 관리 액션(역할변경/제재/추방)의 "호출자 역할 > 대상 역할" 불변식을
+.\src\components\dashboard\event-log-table.tsx:34:            <th className="pb-3 font-medium">Details</th>
+.\src\lib\comfyui\client.ts:197:          const errorDetails = history.status.messages
+.\src\lib\comfyui\client.ts:201:            `ComfyUI execution failed for prompt ${promptId}: ${errorDetails}`,
+.\src\app\api\workflows\route.ts:43:        details: error instanceof Error ? error.message : undefined,
+.\src\features\space\protocol\internal\socket-constants.ts:7://   invariant #1 — 위치 100ms throttle (클라 → 서버 이동 업데이트 최소 간격)
+.\src\features\space\protocol\internal\socket-constants.ts:8://   invariant #2 — 지수 백오프 재연결 500ms → 5s, 최대 30회 시도
+.\src\app\api\spaces\[id]\route.ts:77:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\route.ts:147:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\route.ts:182:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\route.ts:124:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\route.ts:83:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\route.ts:151:      // (app.md 서버 불변식 #2 "필요한 필드만").
+.\src\app\api\spaces\route.ts:173:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\route.test.ts:152:    const body = await readJson<{ code?: string }>(res);
+.\src\app\api\spaces\route.test.ts:296:    const body = await readJson<{ code?: string }>(res);
+.\src\app\api\spaces\route.test.ts:322:    const body = await readJson<{ error: string; code?: string }>(res);
+.\src\app\api\assets\[id]\route.ts:59:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\[id]\route.ts:118:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\generate\route.ts:119:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\auth\register\route.ts:59:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\guest\route.ts:65:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\messages\route.ts:90:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\map\route.ts:74:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\batch\route.ts:112:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\assets\batch\route.ts:166:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\map\objects\route.ts:88:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\members\route.ts:62:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\members\route.ts:137:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\members\route.ts:234:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\join\[inviteCode]\route.ts:40:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\join\[inviteCode]\route.ts:109:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\admin\analytics\route.ts:70:      { error: "Failed to fetch analytics", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\map\tiles\route.ts:53:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\admin\logs\route.ts:54:      { error: "Failed to fetch logs", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\announce\route.ts:65:      { error: "Failed to send announcement", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:91:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\map\objects\[objectId]\route.ts:141:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\admin\stats\route.ts:58:      { error: "Failed to fetch stats", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\members\route.ts:54:      { error: "Failed to fetch members", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\members\route.ts:226:      { error: "Failed to update member", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\media\route.ts:52:      { error: "Failed to fetch media data", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\media\route.ts:115:      { error: "Failed to create grant", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\messages\route.ts:47:      { error: "Failed to fetch messages", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\map\objects\[objectId]\link\route.ts:106:        details: error instanceof Error ? error.message : undefined,
+.\src\app\api\spaces\[id]\admin\messages\[messageId]\route.ts:59:      { error: "Failed to delete message", details: error instanceof Error ? error.message : undefined },
+.\src\app\api\spaces\[id]\admin\media\[grantId]\route.ts:45:      { error: "Failed to delete grant", details: error instanceof Error ? error.message : undefined },
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "details" src server . --glob "*.test.ts" --glob "*.spec.ts"' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "not_configured|realtimeEnforced|Enforcement not configured|Failed to get socket token|parsePageNumber" src server . --glob "*.test.ts" --glob "*.spec.ts"' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\app\\api\\spaces\\route.test.ts" in C:\Team-jane\FlowSpace
+ succeeded in 297ms:
+src\lib\pagination.test.ts:6:  parsePageNumber,
+src\lib\pagination.test.ts:64:describe("parsePageNumber (WI-022)", () => {
+src\lib\pagination.test.ts:66:    expect(parsePageNumber(null)).toBe(1);
+src\lib\pagination.test.ts:67:    expect(parsePageNumber("")).toBe(1);
+src\lib\pagination.test.ts:71:    expect(parsePageNumber("1")).toBe(1);
+src\lib\pagination.test.ts:72:    expect(parsePageNumber("2")).toBe(2);
+src\lib\pagination.test.ts:73:    expect(parsePageNumber("999")).toBe(999);
+src\lib\pagination.test.ts:77:    expect(parsePageNumber("0")).toBe(1);
+src\lib\pagination.test.ts:78:    expect(parsePageNumber("-5")).toBe(1);
+src\lib\pagination.test.ts:82:    expect(parsePageNumber("abc")).toBe(1);
+src\lib\pagination.test.ts:83:    expect(parsePageNumber("NaN")).toBe(1);
+src\lib\pagination.test.ts:87:    expect(parsePageNumber("100000")).toBe(100000);
+src\lib\pagination.test.ts:91:    expect(parsePageNumber("2.9")).toBe(2);
+.\src\lib\pagination.test.ts:6:  parsePageNumber,
+.\src\lib\pagination.test.ts:64:describe("parsePageNumber (WI-022)", () => {
+.\src\lib\pagination.test.ts:66:    expect(parsePageNumber(null)).toBe(1);
+.\src\lib\pagination.test.ts:67:    expect(parsePageNumber("")).toBe(1);
+.\src\lib\pagination.test.ts:71:    expect(parsePageNumber("1")).toBe(1);
+.\src\lib\pagination.test.ts:72:    expect(parsePageNumber("2")).toBe(2);
+.\src\lib\pagination.test.ts:73:    expect(parsePageNumber("999")).toBe(999);
+.\src\lib\pagination.test.ts:77:    expect(parsePageNumber("0")).toBe(1);
+.\src\lib\pagination.test.ts:78:    expect(parsePageNumber("-5")).toBe(1);
+.\src\lib\pagination.test.ts:82:    expect(parsePageNumber("abc")).toBe(1);
+.\src\lib\pagination.test.ts:83:    expect(parsePageNumber("NaN")).toBe(1);
+.\src\lib\pagination.test.ts:87:    expect(parsePageNumber("100000")).toBe(100000);
+.\src\lib\pagination.test.ts:91:    expect(parsePageNumber("2.9")).toBe(2);
+src\app\api\spaces\[id]\admin\members\route.test.ts:128:    const body = await readJson<{ member: Record<string, unknown>; realtimeEnforced: boolean }>(res);
+src\app\api\spaces\[id]\admin\members\route.test.ts:129:    expect(Object.keys(body).sort()).toEqual(["member", "realtimeEnforced"]);
+.\src\app\api\spaces\[id]\admin\members\route.test.ts:128:    const body = await readJson<{ member: Record<string, unknown>; realtimeEnforced: boolean }>(res);
+.\src\app\api\spaces\[id]\admin\members\route.test.ts:129:    expect(Object.keys(body).sort()).toEqual(["member", "realtimeEnforced"]);
+
+2026-06-22T13:12:19.617607Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.3 seconds
+Output:
+
+ exited 1 in 303ms:
+ succeeded in 264ms:
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  buildGetRequest,
+  buildJsonRequest,
+  makeSession,
+  makeSpaceRow,
+  readJson,
+} from "@/__tests__/helpers/api-route";
+
+// ============================================
+// auth()/prisma mock ??vi.hoisted + vi.mock?€ ?Œì¼ ë¡œì»¬ ?¸ì´?¤íŒ…?´ë¼
+// ?¼ìš°??import ?„ì— ???Œì¼?ì„œ ì§ì ‘ ? ì–¸?´ì•¼ ?œë‹¤ (?˜ë‹ˆ?¤ë¡œ ì¤‘ì•™??ë¶ˆê?).
+// ============================================
+const { mockAuth, mockPrisma } = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+  mockPrisma: {
+    space: { findMany: vi.fn(), create: vi.fn() },
+    template: { findUnique: vi.fn() },
+  },
+}));
+
+vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
+vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
+
+import { GET, POST } from "./route";
+
+interface SpacesResponse {
+  spaces: Array<Record<string, unknown>>;
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/** ì§ì „ findMany ?¸ì¶œ???¸ìž(where/take/cursor/skip ??ë¥?êº¼ë‚¸?? */
+function lastFindManyArg(): Record<string, unknown> {
+  const calls = mockPrisma.space.findMany.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  return calls[calls.length - 1][0] as Record<string, unknown>;
+}
+
+beforeEach(() => {
+  mockAuth.mockReset();
+  mockPrisma.space.findMany.mockReset();
+  mockPrisma.space.create.mockReset();
+  mockPrisma.template.findUnique.mockReset();
+  // ê¸°ë³¸: ë¹?ê²°ê³¼
+  mockPrisma.space.findMany.mockResolvedValue([]);
+});
+
+describe("GET /api/spaces ???¸ì¦ ê°€??, () => {
+  it("ë¯¸ì¸ì¦ì´ë©?401?´ê³  prismaë¥?ê±´ë“œë¦¬ì? ?ŠëŠ”??, async () => {
+    mockAuth.mockResolvedValue(makeSession(null));
+
+    const res = await GET(buildGetRequest("/api/spaces"));
+
+    expect(res.status).toBe(401);
+    expect(mockPrisma.space.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/spaces ??filter ??scope ë¶„ê¸°", () => {
+  it("filter=owned ??where.ownerId === ë³¸ì¸ (status ACTIVE)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1" }));
+
+    const res = await GET(buildGetRequest("/api/spaces", { filter: "owned" }));
+
+    expect(res.status).toBe(200);
+    expect(lastFindManyArg().where).toEqual({
+      ownerId: "u1",
+      status: "ACTIVE",
+    });
+  });
+
+  it("filter=joined ??where.members.some.userId === ë³¸ì¸ (status ACTIVE)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1" }));
+
+    await GET(buildGetRequest("/api/spaces", { filter: "joined" }));
+
+    expect(lastFindManyArg().where).toEqual({
+      members: { some: { userId: "u1" } },
+      status: "ACTIVE",
+    });
+  });
+
+  it("filter ë¯¸ì???+ ?¼ë°˜ ?¬ìš©????ë©¤ë²„??scope", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: false }));
+
+    await GET(buildGetRequest("/api/spaces"));
+
+    expect(lastFindManyArg().where).toEqual({
+      members: { some: { userId: "u1" } },
+      status: "ACTIVE",
+    });
+  });
+
+  it("filter ë¯¸ì???+ ?ˆí¼?´ë“œë¯????„ì—­(ACTIVE ?„ì²´, ownerId/members ?†ìŒ)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "admin", isSuperAdmin: true }));
+
+    await GET(buildGetRequest("/api/spaces"));
+
+    expect(lastFindManyArg().where).toEqual({ status: "ACTIVE" });
+  });
+
+  it("filter=all + ?¼ë°˜ ?¬ìš©????ë©¤ë²„??scope (?„ì—­ ?„ë‹˜ ??ê¶Œí•œ ê²©ë¦¬)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: false }));
+
+    await GET(buildGetRequest("/api/spaces", { filter: "all" }));
+
+    // ?¼ë°˜ ?¬ìš©?ëŠ” filter=all ?´ì–´??ë³¸ì¸ ë©¤ë²„??œ¼ë¡??œí•œ?˜ì–´???œë‹¤.
+    expect(lastFindManyArg().where).toEqual({
+      members: { some: { userId: "u1" } },
+      status: "ACTIVE",
+    });
+  });
+
+  it("filter=all + ?ˆí¼?´ë“œë¯????„ì—­(ACTIVE ?„ì²´)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "admin", isSuperAdmin: true }));
+
+    await GET(buildGetRequest("/api/spaces", { filter: "all" }));
+
+    expect(lastFindManyArg().where).toEqual({ status: "ACTIVE" });
+  });
+
+  it("filter=owned + ?ˆí¼?´ë“œë¯???ë³¸ì¸ ?Œìœ ë¡œë§Œ ?œí•œ(?„ì—­?”ë˜ì§€ ?ŠìŒ)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "admin", isSuperAdmin: true }));
+
+    await GET(buildGetRequest("/api/spaces", { filter: "owned" }));
+
+    // ?ˆí¼?´ë“œë¯¼ì´?¼ë„ ëª…ì‹œ??owned ?„í„°???„ì—­???„ë‹Œ ë³¸ì¸ ?Œìœ ë¡?ì¢í????œë‹¤.
+    expect(lastFindManyArg().where).toEqual({
+      ownerId: "admin",
+      status: "ACTIVE",
+    });
+  });
+
+  it("filter=joined + ?ˆí¼?´ë“œë¯???ë³¸ì¸ ë©¤ë²„??œ¼ë¡œë§Œ ?œí•œ(?„ì—­?”ë˜ì§€ ?ŠìŒ)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "admin", isSuperAdmin: true }));
+
+    await GET(buildGetRequest("/api/spaces", { filter: "joined" }));
+
+    expect(lastFindManyArg().where).toEqual({
+      members: { some: { userId: "admin" } },
+      status: "ACTIVE",
+    });
+  });
+
+  it("ë¯¸í—ˆ??filter ??400 INVALID_FILTER ?´ê³  prismaë¥?ê±´ë“œë¦¬ì? ?ŠëŠ”??, async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: true }));
+
+    const res = await GET(buildGetRequest("/api/spaces", { filter: "bogus" }));
+
+    expect(res.status).toBe(400);
+    const body = await readJson<{ code?: string }>(res);
+    expect(body.code).toBe("INVALID_FILTER");
+    expect(mockPrisma.space.findMany).not.toHaveBeenCalled();
+  });
+
+  it("ëª¨ë“  ?•ìƒ scope??status: ACTIVEê°€ ??ƒ ë¶€ì°©ëœ??, async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: true }));
+
+    for (const filter of ["owned", "joined", "all"]) {
+      mockPrisma.space.findMany.mockClear();
+      await GET(buildGetRequest("/api/spaces", { filter }));
+      expect(lastFindManyArg().where).toMatchObject({ status: "ACTIVE" });
+    }
+  });
+});
+
+describe("GET /api/spaces ???˜ì´ì§€?¤ì´???¸ìž", () => {
+  it("limit/cursor ??take=limit+1, cursor:{id}, skip:1 ?„ë‹¬ + ?‘ë‹µ trimming", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: true }));
+    // limit=2 ?¸ë° 3ê±?=limit+1) ë°˜í™˜ ??hasMore true, ë§ˆì?ë§?1ê±??˜ë¦¼
+    mockPrisma.space.findMany.mockResolvedValue([
+      makeSpaceRow({ id: "a" }),
+      makeSpaceRow({ id: "b" }),
+      makeSpaceRow({ id: "c" }),
+    ]);
+
+    const res = await GET(
+      buildGetRequest("/api/spaces", { limit: "2", cursor: "abc" })
+    );
+
+    const arg = lastFindManyArg();
+    expect(arg.take).toBe(3);
+    expect(arg.cursor).toEqual({ id: "abc" });
+    expect(arg.skip).toBe(1);
+
+    const body = await readJson<SpacesResponse>(res);
+    expect(body.spaces).toHaveLength(2);
+    expect(body.spaces.map((s) => s.id)).toEqual(["a", "b"]);
+    expect(body.hasMore).toBe(true);
+    expect(body.nextCursor).toBe("b");
+  });
+
+  it("cursor ë¯¸ì?????ê¸°ë³¸ limit(50) take=51, cursor/skip ë¯¸ì „??, async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: true }));
+
+    await GET(buildGetRequest("/api/spaces"));
+
+    const arg = lastFindManyArg();
+    expect(arg.take).toBe(51);
+    expect(arg.cursor).toBeUndefined();
+    expect(arg.skip).toBeUndefined();
+  });
+
+  it("cursorê°€ ?ˆì–´??where??scope/statusê°€ ë³´ì¡´?œë‹¤ (cursorê°€ scopeë¥??€ì²´í•˜ì§€ ?ŠìŒ)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: false }));
+
+    await GET(
+      buildGetRequest("/api/spaces", { filter: "owned", cursor: "forged" })
+    );
+
+    const arg = lastFindManyArg();
+    expect(arg.where).toEqual({ ownerId: "u1", status: "ACTIVE" });
+    expect(arg.cursor).toEqual({ id: "forged" });
+  });
+});
+
+describe("GET /api/spaces ???‘ë‹µ ë§¤í•‘ allowlist", () => {
+  it("ë¯¼ê°/?´ë? ?„ë“œ(inviteCodeÂ·accessSecretÂ·ownerIdÂ·status)ë¥??¸ì¶œ?˜ì? ?ŠëŠ”??, async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: true }));
+    mockPrisma.space.findMany.mockResolvedValue([
+      makeSpaceRow({ id: "a", role: "OWNER", memberCount: 7 }),
+    ]);
+
+    const res = await GET(buildGetRequest("/api/spaces"));
+    const body = await readJson<SpacesResponse>(res);
+    const space = body.spaces[0];
+
+    // ?¸ì¶œ?˜ì–´???˜ëŠ” ë§¤í•‘ ?„ë“œ
+    expect(space).toMatchObject({
+      id: "a",
+      memberCount: 7,
+      myRole: "OWNER",
+      template: { key: "OFFICE", name: "?¤í”¼?? },
+    });
+
+    // ?•í™•??key ì§‘í•© ?¨ì–¸ ??ì¶”ê?/?„ë½ ?´ëŠ ìª½ì´???Œê?ë¥?ê²€ì¶œí•œ??
+    // (fixture???´ê¸´ inviteCode/accessSecret/ownerId/status/templateId/updatedAt/
+    //  _count/members ??raw row ?„ë“œê°€ ?‘ë‹µ???ˆì? ?ŠìŒ????ë²ˆì— ë³´ìž¥)
+    expect(Object.keys(space).sort()).toEqual(
+      [
+        "accessType",
+        "createdAt",
+        "description",
+        "id",
+        "logoUrl",
+        "maxUsers",
+        "memberCount",
+        "myRole",
+        "name",
+        "primaryColor",
+        "template",
+      ].sort()
+    );
+
+    // ë¯¼ê°/?´ë? ?„ë“œ??ëª…ì‹œ?ìœ¼ë¡œë„ ë¶€???•ì¸ (ê°€?…ì„±Â·?˜ë„ ëª…ì‹œ)
+    for (const leaked of [
+      "inviteCode",
+      "accessSecret",
+      "ownerId",
+      "status",
+      "templateId",
+      "updatedAt",
+      "_count",
+      "members",
+    ]) {
+      expect(space).not.toHaveProperty(leaked);
+    }
+  });
+
+  it("ë¹„ë©¤ë²??‰ì? myRole??nullë¡?ë§¤í•‘?œë‹¤", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "admin", isSuperAdmin: true }));
+    mockPrisma.space.findMany.mockResolvedValue([
+      makeSpaceRow({ id: "a", role: null }),
+    ]);
+
+    const res = await GET(buildGetRequest("/api/spaces"));
+    const body = await readJson<SpacesResponse>(res);
+
+    expect(body.spaces[0].myRole).toBeNull();
+  });
+});
+
+describe("POST /api/spaces ??superAdmin ?ì„± ê°€??, () => {
+  it("ë¹??ˆí¼?´ë“œë¯¼ì? body/prisma ?‘ê·¼ ?„ì— 403 SUPER_ADMIN_REQUIRED", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1", isSuperAdmin: false }));
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", {
+        name: "??ê³µê°„",
+        templateKey: "OFFICE",
+      })
+    );
+
+    expect(res.status).toBe(403);
+    const body = await readJson<{ code?: string }>(res);
+    expect(body.code).toBe("SUPER_ADMIN_REQUIRED");
+    expect(mockPrisma.template.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.space.create).not.toHaveBeenCalled();
+  });
+
+  it("ë¯¸ì¸ì¦ì´ë©?401?´ê³  prismaë¥?ê±´ë“œë¦¬ì? ?ŠëŠ”??, async () => {
+    mockAuth.mockResolvedValue(makeSession(null));
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", { name: "x", templateKey: "OFFICE" })
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockPrisma.template.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.space.create).not.toHaveBeenCalled();
+  });
+
+  it("name ?ëŠ” templateKey ?„ë½ ??400 (code ?†ìŒ) + template ë¯¸ì¡°??, async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", { name: "?´ë¦„ë§? }) // templateKey ?„ë½
+    );
+
+    expect(res.status).toBe(400);
+    const body = await readJson<{ error: string; code?: string }>(res);
+    expect(body.error).toBe("name, templateKey are required");
+    expect(body.code).toBeUndefined(); // INVALID_FILTER?€ ?¬ë¦¬ POST 400?€ code ?†ìŒ
+    expect(mockPrisma.template.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.space.create).not.toHaveBeenCalled();
+  });
+
+  it("ì¡´ìž¬?˜ì? ?ŠëŠ” templateKeyë©?404?´ê³  space.create ë¯¸ì§„??, async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
+    mockPrisma.template.findUnique.mockResolvedValue(null);
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", { name: "??ê³µê°„", templateKey: "NOPE" })
+    );
+
+    expect(res.status).toBe(404);
+    const body = await readJson<{ error: string }>(res);
+    expect(body.error).toBe("Template not found");
+    expect(mockPrisma.space.create).not.toHaveBeenCalled();
+  });
+
+  it("?•ìƒ ?ì„± ??201 + createê°€ ownerId/OWNER ë©¤ë²„ë¡??¸ì¶œ?˜ê³  ?‘ë‹µ allowlist(inviteCode ë¯¸ë…¸ì¶?", async () => {
+    mockAuth.mockResolvedValue(
+      makeSession({ id: "sa-1", isSuperAdmin: true, name: "ê´€ë¦¬ìž" })
+    );
+    mockPrisma.template.findUnique.mockResolvedValue({ id: "tpl-1", key: "OFFICE" });
+    // raw row??inviteCodeê°€ ?ˆì–´???‘ë‹µ?¼ë¡œ ?ˆì? ?Šì•„???œë‹¤ (WI-014 allowlist ?Œê? ê°€??.
+    mockPrisma.space.create.mockResolvedValue({
+      id: "sp-new",
+      name: "??ê³µê°„",
+      inviteCode: "INV-1",
+      template: { key: "OFFICE", name: "?¤í”¼?? },
+    });
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", {
+        name: "??ê³µê°„",
+        templateKey: "OFFICE",
+      })
+    );
+
+    expect(res.status).toBe(201);
+    const body = await readJson<Record<string, unknown>>(res);
+    // ?‘ë‹µ ??ì§‘í•© ??inviteCode ??ë¯¼ê° ?„ë“œ ë¯¸ë…¸ì¶?(GET ëª©ë¡ allowlist ?•ì±…ê³??•í•©)
+    expect(Object.keys(body).sort()).toEqual(["id", "name", "template"]);
+    expect(body).not.toHaveProperty("inviteCode");
+    expect(body).toMatchObject({
+      id: "sp-new",
+      name: "??ê³µê°„",
+      template: { key: "OFFICE", name: "?¤í”¼?? },
+    });
+
+    // create ?¸ìž: ?¸ì…˜ userIdê°€ ownerId + OWNER ë©¤ë²„ë¡??ì„±
+    const createArg = mockPrisma.space.create.mock.calls[0][0] as {
+      data: {
+        ownerId: string;
+        templateId: string;
+        members: { create: { userId: string; role: string } };
+      };
+    };
+    expect(createArg.data.ownerId).toBe("sa-1");
+    expect(createArg.data.templateId).toBe("tpl-1");
+    expect(createArg.data.members.create.role).toBe("OWNER");
+    expect(createArg.data.members.create.userId).toBe("sa-1");
+  });
+
+  it("space.create ?¤íŒ¨ ??500 ?´ë°± (Failed to create space)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
+    mockPrisma.template.findUnique.mockResolvedValue({ id: "tpl-1", key: "OFFICE" });
+    mockPrisma.space.create.mockRejectedValue(new Error("db down"));
+
+    const res = await POST(
+      buildJsonRequest("/api/spaces", "POST", {
+        name: "??ê³µê°„",
+        templateKey: "OFFICE",
+      })
+    );
+
+    expect(res.status).toBe(500);
+    const body = await readJson<{ error: string }>(res);
+    expect(body.error).toBe("Failed to create space");
+  });
+});
+
+describe("GET /api/spaces ??500 ?´ë°±", () => {
+  it("findMany ?¤íŒ¨ ??500 (Failed to fetch spaces)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "u1" }));
+    mockPrisma.space.findMany.mockRejectedValue(new Error("db down"));
+
+    const res = await GET(buildGetRequest("/api/spaces"));
+
+    expect(res.status).toBe(500);
+    const body = await readJson<{ error: string }>(res);
+    expect(body.error).toBe("Failed to fetch spaces");
+  });
+});
+
+
+codex
+결정: **A를 다음 WI-023으로 먼저 처리**하세요.
+
+근거는 명확합니다. A는 CWE-209 보안 이슈이고, 실표면이 `assets` 1곳이 아니라 26파일 37곳의 API 전반입니다. 500은 정상 플로우가 아니어도 DB 장애, Prisma 예외, 배포 미스매치 때 실제로 노출될 수 있습니다. B는 UX 방어, C는 운영 정책 변경입니다. 둘 다 중요하지만 A보다 우선순위가 낮습니다.
+
+**WI-023 스코프**
+- **26파일 37곳 일괄 수정**이 맞습니다. `assets`만 고치면 같은 취약 패턴이 대부분 남아 “해결됨”이라고 말할 수 없습니다.
+- 중앙 헬퍼 도입이 맞습니다. 예: `internalServerErrorResponse(error, "Failed to fetch assets", { route: "GET /api/assets" })`.
+- 클라이언트 응답은 기존 계약을 최대한 유지해서 `{ error: "Failed to ..." }`만 반환하세요. `details` 제거. `code`는 app.md 불변식상 허용되지만, 500 전체에 새로 추가하지 않는 편이 무회귀성이 높습니다.
+- 서버 로그는 유지해야 합니다. `console.error("[api/...]", error)` 또는 헬퍼 내부 구조화 로그로 원본 Error/Prisma error를 서버에만 남깁니다.
+- **dev에서도 details를 응답하지 않는 쪽**을 권합니다. 환경별 응답 shape가 갈라지면 테스트와 클라이언트 계약이 흐려집니다. 디버깅은 서버 로그로 충분합니다.
+- Prisma 에러는 절대 클라이언트에 원문 반환하지 않습니다. 제약명, 컬럼명, DB URL 일부, 파일 경로가 섞일 수 있습니다.
+- 기존 테스트가 `body.error`만 확인하는 곳은 유지됩니다. 다만 `details` 존재를 기대하는 테스트가 있다면 그 테스트가 잘못된 보안 계약이므로 “없어야 한다”로 바꿔야 합니다.
+- 검증은 `rg "details: error instanceof Error"`가 0건이어야 하고, 대표 라우트 2~3곳은 500에서 `details` 미포함을 테스트로 고정하세요.
+
+**offset 상한은 이번 WI에서 분리**하세요.  
+`parsePageNumber("100000") === 100000`이 현재 테스트로 박혀 있고, 소비처 실표면도 낮습니다. A는 보안 노출 제거로 닫고, offset cap은 별도 WI로 `MAX_PAGE_NUMBER` 정책을 정한 뒤 처리하는 게 맞습니다.
+
+B는 A 이후 후보입니다. retry를 넣더라도 401/403 같은 비-일시 장애는 즉시 throw, 네트워크 오류/408/429/5xx만 2~3회 짧은 exponential backoff가 적절합니다.
+
+C는 지금 하지 마세요. 코드 주석상 graceful degrade가 의도된 운영 정책입니다. fail-fast는 안전망이 아니라 배포 기동 실패로 바뀌는 정책 변경이라 별도 승인 게이트가 필요합니다.
+
+놓친 위험 1가지: **500 응답의 `error` 문자열 자체도 라우트별 내부 동작을 드러낼 수 있습니다.** 이번에는 회귀 최소화를 위해 기존 `"Failed to ..."` 문구를 유지하되, 장기적으로는 외부 공개 API와 관리자 API의 에러 문구 노출 수준을 따로 정리하는 후속 보안 WI가 필요합니다.
+tokens used
+53,122
