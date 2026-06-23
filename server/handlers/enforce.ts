@@ -26,7 +26,13 @@ import {
   parseEnforceRequest,
   type EnforceRequest,
 } from "../../src/features/space/enforce/internal/contract";
-import { spacePlayersMap, detachSocketFromSpace, removeUserPresence } from "./room";
+import {
+  spacePlayersMap,
+  detachSocketFromSpace,
+  removeUserPresence,
+  purgeSpaceState,
+  markSpaceArchived,
+} from "./room";
 import { getPrisma } from "../lib/prisma";
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -49,11 +55,39 @@ function socketsForUser(io: IO, spaceId: string, userId: string): TypedSocket[] 
 }
 
 /**
+ * spaceId room 의 모든 소켓 스냅샷(WI-036 archive). detachSocketFromSpace 가 room 을
+ * 변경하므로, 순회 중 mutation 을 피하려면 처리 전에 배열로 고정해야 한다(codex).
+ * socket.data.spaceId 일치까지 확인해 join 인가가 끝난 소켓만 포함한다.
+ */
+function socketsInSpace(io: IO, spaceId: string): TypedSocket[] {
+  const ids = io.sockets.adapter.rooms.get(spaceId);
+  if (!ids) return [];
+  const out: TypedSocket[] = [];
+  for (const id of ids) {
+    const s = io.sockets.sockets.get(id) as TypedSocket | undefined;
+    if (s && s.data.spaceId === spaceId) out.push(s);
+  }
+  return out;
+}
+
+/**
  * DB postcondition 재확인. Next 핸들러가 실제로 그 상태를 만들었는지 확인한 뒤에만
  * 소켓을 조작한다. 불일치(또는 검증 오류)면 false → 호출측이 409 로 거부.
  */
 async function verifyPostcondition(req: EnforceRequest): Promise<boolean> {
   const prisma = await getPrisma();
+
+  // 공간 전체 archive — 멤버가 아니라 Space.status 를 재확인한다.
+  // 시크릿 유출/핸들러 버그가 살아있는 공간을 임의로 archive-추방하는 것을 차단(409).
+  if (req.action === "archive") {
+    const space = await prisma.space.findUnique({
+      where: { id: req.spaceId },
+      select: { status: true },
+    });
+    return space?.status === "ARCHIVED";
+  }
+
+  // 멤버 대상 제재 — discriminated union 이 여기서 req.userId 존재를 보장한다.
   const member = await prisma.spaceMember.findUnique({
     where: { spaceId_userId: { spaceId: req.spaceId, userId: req.userId } },
     select: { restriction: true, role: true },
@@ -78,6 +112,25 @@ async function verifyPostcondition(req: EnforceRequest): Promise<boolean> {
  * 검증된 enforce 요청을 소켓에 적용. 영향받은 소켓 수 반환(오프라인이면 0=no-op).
  */
 export function applyEnforcement(io: IO, req: EnforceRequest): number {
+  // 공간 전체 archive — 그 공간의 모든 접속자를 추방한다(WI-036).
+  if (req.action === "archive") {
+    // 1) deny cache 선 등록 — 이후 in-flight join 을 즉시 차단(TOCTOU 보강).
+    markSpaceArchived(req.spaceId);
+    // 2) 대상 소켓 스냅샷 후 처리(detach 가 room 을 mutate 하므로 순회 전 고정).
+    const targets = socketsInSpace(io, req.spaceId);
+    const message = "이 공간이 삭제되어 연결이 종료되었습니다.";
+    for (const s of targets) {
+      // 사유 통지 후 동기 권한 회수(grace 동안 stale 인가 차단) — kick/ban 과 동일 패턴.
+      s.emit("space:error", { code: "SPACE_ARCHIVED", message });
+      detachSocketFromSpace(s);
+      setTimeout(() => s.disconnect(true), DISCONNECT_GRACE_MS);
+    }
+    // 3) 공간의 모든 인메모리 인덱스 일괄 정리(presence + media). detach 가 socket.data 를
+    //    비웠으므로 지연 disconnect 의 leaveSpace 도 재실행되지 않는다.
+    purgeSpaceState(req.spaceId);
+    return targets.length;
+  }
+
   const targets = socketsForUser(io, req.spaceId, req.userId);
   if (targets.length === 0) return 0;
 
