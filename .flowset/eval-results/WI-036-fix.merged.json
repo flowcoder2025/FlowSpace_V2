@@ -1,0 +1,30 @@
+{
+  "wi": "WI-036-fix",
+  "schemaVersion": 1,
+  "finalCommit": "3646378",
+  "rounds": 1,
+  "codex": {
+    "r1": {
+      "verdict": "WARNING",
+      "issues": 1,
+      "note": "유일 이슈 = 환경적 P3(defer·fixNow=false): read-only 샌드박스에서 `npx vitest run`·`npx prisma validate`가 EPERM(temp-dir mkdir 권한)으로 실행 불가. codex 명시 — 'Code inspection found no archive-hardening defect; npx tsc --noEmit + socket esbuild bundle both exited 0.' 즉 코드 결함 0. 권위 환경(로컬)에서 vitest 478·build 0·prisma validate 이미 실증."
+    }
+  },
+  "evaluator": {
+    "r1": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.81,
+      "issues": "P0/P1/P2/fixNow=0, P3x2 defer (①server/ 핵심 실시간 로직 자동 테스트 0 — vitest include:src/** 구조적 제약[WI-018 동일 교훈], 테스트 WI 분리 권장 ②PATCH findUnique select 없는 전체행 조회 — 응답 allowlist 차단해 누출0, deletedBy 추가로 의존 미묘, 선재 패턴·범위밖 심층방어)"
+    }
+  },
+  "convergence": {
+    "blockingIssues": 0,
+    "fixNow": 0,
+    "deferredP2": 0,
+    "deferredP3": 3,
+    "summary": "듀얼 블라인드 1R 수렴 — 양 검증자 WARNING·P0/P1/P2/fixNow=0. codex의 유일 이슈는 환경적(샌드박스 EPERM으로 vitest/prisma 미실행 — 코드 결함 아님, 코드 인스펙션 0 defect·tsc/esbuild exit0 직접 실증). evaluator P3x2 전부 defer: ①server/ 테스트 부채(vitest가 src/만 스캔하는 구조적 제약 — archive 추방 경로는 코드리뷰+esbuild+contract/route 테스트로 검증, WI-018 선례대로 테스트 WI 분리) ②PATCH findUnique 전체행(응답 allowlist가 deletedBy 포함 민감필드 차단·실누출0·선재 — 후속 lean select 정합 가능). 양 검증자 독립으로 archive 핵심 로직(discriminated union narrowing·snapshot-before-detach·deletedBy 원자보존·postcondition·식별자혼입 차단·deletedBy 미노출) 클린 확인."
+  },
+  "mutationTests": "evaluator 변이검증 3종 전부 검출(복원 후 트리 clean): ①updateMany where에서 status!=ARCHIVED 제거→route 테스트 FAIL(최초행위자 보존 가드) ②update data에서 deletedBy 제거→route 테스트 FAIL ③parseEnforceRequest archive 분기가 입력 userId 채택→contract 테스트 FAIL(식별자 혼입 차단). codex는 read-only 코드 인스펙션으로 archive-hardening 결함 0 확인.",
+  "machineGates": "tsc:0, lint:0err(1 preexisting LiveKit warning·WI무관), vitest:464→478(+14), build:0(next build), esbuild server bundle:0(런타임 src 입력 4=auth-secret/chat-constants/contract/socket-startup, Dockerfile.socket COPY 무변경 실증). prisma validate:valid, migrate diff:Space.deletedBy 단일 컬럼 add만.",
+  "issues": []
+}
