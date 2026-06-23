@@ -111,6 +111,15 @@ describe("DeleteSpaceSection — 이름 타이핑 확인 게이트", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it("빈 이름 스페이스 → 빈 입력이 일치해도 삭제 비활성(무타이핑 활성 차단)", () => {
+    setup("");
+    fireEvent.click(screen.getByRole("button", { name: COPY.deleteButton }));
+    // confirmInput("") === spaceName("") 이지만 length>0 가드로 비활성 유지.
+    expect((confirmButton() as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(confirmButton());
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it("특수문자·공백 포함 이름도 정확히 일치해야 활성", () => {
     setup("Team A / B (2026)");
     openAndType("Team A / B");
