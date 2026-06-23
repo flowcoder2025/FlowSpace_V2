@@ -1,0 +1,16 @@
+WI=WI-033-feat
+commit=82b39ed
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-033.codex-r2.json
+evaluator=.flowset/eval-results/WI-033.eval.json
+merged=.flowset/eval-results/WI-033-feat.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:416pass,build:0
+codexVerdict=PASS
+evaluatorVerdict=PASS:9.88
+blockingIssues=0
+deferredP2=0
+deferredP3=0
+rounds=2
+note=듀얼 블라인드 2R 수렴 — codex r1/r2 PASS 0 issues / evaluator r1 WARNING 9.81→r2 PASS 9.88. 어드민 대시보드(app/dashboard/** + components/dashboard/**) 사용자 노출 영문 ~98개를 단일 SoT src/constants/dashboard-copy.ts(DASHBOARD_COPY, 키 영문/값 한글, as const)로 분리·한글화. 핵심 위험(codex consult Q5)=표시 라벨과 도메인/API 값 분리: <option value>·필터·액션 토큰·색상 맵 키 전수 enum 코드 유지, *Label() 헬퍼로 표시만 매핑(미정의 코드 폴백). 화면·CSV 동일 라벨 SoT 공유, payload JSON 키 미번역. 동적 문자열 함수 엔트리. evaluator 유일 P3(accessType만 패턴 이탈·SoT 중복) r2 즉시 해소→consistency 10.0. 변이검증 2종(라벨 폴백 제거·CSV raw 유출 FAIL). 18 소스파일 배선 + 4 테스트 단언 갱신 + 신규 dashboard-copy.test.ts(9). sourceFingerprint=empty(소스 전 커밋·작업트리 clean). 설계 codex consult 1R(단일 파일·값/라벨 분리·CSV 한글·동적 함수). Vercel 전용(server/·prisma/ 무관). scope dashboard 엄격 고정(인-스페이스 player-list는 별도 후속).
+createdAt=2026-06-23T16:35:00Z

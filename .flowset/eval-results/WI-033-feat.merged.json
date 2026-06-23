@@ -1,0 +1,25 @@
+{
+  "wi": "WI-033-feat",
+  "title": "어드민 대시보드 한글화 + copy constants 분리",
+  "finalCommit": "82b39ed",
+  "rounds": 2,
+  "codex": {
+    "r1": { "verdict": "PASS", "issues": 0, "note": "값/라벨 분리·무회귀·CSV·scope 전부 클린 — 0 findings" },
+    "r2": { "verdict": "PASS", "issues": 0, "note": "P3 해소 커밋(accessTypeLabel 단일 SoT) 재검증 — 신규 결함 0" },
+    "artifact": ".flowset/eval-results/WI-033.codex-r2.json"
+  },
+  "evaluator": {
+    "r1": { "verdict": "WARNING", "weightedTotal": 9.81, "note": "P3×1: accessTypeLabel 헬퍼 정의·테스트됐으나 미사용 + SETTINGS.accessTypes 정적객체 SoT 중복(accessType만 패턴 이탈)" },
+    "r2": { "verdict": "PASS", "weightedTotal": 9.88, "note": "P3 해소 확인 — SoT 단일화·렌더지점 헬퍼 패턴 일치·option value=코드 유지·무회귀·dead code 해소. 신규 결함 0" },
+    "verdict": "PASS",
+    "weightedTotal": 9.88,
+    "scores": { "completeness": 9.8, "consistency": 10.0, "specificity": 9.8, "actionability": 9.9 },
+    "blocking": { "P0": 0, "P1": 0, "P2": 0 },
+    "deferredP3": 0,
+    "mutationTesting": "(M1) roleLabel 폴백을 `?? \"\"`로 깨면 가드 테스트 FAIL / (M2) CSV에 raw enum 코드 유출(라벨 미적용) 시 csv-export 테스트 FAIL — 가드 실효성 확인, false-pass 아님. 전부 원복 clean.",
+    "artifact": ".flowset/eval-results/WI-033.eval.json"
+  },
+  "convergence": "양 검증자 수렴 PASS. codex r1/r2 모두 0 issues(핵심 회귀 위험=값/라벨 혼동 클린 확인). evaluator r1 WARNING 9.81의 유일 P3(accessType SoT 중복·패턴 이탈)를 r2 즉시 해소(accessTypeLabel 단일 SoT로 통합, 다른 enum 렌더지점 헬퍼 패턴 일치) → evaluator r2 PASS 9.88(consistency 10.0 상향). 도메인/API 값(<option value>·필터·액션 토큰·색상 맵 키) 전수 코드 유지 확인, 라벨 헬퍼는 미정의 코드 폴백, CSV 이스케이프/BOM/CRLF/정렬 무회귀.",
+  "gates": { "tsc": 0, "lint": "0err(1 preexisting LiveKit warning)", "vitest": "407->416", "build": 0 },
+  "deferred": []
+}
