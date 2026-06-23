@@ -21,6 +21,8 @@ export const SPACE_COPY = {
       unmute: "채팅 음소거 해제",
       kick: "내보내기",
       ban: "차단",
+      // WI-045: 차단된 멤버에게만 노출(restriction=BANNED → NONE 복원, 재입장 허용).
+      unban: "차단 해제",
     },
     /**
      * 음성 제어(WI-038/039) — LiveKit 서버 측 강제 음소거. **채팅 음소거와 별개 레이어**라

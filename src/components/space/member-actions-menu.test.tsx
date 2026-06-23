@@ -298,3 +298,53 @@ describe("MemberActionsMenu — portal(overflow 탈출)", () => {
     expect(trigger.parentElement?.contains(dropdown)).toBe(false);
   });
 });
+
+// WI-045: 차단된 멤버는 "차단 해제"(unban)만 노출하고 mute/kick/ban/음성은 숨긴다
+// (의미 없는 액션·중복 ban 방지 — codex 놓칠 위험).
+describe("MemberActionsMenu — WI-045 차단된 멤버(unban만)", () => {
+  const BANNED: ManagedMember = {
+    memberId: "m-ban",
+    userId: "u-ban",
+    role: "PARTICIPANT",
+    restriction: "BANNED",
+  };
+
+  function renderBanned() {
+    return renderMenu({
+      member: BANNED,
+      target: { userId: "u-ban", nickname: "밴유저" },
+      participantIdentity: "user-u-ban",
+    });
+  }
+
+  it("'차단 해제'만 노출 — 채팅 음소거/내보내기/차단/음성 강제 음소거 숨김", () => {
+    renderBanned();
+    fireEvent.click(screen.getByLabelText("밴유저 관리"));
+    expect(screen.getByText("차단 해제")).toBeTruthy();
+    expect(screen.queryByText("채팅 음소거")).toBeNull();
+    expect(screen.queryByText("내보내기")).toBeNull();
+    expect(screen.queryByText("차단")).toBeNull(); // exact "차단" 없음("차단 해제"와 구분)
+    expect(screen.queryByText("음성 강제 음소거")).toBeNull();
+  });
+
+  it("'차단 해제' 클릭 → PATCH admin/members action:'unban'(memberId만)", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+    renderBanned();
+    fireEvent.click(screen.getByLabelText("밴유저 관리"));
+    fireEvent.click(screen.getByText("차단 해제"));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const [url, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit
+    ];
+    expect(url).toContain("/admin/members");
+    expect(init.method).toBe("PATCH");
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({ memberId: "m-ban", action: "unban" });
+    expect(body).not.toHaveProperty("userId");
+  });
+});

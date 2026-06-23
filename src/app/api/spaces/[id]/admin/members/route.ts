@@ -4,6 +4,7 @@ import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { canActOn, isSpaceRole } from "@/lib/space-role";
 import { dispatchEnforcement, type EnforceUserAction } from "@/features/space/enforce";
+import { removeSpaceParticipant } from "@/features/space/livekit-moderation";
 import type { SpaceRole, ChatRestriction } from "@prisma/client";
 
 interface RouteParams {
@@ -80,7 +81,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const body = await request.json();
     const { memberId, action, role } = body as {
       memberId: string;
-      action: "changeRole" | "mute" | "unmute" | "kick" | "ban";
+      action: "changeRole" | "mute" | "unmute" | "kick" | "ban" | "unban";
       role?: SpaceRole;
     };
 
@@ -147,9 +148,14 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       case "ban":
         updatedRestriction = "BANNED";
         break;
+      case "unban":
+        // WI-045: 차단 해제 — restriction NONE 복원(DB-only). 차단된 유저는 이미 오프라인이라
+        // realtime enforce 불요(다음 join 게이트에서 restriction!==BANNED 로 통과). LiveKit 무관.
+        updatedRestriction = "NONE";
+        break;
       case "kick": {
-        // kick은 멤버 삭제
-        await prisma.spaceMember.delete({ where: { id: memberId } });
+        // WI-045: kick = 현재 세션에서만 강제 퇴장. 멤버를 삭제하지 않는다(재입장 허용).
+        // 소켓 실시간 disconnect(enforce) + LiveKit 화상 타일 제거(best-effort). restriction 무변경.
         await prisma.spaceEventLog.create({
           data: {
             spaceId,
@@ -158,7 +164,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
             payload: { action: "kick", targetName: target.user?.name || target.displayName },
           },
         });
-        // 살아있는 소켓 실시간 추방 (DB 삭제 후 best-effort)
         let realtimeEnforced = false;
         if (target.userId) {
           const r = await dispatchEnforcement({
@@ -168,6 +173,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
             actorName,
           });
           realtimeEnforced = r.enforced;
+          // 화상 타일 잔존 제거(best-effort — 미접속/미설정이어도 kick 핵심은 소켓 enforce).
+          await removeSpaceParticipant(spaceId, target.userId);
         }
         return NextResponse.json({ message: "Member kicked", realtimeEnforced });
       }
@@ -205,8 +212,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     // 살아있는 소켓에 실시간 반영 (ban/mute/unmute/changeRole). DB 갱신 후 best-effort.
     // changeRole 강등은 권한 회수이므로(인메모리 role 캐시 갱신) 보안상 실시간 반영 필요.
+    // WI-045: unban 은 DB-only(차단 유저는 오프라인) — enforce 미발송.
     let realtimeEnforced = false;
-    if (target.userId) {
+    if (target.userId && actionLabel !== "unban") {
       const enforceAction: EnforceUserAction = actionLabel === "changeRole" ? "role" : actionLabel;
       const r = await dispatchEnforcement({
         spaceId,
@@ -216,6 +224,10 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         actorName,
       });
       realtimeEnforced = r.enforced;
+      // WI-045: ban 도 LiveKit 화상 타일 제거(best-effort — 소켓 disconnect 만으론 미디어 잔존).
+      if (actionLabel === "ban") {
+        await removeSpaceParticipant(spaceId, target.userId);
+      }
     }
 
     return NextResponse.json({ member: updated, realtimeEnforced });

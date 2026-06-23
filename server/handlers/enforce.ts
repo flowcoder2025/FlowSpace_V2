@@ -96,7 +96,9 @@ async function verifyPostcondition(req: EnforceRequest): Promise<boolean> {
     case "ban":
       return member?.restriction === "BANNED";
     case "kick":
-      return member === null; // kick = row 삭제됨
+      // WI-045: kick 은 멤버를 삭제하지 않는다(재입장 허용) → 유효 멤버(미차단)만 disconnect.
+      // HMAC 출처 검증 위 최소 불변식(현재 그 방의 유효 멤버만 kick 가능). 권한 검증은 라우트가 함.
+      return member !== null && member.restriction !== "BANNED";
     case "mute":
       return member?.restriction === "MUTED";
     case "unmute":
