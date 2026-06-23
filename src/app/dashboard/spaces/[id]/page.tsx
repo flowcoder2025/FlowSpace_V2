@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { AnnounceForm } from "@/components/dashboard/announce-form";
+import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
 
 interface Stats {
   memberCount: number;
@@ -13,8 +14,9 @@ interface Stats {
     id: string;
     eventType: string;
     createdAt: string;
-    user?: { name: string | null; email: string };
-    payload?: Record<string, unknown>;
+    user?: { name: string | null; email: string } | null;
+    // API가 allowlist로 정규화한 공개 payload(WI-032). 오버뷰는 미렌더.
+    payload?: PublicSpaceEventPayload;
   }>;
 }
 

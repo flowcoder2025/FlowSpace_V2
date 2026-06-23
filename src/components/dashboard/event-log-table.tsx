@@ -1,9 +1,12 @@
 "use client";
 
+import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
+
 interface EventLog {
   id: string;
   eventType: string;
-  payload?: Record<string, unknown> | null;
+  // API가 allowlist로 정규화한 공개 payload(WI-032) — 화면은 그대로 직렬화 표시.
+  payload?: PublicSpaceEventPayload;
   createdAt: string;
   user?: { name: string | null; email: string } | null;
 }

@@ -1,0 +1,16 @@
+WI=WI-032-fix
+commit=b6e3811
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-032.codex-r2.json
+evaluator=.flowset/eval-results/WI-032-fix.eval.json
+merged=.flowset/eval-results/WI-032-fix.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:384pass,build:0
+codexVerdict=PASS
+evaluatorVerdict=WARNING:9.85
+blockingIssues=0
+deferredP2=0
+deferredP3=3
+rounds=2
+note=듀얼 블라인드 2R 수렴 — codex r1 WARNING(P2/fixNow admin/stats 병렬경로)→r2 PASS 0 issues / evaluator 최종 HEAD WARNING 9.85(P0/P1/P2 0, P3×3 defer). 양 검증자 stats recentActivity 병렬 누출경로 독립 수렴→r2 해소(stats 정규화+회귀테스트+전수grep 제3경로 부재). 변이검증 M1/M2/M3 3종 검출·원복 clean. sourceFingerprint=empty(소스 전 커밋·작업트리 clean). 설계 codex consult 1R.
+createdAt=2026-06-23T13:20:00Z

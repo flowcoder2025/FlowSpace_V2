@@ -13,11 +13,15 @@
 
 import { toCsv, CSV_BOM } from "@/lib/csv";
 import type { Member } from "@/components/dashboard/member-table";
+import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
 
-/** 로그 CSV 입력(로그 페이지 state와 구조 호환 — 내보내기에 필요한 필드만). */
+/**
+ * 로그 CSV 입력(로그 페이지 state와 구조 호환 — 내보내기에 필요한 필드만).
+ * payload는 API가 이미 allowlist로 정규화한 공개 payload다(WI-032) — 여기선 직렬화만.
+ */
 export interface LogExportEntry {
   eventType: string;
-  payload?: Record<string, unknown> | null;
+  payload?: PublicSpaceEventPayload;
   createdAt: string;
   user?: { name: string | null; email: string } | null;
 }
@@ -70,7 +74,7 @@ export function logsToCsv(logs: ReadonlyArray<LogExportEntry>): string {
   return toCsv(LOG_HEADERS, rows);
 }
 
-function stringifyPayload(payload?: Record<string, unknown> | null): string {
+function stringifyPayload(payload?: PublicSpaceEventPayload): string {
   if (payload == null) return "";
   try {
     return JSON.stringify(payload);
