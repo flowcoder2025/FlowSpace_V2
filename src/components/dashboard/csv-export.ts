@@ -14,6 +14,7 @@
 import { toCsv, CSV_BOM } from "@/lib/csv";
 import type { Member } from "@/components/dashboard/member-table";
 import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 /**
  * 로그 CSV 입력(로그 페이지 state와 구조 호환 — 내보내기에 필요한 필드만).
@@ -32,46 +33,37 @@ export interface AnalyticsExportData {
   dailyVisitors: { date: string; count: number }[];
 }
 
-const MEMBER_HEADERS = [
-  "Name",
-  "Email",
-  "Role",
-  "Restriction",
-  "Guest",
-  "Joined",
-] as const;
-const LOG_HEADERS = ["Time", "Event Type", "User", "Details"] as const;
-const ANALYTICS_HEADERS = ["Date", "Messages", "Visitors"] as const;
-
-/** payload 직렬화 실패 시 표기(JSON.stringify가 던지는 경우 — 순환참조 등). */
-const UNSERIALIZABLE_PAYLOAD = "[unserializable]";
+// CSV 헤더·표시 값은 화면 라벨과 동일한 한글 SoT(DASHBOARD_COPY)를 공유한다(WI-033 —
+// 한국어 단일 언어 제품 정합성). 도메인 enum(role/restriction/eventType)은 화면과 동일
+// `*Label()` 매핑으로 표시하고, payload JSON 키는 데이터라 번역하지 않는다.
 
 /**
  * 멤버 목록을 CSV로 직렬화한다. 이름은 MemberTable/filterMembers와 **동일한 표시
  * 우선순위**(truthy `||` 체인)로 해석한다 — `??`(nullish)를 쓰면 빈 문자열 이름이
- * 폴백되지 않아 화면과 CSV가 어긋난다(codex 적출). 최종 폴백은 화면 표기와 동일한 "Unknown".
+ * 폴백되지 않아 화면과 CSV가 어긋난다(codex 적출). 최종 폴백은 화면 표기와 동일하게
+ * `DASHBOARD_COPY.CSV.unknown`("알 수 없음"). role/restriction은 화면과 동일 라벨로 표시.
  */
 export function membersToCsv(members: ReadonlyArray<Member>): string {
   const rows = members.map((m) => [
-    m.user?.name || m.guestSession?.nickname || m.displayName || "Unknown",
+    m.user?.name || m.guestSession?.nickname || m.displayName || DASHBOARD_COPY.CSV.unknown,
     m.user?.email ?? "",
-    m.role,
-    m.restriction,
-    m.guestSession ? "Yes" : "No",
+    DASHBOARD_COPY.roleLabel(m.role),
+    DASHBOARD_COPY.restrictionLabel(m.restriction),
+    m.guestSession ? DASHBOARD_COPY.CSV.guestYes : DASHBOARD_COPY.CSV.guestNo,
     m.createdAt,
   ]);
-  return toCsv(MEMBER_HEADERS, rows);
+  return toCsv(DASHBOARD_COPY.CSV.memberHeaders, rows);
 }
 
-/** 로드된 이벤트 로그를 CSV로 직렬화한다(화면 정렬 순서 유지). */
+/** 로드된 이벤트 로그를 CSV로 직렬화한다(화면 정렬 순서 유지). eventType은 화면과 동일 라벨. */
 export function logsToCsv(logs: ReadonlyArray<LogExportEntry>): string {
   const rows = logs.map((log) => [
     log.createdAt,
-    log.eventType,
+    DASHBOARD_COPY.eventTypeLabel(log.eventType),
     log.user?.name || log.user?.email || "",
     stringifyPayload(log.payload),
   ]);
-  return toCsv(LOG_HEADERS, rows);
+  return toCsv(DASHBOARD_COPY.CSV.logHeaders, rows);
 }
 
 function stringifyPayload(payload?: PublicSpaceEventPayload): string {
@@ -79,7 +71,7 @@ function stringifyPayload(payload?: PublicSpaceEventPayload): string {
   try {
     return JSON.stringify(payload);
   } catch {
-    return UNSERIALIZABLE_PAYLOAD;
+    return DASHBOARD_COPY.CSV.unserializable;
   }
 }
 
@@ -102,7 +94,7 @@ export function analyticsToCsv(data: AnalyticsExportData): string {
     String(messagesByDate.get(date) ?? 0),
     String(visitorsByDate.get(date) ?? 0),
   ]);
-  return toCsv(ANALYTICS_HEADERS, rows);
+  return toCsv(DASHBOARD_COPY.CSV.analyticsHeaders, rows);
 }
 
 /** `flowspace-<kind>-<spaceId>-<YYYY-MM-DD>.csv` 다운로드 파일명을 만든다. */

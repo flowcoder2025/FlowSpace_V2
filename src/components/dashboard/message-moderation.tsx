@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 interface ChatMsg {
   id: string;
@@ -31,7 +32,7 @@ export function MessageModeration({
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleDelete(messageId: string) {
-    if (!confirm("이 메시지를 삭제하시겠습니까?")) return;
+    if (!confirm(DASHBOARD_COPY.MESSAGES.deleteConfirm)) return;
 
     setDeletingId(messageId);
     try {
@@ -40,11 +41,11 @@ export function MessageModeration({
       });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || "Delete failed");
+        alert(data.error || DASHBOARD_COPY.MESSAGES.deleteFailed);
       }
       onRefresh();
     } catch {
-      alert("Network error");
+      alert(DASHBOARD_COPY.COMMON.networkError);
     } finally {
       setDeletingId(null);
     }
@@ -67,11 +68,11 @@ export function MessageModeration({
                   {new Date(msg.createdAt).toLocaleString("ko-KR")}
                 </span>
                 <span className="text-xs px-1.5 py-0.5 rounded bg-cream-deep text-ink-muted">
-                  {msg.type}
+                  {DASHBOARD_COPY.messageTypeLabel(msg.type)}
                 </span>
                 {msg.isDeleted && (
                   <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600">
-                    Deleted
+                    {DASHBOARD_COPY.MESSAGES.deletedBadge}
                   </span>
                 )}
               </div>
@@ -83,7 +84,7 @@ export function MessageModeration({
                 disabled={deletingId === msg.id}
                 className="ml-3 px-2 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded disabled:opacity-50"
               >
-                Delete
+                {DASHBOARD_COPY.MESSAGES.delete}
               </button>
             )}
           </div>
@@ -97,7 +98,7 @@ export function MessageModeration({
             disabled={isLoading}
             className="px-4 py-2 text-sm text-ink hover:text-brand-deep disabled:opacity-50"
           >
-            {isLoading ? "Loading..." : "Load more"}
+            {isLoading ? DASHBOARD_COPY.COMMON.loading : DASHBOARD_COPY.COMMON.loadMore}
           </button>
         </div>
       )}

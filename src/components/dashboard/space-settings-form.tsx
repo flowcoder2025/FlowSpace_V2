@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 interface SpaceSettingsFormProps {
   spaceId: string;
@@ -37,12 +38,12 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to save settings");
+        throw new Error(data.error || DASHBOARD_COPY.SETTINGS.saveError);
       }
 
-      setMessage({ type: "success", text: "설정이 저장되었습니다." });
+      setMessage({ type: "success", text: DASHBOARD_COPY.SETTINGS.success });
     } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unknown error" });
+      setMessage({ type: "error", text: err instanceof Error ? err.message : DASHBOARD_COPY.COMMON.unknownError });
     } finally {
       setIsSubmitting(false);
     }
@@ -53,7 +54,7 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
       {/* Name */}
       <div>
         <label htmlFor="space-name" className="block text-sm font-medium text-ink-soft mb-1">
-          Space Name
+          {DASHBOARD_COPY.SETTINGS.form.name}
         </label>
         <input
           id="space-name"
@@ -68,7 +69,7 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
       {/* Description */}
       <div>
         <label htmlFor="space-desc" className="block text-sm font-medium text-ink-soft mb-1">
-          Description
+          {DASHBOARD_COPY.SETTINGS.form.description}
         </label>
         <textarea
           id="space-desc"
@@ -82,7 +83,7 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
       {/* Max Users */}
       <div>
         <label htmlFor="max-users" className="block text-sm font-medium text-ink-soft mb-1">
-          Max Users
+          {DASHBOARD_COPY.SETTINGS.form.maxUsers}
         </label>
         <input
           id="max-users"
@@ -98,7 +99,7 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
       {/* Access Type */}
       <div>
         <label htmlFor="access-type" className="block text-sm font-medium text-ink-soft mb-1">
-          Access Type
+          {DASHBOARD_COPY.SETTINGS.form.accessType}
         </label>
         <select
           id="access-type"
@@ -106,16 +107,16 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
           onChange={(e) => handleChange("accessType", e.target.value)}
           className="w-48 px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20"
         >
-          <option value="PUBLIC">Public</option>
-          <option value="PRIVATE">Private</option>
-          <option value="PASSWORD">Password</option>
+          <option value="PUBLIC">{DASHBOARD_COPY.SETTINGS.accessTypes.PUBLIC}</option>
+          <option value="PRIVATE">{DASHBOARD_COPY.SETTINGS.accessTypes.PRIVATE}</option>
+          <option value="PASSWORD">{DASHBOARD_COPY.SETTINGS.accessTypes.PASSWORD}</option>
         </select>
       </div>
 
       {/* Primary Color */}
       <div>
         <label htmlFor="primary-color" className="block text-sm font-medium text-ink-soft mb-1">
-          Primary Color
+          {DASHBOARD_COPY.SETTINGS.form.primaryColor}
         </label>
         <input
           id="primary-color"
@@ -129,14 +130,14 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
       {/* Loading Message */}
       <div>
         <label htmlFor="loading-msg" className="block text-sm font-medium text-ink-soft mb-1">
-          Loading Message
+          {DASHBOARD_COPY.SETTINGS.form.loadingMessage}
         </label>
         <input
           id="loading-msg"
           type="text"
           value={values.loadingMessage}
           onChange={(e) => handleChange("loadingMessage", e.target.value)}
-          placeholder="Space에 입장 중입니다..."
+          placeholder={DASHBOARD_COPY.SETTINGS.form.loadingPlaceholder}
           className="w-full px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
       </div>
@@ -154,7 +155,7 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
         disabled={isSubmitting}
         className="px-6 py-2 bg-brand text-white text-sm rounded-md hover:bg-brand-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
-        {isSubmitting ? "Saving..." : "Save Settings"}
+        {isSubmitting ? DASHBOARD_COPY.SETTINGS.form.saving : DASHBOARD_COPY.SETTINGS.form.save}
       </button>
     </form>
   );

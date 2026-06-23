@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 interface AnnounceFormProps {
   spaceId: string;
@@ -27,13 +28,13 @@ export function AnnounceForm({ spaceId }: AnnounceFormProps) {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to send announcement");
+        throw new Error(data.error || DASHBOARD_COPY.ANNOUNCE.error);
       }
 
       setContent("");
-      setMessage({ type: "success", text: "공지가 발송되었습니다." });
+      setMessage({ type: "success", text: DASHBOARD_COPY.ANNOUNCE.success });
     } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unknown error" });
+      setMessage({ type: "error", text: err instanceof Error ? err.message : DASHBOARD_COPY.COMMON.unknownError });
     } finally {
       setIsSubmitting(false);
     }
@@ -41,11 +42,11 @@ export function AnnounceForm({ spaceId }: AnnounceFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-line p-5">
-      <h3 className="text-sm font-semibold text-ink-soft mb-3">Send Announcement</h3>
+      <h3 className="text-sm font-semibold text-ink-soft mb-3">{DASHBOARD_COPY.ANNOUNCE.title}</h3>
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        placeholder="공지사항을 입력하세요..."
+        placeholder={DASHBOARD_COPY.ANNOUNCE.placeholder}
         rows={3}
         className="w-full px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20 resize-none"
       />
@@ -59,7 +60,7 @@ export function AnnounceForm({ spaceId }: AnnounceFormProps) {
         disabled={isSubmitting || !content.trim()}
         className="mt-3 px-4 py-2 bg-brand text-white text-sm rounded-md hover:bg-brand-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
-        {isSubmitting ? "발송 중..." : "공지 발송"}
+        {isSubmitting ? DASHBOARD_COPY.ANNOUNCE.submitting : DASHBOARD_COPY.ANNOUNCE.submit}
       </button>
     </form>
   );

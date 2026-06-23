@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { UsageChart } from "@/components/dashboard/usage-chart";
 import { ExportCsvButton } from "@/components/dashboard/export-csv-button";
 import { analyticsToCsv, downloadCsv, csvFilename } from "@/components/dashboard/csv-export";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 interface DataPoint {
   date: string;
@@ -26,7 +27,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     fetch(`/api/spaces/${spaceId}/admin/analytics?days=${days}`)
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to load analytics");
+        if (!res.ok) throw new Error(DASHBOARD_COPY.ANALYTICS.loadError);
         return res.json();
       })
       .then(setData)
@@ -34,22 +35,23 @@ export default function AnalyticsPage() {
   }, [spaceId, days]);
 
   if (error) return <div className="text-red-600 text-sm">{error}</div>;
-  if (!data) return <div className="text-ink-muted text-sm">Loading...</div>;
+  if (!data) return <div className="text-ink-muted text-sm">{DASHBOARD_COPY.COMMON.loading}</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-ink">Analytics</h1>
+        <h1 className="text-2xl font-bold text-ink">{DASHBOARD_COPY.ANALYTICS.title}</h1>
         <div className="flex items-center gap-3">
           <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
             className="text-sm border border-line rounded px-3 py-1.5"
           >
-            <option value={7}>Last 7 days</option>
-            <option value={14}>Last 14 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
+            {DASHBOARD_COPY.ANALYTICS.ranges.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
           </select>
           <ExportCsvButton
             disabled={data.dailyMessages.length === 0 && data.dailyVisitors.length === 0}
@@ -64,8 +66,8 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <UsageChart title="Daily Messages" data={data.dailyMessages} color="bg-blue-500" />
-        <UsageChart title="Daily Visitors" data={data.dailyVisitors} color="bg-green-500" />
+        <UsageChart title={DASHBOARD_COPY.ANALYTICS.dailyMessages} data={data.dailyMessages} color="bg-blue-500" />
+        <UsageChart title={DASHBOARD_COPY.ANALYTICS.dailyVisitors} data={data.dailyVisitors} color="bg-green-500" />
       </div>
     </div>
   );
