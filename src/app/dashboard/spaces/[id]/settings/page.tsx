@@ -30,9 +30,13 @@ export default async function SettingsPage({ params }: PageProps) {
     return <div className="text-red-600">{DASHBOARD_COPY.SETTINGS.notFound}</div>;
   }
 
-  // 삭제 권한 = DELETE /api/spaces/[id] 게이트의 정확한 미러(superAdmin 또는 실소유자).
-  // 설정 페이지는 STAFF도 진입 가능하나(requireSpaceAdmin) 삭제는 OWNER/superAdmin만.
-  const canDelete = ctx.isSuperAdmin || space.ownerId === ctx.userId;
+  // owner-or-superAdmin = 설정 편집(PATCH)·삭제(DELETE) 두 서버 게이트의 공통 판정식.
+  // 설정 페이지는 STAFF도 진입 가능하나(requireSpaceAdmin) 편집/삭제는 owner/superAdmin만.
+  // 편집과 삭제는 현재 표현식이 같지만 의미상 서로 다른 서버 게이트의 미러이므로
+  // (향후 정책 발산 대비) 렌더 판단 변수는 분리해 둔다(WI-041).
+  const isOwnerOrSuperAdmin = ctx.isSuperAdmin || space.ownerId === ctx.userId;
+  const canEditSettings = isOwnerOrSuperAdmin; // PATCH /api/spaces/[id] 게이트 미러
+  const canDelete = isOwnerOrSuperAdmin; // DELETE /api/spaces/[id] 게이트 미러
 
   return (
     <div className="space-y-6">
@@ -40,6 +44,7 @@ export default async function SettingsPage({ params }: PageProps) {
       <div className="bg-white rounded-lg border border-line p-6 max-w-2xl">
         <SpaceSettingsForm
           spaceId={id}
+          canEdit={canEditSettings}
           initialValues={{
             name: space.name,
             description: space.description || "",

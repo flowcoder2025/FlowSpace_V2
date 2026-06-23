@@ -217,6 +217,9 @@ export const DASHBOARD_COPY = {
     notFound: "스페이스를 찾을 수 없습니다",
     saveError: "설정 저장에 실패했습니다.",
     success: "설정이 저장되었습니다.",
+    // STAFF는 설정 페이지 진입은 가능하나(requireSpaceAdmin) 편집(PATCH)은 owner/superAdmin만.
+    // STAFF에게는 폼을 읽기전용으로 보여주고 이 안내를 노출한다(WI-041).
+    readOnlyNotice: "설정 편집은 스페이스 소유자 또는 슈퍼관리자만 가능합니다. 현재 설정은 열람만 할 수 있습니다.",
     form: {
       name: "스페이스 이름",
       description: "설명",
