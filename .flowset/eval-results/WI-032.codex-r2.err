@@ -1,0 +1,62 @@
+2026-06-23T04:16:39.469234Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.2 seconds
+Output:
+Get-Content : 'src/components/dashboard/csv-export.tsx' 경로는 존재하지 않으므로 찾을 수 없습니다.
+위치 줄:2 문자:1
++ Get-Content -LiteralPath 'src/components/dashboard/csv-export.tsx'
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (src/components/dashboard/csv-export.tsx:String) [Get-Content], ItemNotF 
+   oundException
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+2026-06-23T04:16:43.749725Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.2 seconds
+Output:
+위치 줄:2 문자:15
++ rg -n "from \"@/lib/space-event-log-payload\"|from './space-event-log ...
++               ~
+원본 텍스트의 알 수 없는 토큰입니다.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnrecognizedToken
+ 
+
+2026-06-23T04:16:48.253489Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.2 seconds
+Output:
+rg: SpaceEventLog -S . -g !node_modules -g !*.map: IO error for operation on SpaceEventLog -S . -g !node_modules -g !*.map: 파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다. (os error 123)
+
+2026-06-23T04:16:55.633468Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.2 seconds
+Output:
+.flowset/eval-results/WI-032.codex.err:26: new blank line at EOF.
+
+2026-06-23T04:17:00.141517Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.8 seconds
+Output:
+
+> flowspace@0.1.0 test
+> vitest run src/lib/space-event-log-payload.test.ts src/app/api/spaces/[id]/admin/logs/route.test.ts src/app/api/spaces/[id]/admin/stats/route.test.ts
+
+[31mfailed to load config from C:\Team-jane\FlowSpace\vitest.config.ts[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Startup Error [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯⎯[39m
+Error: spawn EPERM
+    at ChildProcess.spawn (node:internal/child_process:421:11)
+    at Object.spawn (node:child_process:796:9)
+    at ensureServiceIsRunning (C:\Team-jane\FlowSpace\node_modules\esbuild\lib\main.js:1978:29)
+    at build (C:\Team-jane\FlowSpace\node_modules\esbuild\lib\main.js:1876:26)
+    at bundleConfigFile (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:35808:23)
+    at bundleAndLoadConfigFile (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:35795:24)
+    at loadConfigFromFile (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:35764:179)
+    at resolveConfig (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:35413:28)
+    at _createServer (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:25362:73)
+    at createServer$2 (file:///C:/Team-jane/FlowSpace/node_modules/vite/dist/node/chunks/config.js:25359:9) {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'spawn'
+}
+
+
+
+
