@@ -1,14 +1,16 @@
 {
-  "activeWI": "WI-039-feat",
-  "lastWI": "WI-038-feat",
+  "activeWI": null,
+  "lastWI": "WI-039-feat",
   "nextQueue": ["WI-040"],
   "type": "feat",
-  "status": "VERIFIED_PR_PENDING",
+  "status": "MERGED_TO_DEVELOP",
   "integrationBranch": "develop",
   "branch": "feature/WI-039-feat-voice-mute-ui",
+  "mergedPR": 42,
+  "mergeCommit": "b7876c2",
   "implCommit": "21f5c4f",
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": "21f5c4f",
-  "note": "[WI-039-feat 듀얼 블라인드 1R 수렴 — codex WARNING(구현0·환경 P3)·evaluator 9.77(P0/P1/P2/fixNow=0·변이검증 5/5·P3x4 defer)·.pass 작성] WI-038 라우트 POST /api/spaces/[id]/livekit/moderate를 MemberActionsMenu에 배선(participantIdentity prop·두 액션 명시·refetch 미호출·메뉴/액션 게이트 분리). 게이트 tsc0/lint0err/vitest 541→550/build0. Vercel 전용. develop PR 생성 대기. 다음: WI-040(귓속말 발견성·P3 선택) 또는 사용자 기능 큐 7/8(8/8 가능) 보고 후 승격 검토."
+  "note": "[✅ WI-039-feat 완료·머지 — 사용자 기능 요청 큐 7/8] WI-038 라우트 POST /api/spaces/[id]/livekit/moderate를 MemberActionsMenu에 배선(participantIdentity prop·음성 강제 음소거/발언 허용 두 액션 명시·isAudioMuted 토글 금지·refetch 미호출·메뉴/액션 게이트 분리). PR#42 merge b7876c2·impl 21f5c4f. 듀얼 1R 수렴 codex WARNING(구현0·환경 P3)·evaluator 9.77(P0/P1/P2/fixNow=0·변이검증 5/5·P3x4 defer)·.pass. 게이트 tsc0/lint0err/vitest 541→550/build0. Vercel 전용(server/·prisma/ 무관). main 미승격. === 다음: WI-040(feat·P3·선택) 귓속말 발견성 개선 — DM 이미 완전 구현이라 신규 가치 낮음. 사용자 기능 요청 큐 8/8 완료로 볼지, develop→main 승격(WI-033~039 7건+α 누적)할지 사용자 확인 필요. 후속 BACKLOG: guest-* 음성 제어(신규)·WI-041(설정 PATCH 권한 정합 STAFF)·WI-042(대시보드 archived 가드)·WI-043(공용 Dialog/focus-trap a11y)."
 }
