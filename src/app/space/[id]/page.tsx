@@ -53,25 +53,30 @@ export default async function SpacePage({ params }: PageProps) {
 
   const member = await prisma.spaceMember.findUnique({
     where: { spaceId_userId: { spaceId: id, userId: user.id } },
-    select: { role: true },
+    select: { role: true, restriction: true },
   });
 
   const decision = resolveSpaceRoleDecision({
     memberRole: member?.role ?? null,
+    restriction: member?.restriction ?? null,
     isOwner,
     accessType: space.accessType,
   });
 
-  // PRIVATE/PASSWORD 스페이스는 초대 코드로만 가입 가능
+  // PRIVATE/PASSWORD 비멤버 또는 BANNED 멤버 → 접근 거부 (소켓 정합)
   if (decision.action === "redirect") {
     redirect("/my-spaces");
   }
 
   let role = decision.role;
   if (decision.action === "create") {
-    // owner=OWNER self-heal / PUBLIC 비멤버=PARTICIPANT 자동 가입
-    const created = await prisma.spaceMember.create({
-      data: {
+    // owner=OWNER self-heal / PUBLIC 비멤버=PARTICIPANT 자동 가입.
+    // upsert로 원자성 확보 — 동일 사용자 동시 첫 진입의 unique(spaceId,userId)
+    // 충돌(P2002→500)을 방지하고, 이미 있으면 기존 role을 그대로 반환한다.
+    const upserted = await prisma.spaceMember.upsert({
+      where: { spaceId_userId: { spaceId: id, userId: user.id } },
+      update: {},
+      create: {
         spaceId: id,
         userId: user.id,
         displayName: user.name,
@@ -79,7 +84,7 @@ export default async function SpacePage({ params }: PageProps) {
       },
       select: { role: true },
     });
-    role = created.role;
+    role = upserted.role;
   }
 
   // avatarConfig에서 avatarString 추출, 없으면 userId 해시 폴백

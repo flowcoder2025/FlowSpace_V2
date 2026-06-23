@@ -60,10 +60,15 @@ export type SpaceRoleDecision =
  * 소켓 서버가 거부하는 발산이 생기므로, 항상 멤버 행 role을 따른다.
  *
  * 결정:
- * - 멤버 행 있음 → `use`(그 role)
+ * - 멤버 행 있음 + BANNED → `redirect` (소켓 join:space와 동일하게 입장 거부, role 무관)
+ * - 멤버 행 있음 + 비BANNED → `use`(그 role)
  * - 멤버 행 없음 + 오너 → `create` OWNER (합성 OWNER 대신 행을 self-heal 해 소켓과 정합)
  * - 멤버 행 없음 + PUBLIC 비멤버 → `create` PARTICIPANT (자동 가입)
  * - 멤버 행 없음 + PRIVATE/PASSWORD 비멤버 → `redirect` (초대 코드로만 가입)
+ *
+ * BANNED는 role보다 먼저 차단한다 — 소켓이 BANNED 멤버를 입장 거부하므로
+ * (room.ts: `restriction === "BANNED"` → `space:error`) 클라가 그들에게 role을 주면
+ * 에디터/관리 UI가 열리는 발산이 생긴다(맵 편집 HTTP 라우트는 BANNED 미검사).
  *
  * superAdmin은 입력이 아니다 — `join:space`에 superAdmin 특례가 없어
  * (비멤버 superAdmin은 `NOT_A_MEMBER`로 거부됨) 인-스페이스 클라 role에 반영하면
@@ -71,11 +76,15 @@ export type SpaceRoleDecision =
  */
 export function resolveSpaceRoleDecision(input: {
   memberRole: SpaceRole | null;
+  restriction: ChatRestrictionValue | null;
   isOwner: boolean;
   accessType: SpaceAccessType;
 }): SpaceRoleDecision {
-  const { memberRole, isOwner, accessType } = input;
-  if (memberRole) return { action: "use", role: memberRole };
+  const { memberRole, restriction, isOwner, accessType } = input;
+  if (memberRole) {
+    if (restriction === "BANNED") return { action: "redirect" };
+    return { action: "use", role: memberRole };
+  }
   if (isOwner) return { action: "create", role: "OWNER" };
   if (accessType === "PUBLIC") return { action: "create", role: "PARTICIPANT" };
   return { action: "redirect" };
