@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.9,
+    "consistency": 9.9,
+    "specificity": 10.0,
+    "actionability": 9.7
+  },
+  "weightedTotal": 9.88,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/components/space/video/VideoTile.tsx:347-351",
+      "description": "actionsSlot은 항상 <MemberActionsMenu/> 엘리먼트(truthy ReactNode)이므로 `{actionsSlot && (...)}` 가드는 메뉴 컴포넌트가 게이팅으로 null을 반환하는 경우(비인가/본인/canActOn 불가/매핑 없음)에도 빈 오버레이 div(`absolute left-2 z-30`)를 렌더한다. 내용이 없어 시각/기능 영향은 없으나(보이지 않는 빈 컨테이너) 비인가 사용자 타일마다 무의미한 DOM 노드가 생긴다. 보안/기능 결함 아님 — 순수 cosmetic.",
+      "recommendation": "MemberActionsMenu 게이팅 결과를 상위에서 계산해 메뉴가 표시될 때만 actionsSlot을 전달하거나, slot 래퍼를 메뉴 내부로 흡수해 null일 때 div 자체가 없게 한다.",
+      "defer": true,
+      "deferRationale": "DOM 노드 1개의 비가시 빈 컨테이너로 런타임 동작·보안·레이아웃에 영향 없음(z-30 빈 영역, pointer target 없음). 기능 요건 충족이며 P3 정리 부채.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/components/space/use-space-members.ts:111 + member-actions-menu.tsx:103",
+      "description": "비멤버 superAdmin은 admin GET이 200(isAuthorized=true)을 주지만 멤버 행이 없어 selfRole=null → actorRole=null → MemberActionsMenu가 모든 대상에 대해 null 반환(메뉴 미표시). 즉 멤버가 아닌 superAdmin은 인-스페이스 UI에서 제재 액션을 못 한다. 또 canActOn 호출에 isSuperAdmin을 전달하지 않아(member-actions-menu.tsx:103) 멤버 superAdmin이라도 계층 우회 액션은 못 한다. 서버 PATCH는 이를 허용하므로 클라가 보수적으로 더 닫힌 상태(서버가 막지 않는 케이스를 클라가 추가로 숨김). WI-034 설계('superAdmin 인-스페이스 특례 없음')와 일관된 의도된 보수적 게이팅이며 권한 상승/누수는 발생하지 않는다(닫힘 방향).",
+      "recommendation": "in-space superAdmin 제재가 제품 요건이면 별도 WI에서 isSuperAdmin 신호를 훅/메뉴에 주입해 actorRole 폴백 + canActOn(isSuperAdmin) 전달. 현 범위에선 대시보드 경로가 superAdmin 관리를 담당하므로 defer.",
+      "defer": true,
+      "deferRationale": "닫힘 방향 게이팅이라 보안 결함 아님(서버가 허용하는 액션을 클라가 추가로 숨김). WI-034 'superAdmin 인-스페이스 특례 없음' 설계와 일관. superAdmin 관리는 대시보드 경로로 충족.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/[id]/admin/members/route.ts:58-225 (서버 PATCH — self-guard 부재)",
+      "description": "서버 PATCH에는 '본인을 대상으로 한 액션 금지' 명시 가드가 없다(클라 member-actions-menu.tsx:102만 self를 숨김). 그러나 실제로 self-action은 다른 가드로 전부 차단된다: OWNER가 자기 memberId 지정 시 `target.role===OWNER && !isSuperAdmin` → 403; STAFF/PARTICIPANT가 자기 memberId 지정 시 `canActOn(self,self)`=동급이라 false → 403. 따라서 클라 게이팅 우회(직접 PATCH)로도 self-mute/self-ban escalation은 불가능. 서버 self-guard가 암묵적(canActOn 동급 차단에 의존)이라 향후 canActOn 시맨틱 변경 시 회귀 위험이 잠재.",
+      "recommendation": "선택적 강건화: PATCH에 `target.userId === session.user.id` 명시 거부를 추가해 self-action 차단을 canActOn 부수효과가 아닌 1차 불변식으로 만든다. 현재는 실표면 0(전 경로 차단 실증).",
+      "defer": true,
+      "deferRationale": "현 코드에서 self-action은 OWNER-target 차단 + canActOn 동급 차단으로 전부 403(실표면 0). 명시 가드 부재는 방어적 명료성 부채일 뿐이며 이번 WI는 기존 PATCH 라우트를 변경하지 않음(재사용).",
+      "fixNow": false
+    }
+  ]
+}

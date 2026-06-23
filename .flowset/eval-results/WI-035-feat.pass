@@ -1,0 +1,16 @@
+WI=WI-035-feat
+commit=b8079de
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-035-feat.codex-r2.json
+evaluator=.flowset/eval-results/WI-035-feat.eval.json
+merged=.flowset/eval-results/WI-035-feat.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:464pass,build:0
+codexVerdict=PASS
+evaluatorVerdict=WARNING:9.88(P0/P1/fixNow=0)
+blockingIssues=0
+deferredP2=0
+deferredP3=4
+rounds=2
+note=듀얼 블라인드 2R 수렴 — codex r1 WARNING(P3x2 defer·fixNow=0)→r2 PASS 0 issues / evaluator WARNING 9.88(P0/P1/fixNow=0, P3x3 defer). 인-스페이스 참가자 패널(ParticipantPanel — player-list.tsx는 죽은코드라 미사용)에 OWNER/STAFF 멤버관리(채팅 mute/unmute/kick/ban) 추가. 기존 dashboard HTTP admin API(GET/PATCH /api/spaces/[id]/admin/members) 재사용 — 신규 라우트/스키마/소켓 변경 0. 신규 SPACE_COPY(in-space 카피, dashboard-copy 분리)·useSpaceMembers 훅(admin GET으로 userId→{memberId,role,restriction} 매핑, GET 403이 자연 권한게이트로 stale prop 우회, actor role을 GET self행에서 도출)·managedUserIdFromIdentity(LiveKit identity는 user- 접두사만 userId 해석, guest-/dev-anon-/bare→null, 식별자혼동 방지)·MemberActionsMenu(canActOn+self+멤버존재 게이팅, PATCH는 memberId만, kick/ban 인라인확인). VideoTile actionsSlot(좌상단·우상단 컨트롤과 분리)+비-미디어행 메뉴. 게스트(userId=null) 1차범위 제외, changeRole 제외(대시보드 전담). r2: codex P3-1(훅 비활성시 stale 스냅샷 미정리) 선제해소(early-return 전 폐기+회귀테스트+1). codex P3-2(eval-results diff 포함)는 프로젝트 컨벤션이라 미변경. 설계 codex consult 1R(컴포넌트 타깃=ParticipantPanel·actionsSlot·게스트 후속·actor role GET self행·copy 신규상수·식별자혼동 #1위험). 양검증자 식별자혼동 차단 독립확인. evaluator 변이검증 8/8 검출. 게이트 4/4(tsc0/lint0err/vitest 442→464[+22]/build0). sourceFingerprint=empty(소스 전 커밋·작업트리 clean). Vercel 전용(server/·prisma/ 무관 — OCI 소켓·prod DB 무관). main 미승격.
+createdAt=2026-06-23T18:18:00Z

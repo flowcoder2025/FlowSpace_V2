@@ -1,0 +1,40 @@
+read-only로 확인한 기준에서는 **`ParticipantPanel`에 통합**하는 안이 맞습니다. `player-list.tsx`는 살리지 않는 게 좋고, 실제 노출면은 `src/components/space/video/ParticipantPanel.tsx`입니다.
+
+**결정**
+1. **컴포넌트 타깃**
+   - `ParticipantPanel`에 붙이세요.
+   - 미디어 참가자도 관리 대상이어야 하므로 `VideoTile`에 `actionsSlot` 렌더프롭을 작게 추가하는 안이 가장 균형이 좋습니다.
+   - 비-미디어 행에만 메뉴를 넣으면 실제 카메라/마이크를 켠 주요 참가자를 관리하지 못해서 기능 반쪽짜리가 됩니다.
+
+2. **멤버 매핑**
+   - `GET /api/spaces/[id]/admin/members`로 `userId -> { memberId, role, restriction }` 맵을 만드는 방향이 맞습니다.
+   - 단, LiveKit identity는 `user-{id}` / `guest-{id}` 네임스페이스가 있으니 단순 `replace(/^(user-|guest-)/, "")`를 관리 식별에 재사용하면 안 됩니다. 관리 매핑은 `user-`만 `userId`로 해석하세요.
+
+3. **게스트**
+   - 1차 범위에서는 **등록 사용자만** 하세요.
+   - 게스트는 `SpaceMember.userId = null`, `guestSession.id` 기반이고, 현재 `admin/members`의 realtime enforcement도 `target.userId`가 있을 때만 dispatch합니다. UI에 게스트 ban/mute를 노출하면 “성공처럼 보이지만 살아있는 세션에는 즉시 적용되지 않는” 상태가 생깁니다.
+   - 게스트 관리는 후속 WI로 명시하는 게 안전합니다.
+
+4. **actor role**
+   - stale `user.role` 대신 admin GET의 self row에서 도출하는 게 맞습니다.
+   - 다만 처음 fetch를 stale role로 강하게 막으면 승격된 STAFF가 세션 중에는 메뉴를 못 봅니다. 패널 열릴 때 GET을 시도하고, 403이면 관리 UI를 숨기는 쪽이 더 일관됩니다.
+   - socket role-sync를 이 WI에 넣을 필요는 없습니다. 서버 PATCH가 hard gate입니다.
+
+5. **액션 범위**
+   - `mute / unmute / kick / ban` 적정합니다.
+   - `changeRole`은 제외가 맞습니다. 인-스페이스 패널에는 운영 중 즉시 제재만 두고, 역할 변경은 대시보드가 맞습니다.
+   - `kick`/`ban`은 둘 다 노출하되 확인 문구에서 차이를 분명히 해야 합니다. kick은 내보내기, ban은 재입장 차단입니다.
+
+6. **copy 상수**
+   - `DASHBOARD_COPY` 재사용은 피하세요. WI-033이 dashboard scope를 강하게 잡고 있으므로 `SPACE_COPY` 또는 `PARTICIPANT_PANEL_COPY` 같은 인-스페이스 상수를 새로 두는 편이 낫습니다.
+
+7. **새로고침/실시간**
+   - 1차는 “패널 열 때 fetch + 액션 후 refetch”면 충분합니다.
+   - 다른 운영자의 동시 제재 반영은 기존 `member:muted/unmuted/kicked` 이벤트로 refetch 트리거만 붙일 수는 있지만 필수는 아닙니다. 붙이더라도 이벤트 payload로 부분 갱신하지 말고 refetch하세요.
+
+**대안**
+- `VideoTile` 변경을 정말 피하고 싶다면 `ParticipantPanel`에서 `VideoTile`을 감싸는 wrapper에 오버레이 버튼을 얹을 수 있습니다. 하지만 기존 `VideoTile` 우상단 컨트롤과 겹칠 가능성이 있어 `actionsSlot`이 더 깨끗합니다.
+- superAdmin까지 인-스페이스 UX로 정확히 지원하려면 현재 GET 응답만으로는 부족합니다. `isSuperAdmin`이 클라에 명시되지 않으므로 이 WI에서는 OWNER/STAFF UX로 제한하는 편이 낫습니다.
+
+**놓칠 위험 1가지**
+가장 위험한 건 **식별자 혼동**입니다. 이 화면에는 `SpaceMember.id`, `userId`, LiveKit identity(`user-*`, `guest-*`), 그리고 socket 이벤트의 `memberId`가 섞입니다. 특히 서버 enforcement 이벤트는 이름은 `memberId`지만 실제로는 `userId`를 넣고 있습니다. 이 값을 PATCH의 `memberId`로 쓰거나, `guest-`를 벗겨 userId처럼 매칭하면 잘못된 대상 제재 또는 미적용 제재가 생길 수 있습니다. UI는 반드시 admin GET에서 얻은 `SpaceMember.id`만 PATCH에 사용해야 합니다.
