@@ -94,10 +94,13 @@ describe("SpacePage role 주입", () => {
       where: unknown;
       update: Record<string, unknown>;
       create: { role: string };
+      select: Record<string, boolean>;
     };
     expect(arg.where).toEqual({ spaceId_userId: { spaceId: SPACE_ID, userId: SELF } });
     expect(arg.update).toEqual({}); // 멱등 — 이미 있으면 기존 role 유지
     expect(arg.create.role).toBe("PARTICIPANT");
+    // post-upsert BANNED 재확인을 위해 restriction 까지 select 해야 함(누락 시 race 누출 재발)
+    expect(arg.select).toEqual({ role: true, restriction: true });
   });
 
   it("오너인데 멤버 행 없음 → upsert로 OWNER self-heal", async () => {
