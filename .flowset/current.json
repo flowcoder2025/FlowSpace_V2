@@ -1,13 +1,13 @@
 {
   "activeWI": null,
-  "lastWI": "WI-034-fix",
-  "nextQueue": ["WI-035", "WI-036", "WI-037", "WI-038", "WI-039", "WI-040"],
-  "type": "fix",
+  "lastWI": "WI-035-feat",
+  "nextQueue": ["WI-036", "WI-037", "WI-038", "WI-039", "WI-040"],
+  "type": "feat",
   "status": "MERGED_TO_DEVELOP",
   "integrationBranch": "develop",
-  "branch": "fix/WI-034-fix-space-role-prop",
+  "branch": "feature/WI-035-feat-participant-member-actions",
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "70a7bac",
-  "note": "[다음: WI-035-feat — 사용자 기능 요청 큐 3/8] WI-035 = 인-스페이스 참가자 패널(player-list.tsx) 멤버관리 UI(채팅음소거/해제/강퇴, OWNER/STAFF canActOn 게이팅). dashboard HTTP admin API(PATCH /api/spaces/[id]/admin/members) 재사용(socket 채팅명령 경로 아님 — use-socket.ts:584 admin:ban 누락·canActOn/감사 약함). WI-034가 user.role 전달을 마쳤으므로 권한 게이팅 선결조건 충족. codex 놓칠위험(WI-034 consult): 세션 중 role 변경(WI-035 승강) 시 SpaceClient user.role prop은 stale — enforce가 socket.data.role만 갱신하고 클라 prop 미갱신 → 보안은 서버가 막으나 UI/명령파서 발산 가능(reload 전) → WI-035에서 socket 이벤트로 클라 role 동기화 고려. === 직전: ✅ WI-034-fix(인-스페이스 role 전달) develop 머지 완료(PR#37 merge 70a7bac). page가 SpaceMember.role(+restriction) 조회→SpaceClient.user.role 주입(선결버그). 신규 순수헬퍼 resolveSpaceRoleDecision(SpaceMember.role SoT·합성OWNER 금지 self-heal·superAdmin 비특례). BANNED 멤버 redirect(소켓 정합·맵편집 HTTP BANNED 미검사 우회 차단)+upsert 원자화+post-upsert BANNED 재평가(TOCTOU). 듀얼 3R 수렴 codex r3 PASS·evaluator 9.94(P0/P1/P2=0, 양검증자 BANNED·race 독립수렴, 변이검증 9종). 게이트 4/4(tsc0/lint0err/vitest 416→442/build0). 설계 codex consult 1R. impl c75e351/r2 22aa279/r3 5379485/테스트강화 41d5156. Vercel 전용. main 미승격. === 큐 잔여 WI-035~040. 저우선 BACKLOG: WI-025(표면0)/WI-028(운영 runbook)."
+  "lastVerifiedCommit": "b8079de",
+  "note": "[다음: WI-036-fix — 사용자 기능 요청 큐 4/8] WI-036 = 스페이스 archive 하드닝(deletedBy 감사 + 접속자 추방/알림). 현 DELETE는 status=ARCHIVED+deletedAt만 — deletedBy 미기록·접속중 사용자 미추방(enforce 채널은 ban/kick/mute/role만·space-level archive 브로드캐스트 없음). ⚠️ Space.deletedBy 컬럼=Prisma schema 변경→마이그레이션 승인 게이트(WI-013/016 패턴). enforce 채널에 space-level archive 추가. UI(WI-037) 선결. === 직전: ✅ WI-035-feat(인-스페이스 참가자 패널 멤버관리 UI) develop 머지 완료. ParticipantPanel(실 패널 — player-list.tsx는 죽은코드)에 OWNER/STAFF 채팅 음소거/해제·강퇴·차단. 기존 dashboard HTTP admin API(GET/PATCH /api/spaces/[id]/admin/members) 재사용 — 신규 라우트/스키마/소켓 0. 신규 SPACE_COPY·useSpaceMembers 훅(admin GET→userId→{memberId,role,restriction} 매핑·GET 403 자연 권한게이트로 stale prop 우회·actor role GET self행 도출)·managedUserIdFromIdentity(LiveKit identity는 user- 접두사만 userId — 식별자혼동 방지[codex #1위험])·MemberActionsMenu(canActOn 게이팅·PATCH는 memberId만·kick/ban 인라인확인). VideoTile actionsSlot+비-미디어행. 게스트(userId=null) 1차제외·changeRole 제외. r2: codex P3(훅 비활성시 stale 스냅샷 폐기) 선제해소. 설계 codex consult 1R. 듀얼 2R 수렴 codex r2 PASS·evaluator 9.88(P0/P1/fixNow=0, P3×3 defer). 변이검증 8/8. 게이트 4/4(tsc0/lint0err/vitest 442→464/build0). impl f370b3a/r2 b8079de. Vercel 전용(server/·prisma/ 무관). main 미승격. === 큐 잔여 WI-036~040. 저우선 BACKLOG: WI-025(표면0)/WI-028(운영 runbook)."
 }

@@ -1,0 +1,22 @@
+{
+  "wi": "WI-035-feat",
+  "schemaVersion": 1,
+  "finalCommit": "b8079de (r2 — codex r2 PASS·evaluator 평가 대상)",
+  "rounds": 2,
+  "codex": {
+    "r1": { "verdict": "WARNING", "issues": 2, "note": "P3 훅 비활성 시 stale 스냅샷 미정리(defer·fixNow=false) + P3 eval-results 산출물 diff 포함(defer·fixNow=false)" },
+    "r2": { "verdict": "PASS", "issues": 0 }
+  },
+  "evaluator": {
+    "r1": { "verdict": "WARNING", "weightedTotal": 9.88, "issues": "P0/P1/fixNow=0, P3x3 defer (VideoTile 빈 오버레이 div·비멤버 superAdmin 관리불가[설계일관]·서버 PATCH self-guard 암묵적[실표면0·미변경 라우트])" }
+  },
+  "convergence": {
+    "blockingIssues": 0,
+    "fixNow": 0,
+    "deferredP2": 0,
+    "deferredP3": 4,
+    "summary": "양 검증자 WARNING·P0/P1/fixNow=0. codex r1 유일 실질 P3(훅이 enabled/spaceId/currentUserId falsy 전환 시 이전 스냅샷 미정리 → 닫힌 패널 stale 관리상태 보유 가능)를 r2에서 선제 해소(early-return 전 폐기 + 회귀테스트 +1) → codex r2 PASS 0 issues. codex P3-2(eval-results diff 포함)는 프로젝트 컨벤션이라 미변경(전 WI가 .flowset/eval-results consult/.pass 산출물 커밋 — git ls-files 확인, gitignore 미포함). evaluator P3x3 전부 defer: ①VideoTile 메뉴 null 시 빈 오버레이 div(비가시 cosmetic) ②비멤버 superAdmin in-space 관리불가(WI-034 'superAdmin 인-스페이스 특례 없음' 설계와 일관·닫힘방향·누수 아님) ③서버 PATCH self-guard 암묵적(canActOn 동급차단 의존·실표면0·이번 WI 미변경 admin/members 라우트)."
+  },
+  "mutationTests": "evaluator 변이검증 8/8 전부 테스트 검출(복원 후 clean): ①canActOn 게이트 제거→2 FAIL ②self-guard 제거→1 FAIL ③PATCH body memberId→userId→2 FAIL ④mute/unmute 토글 반전→1 FAIL ⑤훅 게스트 제외 제거→1 FAIL ⑥identity 접두사 검사 반전→4 FAIL ⑦403 경로 isAuthorized=true→1 FAIL ⑧kick 확인 플로우 생략→1 FAIL.",
+  "issues": []
+}
