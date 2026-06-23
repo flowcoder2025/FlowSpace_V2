@@ -107,9 +107,9 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
           onChange={(e) => handleChange("accessType", e.target.value)}
           className="w-48 px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20"
         >
-          <option value="PUBLIC">{DASHBOARD_COPY.SETTINGS.accessTypes.PUBLIC}</option>
-          <option value="PRIVATE">{DASHBOARD_COPY.SETTINGS.accessTypes.PRIVATE}</option>
-          <option value="PASSWORD">{DASHBOARD_COPY.SETTINGS.accessTypes.PASSWORD}</option>
+          <option value="PUBLIC">{DASHBOARD_COPY.accessTypeLabel("PUBLIC")}</option>
+          <option value="PRIVATE">{DASHBOARD_COPY.accessTypeLabel("PRIVATE")}</option>
+          <option value="PASSWORD">{DASHBOARD_COPY.accessTypeLabel("PASSWORD")}</option>
         </select>
       </div>
 
