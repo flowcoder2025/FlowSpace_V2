@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { internalErrorResponse } from "@/lib/api-error";
+import { dispatchEnforcement } from "@/features/space/enforce";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -149,7 +150,10 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     }
 
     const { id } = await params;
-    const space = await prisma.space.findUnique({ where: { id } });
+    const space = await prisma.space.findUnique({
+      where: { id },
+      select: { id: true, ownerId: true },
+    });
 
     if (!space) {
       return NextResponse.json({ error: "Space not found" }, { status: 404 });
@@ -158,12 +162,23 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await prisma.space.update({
-      where: { id },
-      data: { status: "ARCHIVED", deletedAt: new Date() },
+    // 최초 archive 행위자 보존(WI-036): status!=ARCHIVED 조건부 원자적 갱신.
+    // 동시 DELETE/재삭제에도 최초 deletedBy/deletedAt 가 덮어쓰이지 않는다(감사 무결성).
+    // count===0 이면 이미 archived → 기존 행위자 보존(멱등).
+    await prisma.space.updateMany({
+      where: { id, status: { not: "ARCHIVED" } },
+      data: { status: "ARCHIVED", deletedAt: new Date(), deletedBy: session.user.id },
     });
 
-    return NextResponse.json({ message: "Space archived" });
+    // 접속 중인 모든 사용자 실시간 추방(best-effort). 이미 archived 든 방금이든,
+    // 살아있는 소켓이 있으면 끊는다(소켓 서버가 postcondition=status===ARCHIVED 재확인).
+    const enforced = await dispatchEnforcement({
+      spaceId: id,
+      action: "archive",
+      actorName: session.user.name ?? undefined,
+    });
+
+    return NextResponse.json({ message: "Space archived", realtimeEnforced: enforced.enforced });
   } catch (error) {
     return internalErrorResponse("DELETE /api/spaces/[id]", error, "Failed to delete space");
   }

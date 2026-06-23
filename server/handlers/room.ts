@@ -5,12 +5,47 @@ import type {
   PlayerData,
 } from "../../src/features/space/protocol/internal/socket-events";
 import { getPrisma } from "../lib/prisma";
+import { recordingStates, spotlightStates, proximityStates } from "../state";
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 // spaceId → Map<userId, PlayerData>
 export const spacePlayersMap = new Map<string, Map<string, PlayerData>>();
+
+/**
+ * archive 된 공간 deny cache(WI-036, TOCTOU 보강).
+ * archive enforce 적용 시 추가되며, join:space 가 DB 조회와 별개로 즉시 입장을 거부한다.
+ * archive 직전 status=ACTIVE 를 읽고 진행 중이던 in-flight join 이 archive 스냅샷 이후 room 에
+ * 합류해 추방을 놓치는 좁은 창을 닫는다. **근본 방어는 join:space 의 DB status 게이트**이며
+ * 이건 best-effort 보강 — 서버 재시작 시 비워지고 DB 게이트가 최종 방어다.
+ * 공간은 ARCHIVED 단방향(되돌리는 API 없음)이라 항목은 제거하지 않으며, 누적 크기는
+ * 서버 가동 중 archive 된 공간 수로 제한된다.
+ */
+const archivedSpaces = new Set<string>();
+
+/** 공간을 archived deny cache 에 추가한다(archive enforce 적용 시). */
+export function markSpaceArchived(spaceId: string): void {
+  archivedSpaces.add(spaceId);
+}
+
+/** 공간이 archived deny cache 에 있는지(입장 즉시 거부 판정). */
+export function isSpaceArchived(spaceId: string): boolean {
+  return archivedSpaces.has(spaceId);
+}
+
+/**
+ * 공간의 모든 인메모리 인덱스를 일괄 제거(WI-036 archive). spaceId 로 키된 상태는
+ * presence(spacePlayersMap) + media(recording/spotlight/proximity) 가 전부다
+ * (chat 의 rate-limit/reaction 맵은 userId/messageId 키라 공간 범위 아님).
+ * archive 는 공간을 영구 종료시키므로 잔존 상태가 새지 않도록 직접 정리한다.
+ */
+export function purgeSpaceState(spaceId: string): void {
+  spacePlayersMap.delete(spaceId);
+  recordingStates.delete(spaceId);
+  spotlightStates.delete(spaceId);
+  proximityStates.delete(spaceId);
+}
 
 function getSpacePlayers(spaceId: string): Map<string, PlayerData> {
   if (!spacePlayersMap.has(spaceId)) {
@@ -72,6 +107,17 @@ export function handleRoom(io: IO, socket: TypedSocket) {
       socket.emit("space:error", {
         code: "JOIN_FAILED",
         message: "입장 처리 중 오류가 발생했습니다.",
+      });
+      return;
+    }
+
+    // TOCTOU 보강(WI-036): DB status 를 읽은 뒤 archive 가 일어났을 수 있다.
+    // 모든 await 이후·room 합류 직전에 deny cache 를 재확인해, in-flight join 이
+    // archive 추방 스냅샷 이후 합류해 살아남는 좁은 창을 닫는다.
+    if (isSpaceArchived(spaceId)) {
+      socket.emit("space:error", {
+        code: "SPACE_NOT_FOUND",
+        message: "공간을 찾을 수 없거나 비활성 상태입니다.",
       });
       return;
     }

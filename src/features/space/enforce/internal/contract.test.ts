@@ -118,3 +118,44 @@ describe("enforce contract: parseEnforceRequest 스키마 검증", () => {
     expect(noActor?.actorName).toBeUndefined();
   });
 });
+
+describe("enforce contract: archive(공간 전체) 파싱 (WI-036)", () => {
+  it("archive는 userId 없이 유효", () => {
+    const parsed = parseEnforceRequest({ spaceId: "s1", action: "archive" });
+    expect(parsed).toEqual({ spaceId: "s1", action: "archive", actorName: undefined });
+  });
+
+  it("archive는 actorName을 받아 100자로 절단", () => {
+    const parsed = parseEnforceRequest({ spaceId: "s1", action: "archive", actorName: "관리자" });
+    expect(parsed).toMatchObject({ action: "archive", actorName: "관리자" });
+    const long = parseEnforceRequest({ spaceId: "s1", action: "archive", actorName: "x".repeat(200) });
+    expect(long?.actorName).toHaveLength(100);
+  });
+
+  it("archive는 입력의 userId/role을 채택하지 않는다(식별자 혼입 차단)", () => {
+    const parsed = parseEnforceRequest({
+      spaceId: "s1",
+      action: "archive",
+      userId: "intruder",
+      role: "OWNER",
+    });
+    // archive 변형에는 userId/role 필드가 없어야 한다 — 혼입 무시.
+    expect(parsed).toEqual({ spaceId: "s1", action: "archive", actorName: undefined });
+    expect(parsed).not.toHaveProperty("userId");
+    expect(parsed).not.toHaveProperty("role");
+  });
+
+  it("archive도 spaceId는 필수(빈/타입오류 거부)", () => {
+    expect(parseEnforceRequest({ action: "archive" })).toBeNull();
+    expect(parseEnforceRequest({ spaceId: "", action: "archive" })).toBeNull();
+    expect(parseEnforceRequest({ spaceId: 1, action: "archive" })).toBeNull();
+  });
+
+  it("멤버 제재는 여전히 userId 필수(archive 추가가 회귀시키지 않음)", () => {
+    for (const action of ["ban", "kick", "mute", "unmute"] as const) {
+      expect(parseEnforceRequest({ spaceId: "s1", action })).toBeNull();
+      expect(parseEnforceRequest({ spaceId: "s1", userId: "", action })).toBeNull();
+    }
+    expect(parseEnforceRequest({ spaceId: "s1", action: "role", role: "STAFF" })).toBeNull();
+  });
+});

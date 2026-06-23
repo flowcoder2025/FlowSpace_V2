@@ -1,0 +1,16 @@
+WI=WI-036-fix
+commit=3646378
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-036-fix.codex.json
+evaluator=.flowset/eval-results/WI-036-fix.eval.json
+merged=.flowset/eval-results/WI-036-fix.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:478pass,build:0,esbuild:0
+codexVerdict=WARNING(환경적 P3만 — 코드 결함 0, vitest/prisma 샌드박스 EPERM 미실행)
+evaluatorVerdict=WARNING:9.81(P0/P1/P2/fixNow=0)
+blockingIssues=0
+deferredP2=0
+deferredP3=3
+rounds=1
+note=듀얼 블라인드 1R 수렴 — codex WARNING(유일 이슈=read-only 샌드박스 EPERM으로 vitest/prisma 미실행, 코드 인스펙션 0 defect·tsc/esbuild exit0 / 권위 환경에서 vitest 478·build 0 실증) / evaluator WARNING 9.81(P0/P1/P2/fixNow=0, P3x2 defer). DELETE /api/spaces/[id]가 status=ARCHIVED+deletedAt만 기록하고 접속자를 방치하던 결함 해소. 설계 codex consult 1R 반영. (A) Space.deletedBy String? 추가(FK없는 순수 스칼라·ChatMessage 선례)+멱등 마이그레이션(ADD COLUMN IF NOT EXISTS, prod 적용=승인 게이트). (B) enforce 계약 discriminated union(ArchiveEnforceRequest userId 없음/UserEnforceRequest userId 필수)+parseEnforceRequest archive 분기(입력 userId/role 무시·멤버제재 회귀0). (C) DELETE updateMany(status!=ARCHIVED) 원자적 최초-행위자 보존(재삭제·동시요청 deletedBy 미덮어쓰기)+dispatchEnforcement(action:archive·best-effort). (D) 소켓서버: archive postcondition=Space.status===ARCHIVED(시크릿 유출 차단)·applyEnforcement 전 room 소켓 snapshot 후 detach(순회중 mutation 방지)·purgeSpaceState(presence+recording+spotlight+proximity 4개 space-키 맵 일괄)·archivedSpaces deny cache+join:space TOCTOU 가드. (E) 클라 변경0(강제 리다이렉트는 WI-037). 양검증자 archive 핵심로직(union narrowing·snapshot-before-detach·deletedBy 원자보존·postcondition·식별자혼입 차단·deletedBy 미노출 4경로) 독립 클린확인. evaluator 변이검증 3종 검출(status!=ARCHIVED 가드·deletedBy 기록·archive userId 혼입차단). 게이트 tsc0/lint0err/vitest 464→478[+14]/build0/esbuild0. 마이그레이션 force-add(prisma/migrations gitignore). Dockerfile.socket COPY 무변경(room.ts ../state는 server/ 전체COPY·신규 src COPY 불요 실증). deletedBy 응답 미노출(GET/PATCH/DELETE/join 전수확인). sourceFingerprint=empty(소스 전 커밋·작업트리 clean). impl 3646378. Vercel(웹/API)+server/(소켓)+prisma/ 변경 — 승격 시 OCI 소켓 재배포 필요(server/handlers 변경)+prod DB 마이그레이션 승인(Space.deletedBy). main 미승격. 잔여 defer P3: server/ archive 테스트(구조적·WI 분리)·PATCH lean select(후속).
+createdAt=2026-06-23T19:20:00Z
