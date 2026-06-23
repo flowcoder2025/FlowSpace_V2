@@ -5,6 +5,11 @@ import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 interface SpaceSettingsFormProps {
   spaceId: string;
+  /**
+   * 설정 편집 가능 여부 = PATCH /api/spaces/[id] 게이트(owner/superAdmin)의 미러.
+   * false(STAFF)면 모든 입력을 읽기전용으로, 저장 버튼을 숨기고 안내를 노출한다.
+   */
+  canEdit: boolean;
   initialValues: {
     name: string;
     description: string;
@@ -15,7 +20,7 @@ interface SpaceSettingsFormProps {
   };
 }
 
-export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormProps) {
+export function SpaceSettingsForm({ spaceId, canEdit, initialValues }: SpaceSettingsFormProps) {
   const [values, setValues] = useState(initialValues);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -26,6 +31,9 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // 이중 방어: 편집 불가(STAFF)면 PATCH 요청 자체를 보내지 않는다.
+    // 서버 PATCH 403이 근본 게이트이고, 이 가드는 Enter 제출·disabled 누락 등 UX 경로 차단용.
+    if (!canEdit) return;
     setIsSubmitting(true);
     setMessage(null);
 
@@ -51,6 +59,16 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {/* 읽기전용 안내 — STAFF 등 편집 불가 사용자에게 노출 */}
+      {!canEdit && (
+        <p
+          role="status"
+          className="text-sm text-ink-soft bg-line/30 border border-line rounded-md px-3 py-2"
+        >
+          {DASHBOARD_COPY.SETTINGS.readOnlyNotice}
+        </p>
+      )}
+
       {/* Name */}
       <div>
         <label htmlFor="space-name" className="block text-sm font-medium text-ink-soft mb-1">
@@ -62,7 +80,8 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
           value={values.name}
           onChange={(e) => handleChange("name", e.target.value)}
           required
-          className="w-full px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20"
+          disabled={!canEdit}
+          className="w-full px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20 disabled:bg-line/20 disabled:cursor-not-allowed"
         />
       </div>
 
@@ -76,7 +95,8 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
           value={values.description}
           onChange={(e) => handleChange("description", e.target.value)}
           rows={3}
-          className="w-full px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20 resize-none"
+          disabled={!canEdit}
+          className="w-full px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20 resize-none disabled:bg-line/20 disabled:cursor-not-allowed"
         />
       </div>
 
@@ -92,7 +112,8 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
           max={500}
           value={values.maxUsers}
           onChange={(e) => handleChange("maxUsers", Number(e.target.value))}
-          className="w-32 px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20"
+          disabled={!canEdit}
+          className="w-32 px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20 disabled:bg-line/20 disabled:cursor-not-allowed"
         />
       </div>
 
@@ -105,7 +126,8 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
           id="access-type"
           value={values.accessType}
           onChange={(e) => handleChange("accessType", e.target.value)}
-          className="w-48 px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20"
+          disabled={!canEdit}
+          className="w-48 px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20 disabled:bg-line/20 disabled:cursor-not-allowed"
         >
           <option value="PUBLIC">{DASHBOARD_COPY.accessTypeLabel("PUBLIC")}</option>
           <option value="PRIVATE">{DASHBOARD_COPY.accessTypeLabel("PRIVATE")}</option>
@@ -123,7 +145,8 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
           type="color"
           value={values.primaryColor || "#3b82f6"}
           onChange={(e) => handleChange("primaryColor", e.target.value)}
-          className="w-16 h-8 border border-line rounded cursor-pointer"
+          disabled={!canEdit}
+          className="w-16 h-8 border border-line rounded cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
         />
       </div>
 
@@ -138,7 +161,8 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
           value={values.loadingMessage}
           onChange={(e) => handleChange("loadingMessage", e.target.value)}
           placeholder={DASHBOARD_COPY.SETTINGS.form.loadingPlaceholder}
-          className="w-full px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20"
+          disabled={!canEdit}
+          className="w-full px-3 py-2 border border-line rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ink/20 disabled:bg-line/20 disabled:cursor-not-allowed"
         />
       </div>
 
@@ -149,14 +173,16 @@ export function SpaceSettingsForm({ spaceId, initialValues }: SpaceSettingsFormP
         </p>
       )}
 
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="px-6 py-2 bg-brand text-white text-sm rounded-md hover:bg-brand-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        {isSubmitting ? DASHBOARD_COPY.SETTINGS.form.saving : DASHBOARD_COPY.SETTINGS.form.save}
-      </button>
+      {/* Submit — 편집 불가(STAFF)면 저장 버튼 자체를 숨긴다 */}
+      {canEdit && (
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="px-6 py-2 bg-brand text-white text-sm rounded-md hover:bg-brand-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isSubmitting ? DASHBOARD_COPY.SETTINGS.form.saving : DASHBOARD_COPY.SETTINGS.form.save}
+        </button>
+      )}
     </form>
   );
 }
