@@ -74,7 +74,14 @@ export function useSpaceMembers(
   const refetch = useCallback(() => setReqTick((n) => n + 1), []);
 
   useEffect(() => {
-    if (!enabled || !spaceId || !currentUserId) return;
+    // 비활성/식별자 없음 → 이전 스냅샷을 폐기(닫힌 패널이 stale 관리 상태를 보유하지 않게).
+    if (!enabled || !spaceId || !currentUserId) {
+      setMembersByUserId(new Map());
+      setActorRole(null);
+      setIsAuthorized(false);
+      setIsLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setIsLoading(true);

@@ -106,6 +106,23 @@ describe("useSpaceMembers", () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   });
 
+  it("enabled true→false 전환 시 이전 스냅샷 폐기(stale 관리 상태 방지)", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      jsonOk({ members: MEMBERS })
+    );
+    const { result, rerender } = renderHook(
+      ({ en }) => useSpaceMembers("space-1", "u-owner", en),
+      { initialProps: { en: true } }
+    );
+    await waitFor(() => expect(result.current.isAuthorized).toBe(true));
+    expect(result.current.membersByUserId.size).toBe(3);
+
+    rerender({ en: false });
+    await waitFor(() => expect(result.current.isAuthorized).toBe(false));
+    expect(result.current.membersByUserId.size).toBe(0);
+    expect(result.current.actorRole).toBeNull();
+  });
+
   it("네트워크 오류 → 미인가(보수적)", async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("net"));
     const { result } = renderHook(() =>
