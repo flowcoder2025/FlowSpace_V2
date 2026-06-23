@@ -1,15 +1,18 @@
 # HANDOFF
 
-## 직전 Active — ✅ WI-033-feat (어드민 대시보드 한글화 + copy constants 분리) develop 머지 완료(2026-06-23, PR#36 merge `bde92f0`)
+## 직전 Active — ✅ WI-034-fix (인-스페이스 role 전달 — page가 SpaceMember.role 조회해 SpaceClient.user.role 주입) develop PR 대기/머지
+사용자 기능 요청 큐 **2/8 완료**. `src/app/space/[id]/page.tsx`가 `SpaceClient`에 `{id,nickname,avatar}`만 넘기고 **role 미전달** → `user.role` 세션 내내 undefined(prop·소켓 갱신 경로 없음) → OWNER/STAFF도 ①에디터 진입(`space-client.tsx:80 canEdit`) ②관리 채팅명령 파싱(`use-chat.ts:132 isAdmin` @mute/@kick) ③`ChatPanel` 관리 UI가 비활성이던 선결 버그(WI-035 인-스페이스 관리 UI 권한 게이팅 선결). **설계 codex consult 1R**: 권한 SoT=`SpaceMember.role`(소켓 `join:space` room.ts:48·`requireSpaceAdmin` 정합 — ownerId 파생/합성OWNER/superAdmin 특례는 클라/소켓 발산) · 합성OWNER 금지(owner 멤버행 누락시 self-heal create) · superAdmin 인-스페이스 특례 없음 · 순수헬퍼 분리 · 놓칠위험=세션중 role 변경 stale(WI-035 범위). **해소**: 신규 순수헬퍼 `resolveSpaceRoleDecision`(space-role.ts) + page 통합 1쿼리(role+restriction)→결정→redirect/upsert→prop 주입. **듀얼 3R 수렴**: codex r1 FAIL(P2 BANNED page미검사·P3 bare create race, 둘 fixNow)→r2 FAIL(P2 upsert 충돌분기 BANNED race·fixNow 신규)→r3 PASS 0 issues / evaluator r1 9.85→r2 10.0→r3 WARNING 9.94(P0/P1/P2=0). **양 검증자 BANNED·race 독립 수렴**. **r2**: BANNED 멤버 role보다 먼저 redirect(소켓 정합 — **맵 편집 HTTP `map/tiles`·`map/objects`가 BANNED 미검사라 r1이 BANNED admin에게 role 주면 에디터 우회편집 가능 = 신규회귀** 차단)+create→원자적 upsert(P2002). **r3**: upsert 후 post-upsert BANNED 재평가(TOCTOU 마감). 변이검증 9종(MUT-A~I). 게이트 4/4(tsc0/lint0err/vitest 416→**442**[+26]/build0)+`.pass`(empty `e3b0c44`). impl `c75e351`/r2 `22aa279`/r3 `5379485`. **Vercel 전용(server/·prisma/ 무관). main 미승격.** 교훈: 인-스페이스 클라 role SoT=소켓 권위와 동일 / role 신규 주입 시 그 role 게이팅 경로의 우회 가드(BANNED) 재점검 / 자동가입은 upsert(P2002 race·멱등) / TOCTOU는 write 후 불변식 재평가 / vitest mock은 select 무시→`arg.select` 단언+tsc 이중방어. 상세 fix_plan.md Done.
+
+## 이전 Active — ✅ WI-033-feat (어드민 대시보드 한글화 + copy constants 분리) develop 머지 완료(2026-06-23, PR#36 merge `bde92f0`)
 사용자 기능 요청 큐 **1/8 완료**. 어드민 대시보드(18 소스파일) 100% 영문 → 단일 SoT `src/constants/dashboard-copy.ts`(`DASHBOARD_COPY`, 키 영문/값 한글, `as const`)로 분리·한글화. i18n 미도입(단일 한국어 제품). **설계 codex consult 1R**: 단일 파일·scope dashboard 엄격 고정(인-스페이스 player-list 별도 후속)·CSV/에러/aria-label 전부 한글·동적 함수 엔트리. **핵심 위험(codex Q5)=표시 라벨/도메인 값 분리**: `<option value>`·필터키·액션토큰·색상맵 키 전수 enum 코드 유지, `*Label()` 헬퍼로 표시만 매핑(미정의 코드 폴백). CSV는 헤더+표시값 화면과 동일 한글 라벨 SoT 공유, payload JSON 키 미번역. **듀얼 2R 수렴 codex r1/r2 PASS 0 issues·evaluator r1 9.81→r2 9.88**(P0/P1/P2 0). evaluator 유일 P3(accessType만 패턴 이탈·SoT 중복) r2 즉시 해소(accessTypeLabel 단일 SoT·consistency 10.0). 변이검증 2종. 게이트 4/4(tsc0/lint0err/vitest 407→**416**/build0)+`.pass`(empty `e3b0c44`). impl `77f77e6`/r2 `82b39ed`. **Vercel 전용(server/·prisma/ 무관). main 미승격.** 교훈: 표시 라벨↔도메인/API 값 분리(`*Label(code)` 코드 폴백)·CSV↔화면 동일 SoT·헬퍼 패턴 통일=단일 SoT. 상세 fix_plan.md Done.
 
 ## 다음 세션 — 순차 진행 큐 (사용자 지시 2026-06-23)
-**사용자 기능 요청 4건**(①어드민 대시보드 한글 통일[✅WI-033] ②스페이스 삭제 ③인-스페이스 멤버관리 강퇴/음소거/귓속말 ④어드민/공통 권한별 구별)을 read-only 멀티에이전트로 실측 + **codex consult로 분해·우선순위 산정 완료**. **다음 세션은 fix_plan.md Queue의 WI-034부터 1개씩 순서대로 처리**(각 WI 착수 시 READY 승격 → 분기 → 기계게이트 → 듀얼검증 → .pass → develop PR).
+**사용자 기능 요청 4건**(①어드민 대시보드 한글 통일[✅WI-033] ②스페이스 삭제 ③인-스페이스 멤버관리 강퇴/음소거/귓속말 ④어드민/공통 권한별 구별)을 read-only 멀티에이전트로 실측 + **codex consult로 분해·우선순위 산정 완료**. **다음 세션은 fix_plan.md Queue의 WI-035부터 1개씩 순서대로 처리**(각 WI 착수 시 READY 승격 → 분기 → 기계게이트 → 듀얼검증 → .pass → develop PR).
 
 **확정 시퀀스** (상세·근거는 fix_plan.md Queue 표):
 1. ✅ **WI-033** (feat) 대시보드 한글화 + copy constants 분리 — **완료**(develop 머지).
-2. **WI-034** (fix) `/space/[id]` page가 myRole 조회→SpaceClient.user.role 전달 (선결 버그·실측 확인: `page.tsx:85` role 미전달) — **다음 착수**.
-3. **WI-035** (feat) 인-스페이스 참가자 패널 멤버관리 UI(채팅음소거/강퇴, role 게이팅) — **dashboard HTTP admin API 재사용**(socket 채팅명령 경로 아님 — `use-socket.ts:584` admin:ban 누락·canActOn/감사 약함).
+2. ✅ **WI-034** (fix) `/space/[id]` page가 SpaceMember.role→SpaceClient.user.role 전달 (선결 버그) — **완료**(develop PR). user.role 주입 완료 → WI-035 권한 게이팅 선결조건 충족.
+3. **WI-035** (feat) 인-스페이스 참가자 패널 멤버관리 UI(채팅음소거/강퇴, role 게이팅) — **다음 착수**. **dashboard HTTP admin API 재사용**(socket 채팅명령 경로 아님 — `use-socket.ts:584` admin:ban 누락·canActOn/감사 약함). **WI-034 codex consult 놓칠위험 반영 필수**: 세션 중 role 승강 시 `SpaceClient.user.role` prop은 stale(enforce가 `socket.data.role`만 갱신·클라 prop 미갱신) → 보안은 서버가 막으나 UI/명령파서 발산 가능 → socket 이벤트로 클라 role 동기화 고려.
 4. **WI-036** (fix) 스페이스 archive 하드닝(deletedBy 감사+접속자 추방) — **Space.deletedBy 컬럼=마이그레이션 승인 게이트**.
 5. **WI-037** (feat) 설정 스페이스 삭제 UI(확인 모달+DELETE+이동) — WI-036 후행.
 6. **WI-038** (feat, P2) LiveKit moderator mute 서버 계약(음성 강제 음소거·순 신규).

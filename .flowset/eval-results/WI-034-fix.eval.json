@@ -1,0 +1,23 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 10,
+    "consistency": 10,
+    "specificity": 9.8,
+    "actionability": 10
+  },
+  "weightedTotal": 9.94,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/space/[id]/page.test.tsx:134-141 (vs page.tsx:85 select)",
+      "description": "post-upsert BANNED 재확인 테스트는 upsert.mockResolvedValue가 select 절을 무시하고 restriction을 항상 반환하므로, upsert `select`에서 restriction 필드를 떨어뜨리는 회귀(런타임 upserted.restriction=undefined → undefined!==BANNED → BANNED 행이 role 받음)를 vitest 레벨에서 잡지 못한다. 변이검증 MUT-I(select:{role:true})가 테스트 7/7 통과로 survive 확인. 단, 실코드는 restriction을 올바르게 select(page.tsx:85)하며, 동일 변이가 tsc에서 `error TS2339: Property 'restriction' does not exist`로 즉시 차단됨(기계게이트 tsc0 green이 이미 커버). 따라서 런타임 결함 없음 — 순수 테스트 견고성 갭(라이브 누출 아님).",
+      "recommendation": "(선택) page.test.tsx BANNED-race 케이스에서 mockPrisma.spaceMember.upsert 호출 인자의 select에 restriction이 포함됐는지 단언(arg.select).toEqual({role:true,restriction:true)) 추가 — tsc가 이미 막으므로 필수 아님.",
+      "defer": true,
+      "deferRationale": "실코드는 restriction을 올바르게 select하며 동일 회귀를 tsc(이미 green인 기계게이트)가 TS2339로 결정적으로 차단한다 — 라이브 누출 표면 0. vitest mock이 select를 무시하는 구조적 한계라 테스트만으로는 못 잡는 것이며, 타입 시스템이 이중방어. WI-034 수용 기준(role 전달·BANNED 차단·원자성)은 전부 충족.",
+      "fixNow": false
+    }
+  ]
+}
