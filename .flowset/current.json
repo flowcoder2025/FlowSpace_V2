@@ -3,11 +3,12 @@
   "lastWI": "WI-038-feat",
   "nextQueue": ["WI-040"],
   "type": "feat",
-  "status": "DESIGN_CONSULT",
+  "status": "VERIFIED_PR_PENDING",
   "integrationBranch": "develop",
   "branch": "feature/WI-039-feat-voice-mute-ui",
+  "implCommit": "21f5c4f",
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "3cb8bf0",
-  "note": "[착수: WI-039-feat — 인-스페이스 UI에 음성 강제 음소거 액션 연결(WI-038 백엔드 POST /api/spaces/[id]/livekit/moderate {identity,muted}를 MemberActionsMenu에 연결)] 위험: '채팅 음소거'(WI-035 restriction) vs '음성 음소거'(WI-038 LiveKit) 라벨 혼동 → SPACE_COPY로 명확 구분. 클라는 track.participantId(=LiveKit identity user-/guest-)를 moderate 라우트 identity로 사용. 설계 codex consult 진행 중."
+  "lastVerifiedCommit": "21f5c4f",
+  "note": "[WI-039-feat 듀얼 블라인드 1R 수렴 — codex WARNING(구현0·환경 P3)·evaluator 9.77(P0/P1/P2/fixNow=0·변이검증 5/5·P3x4 defer)·.pass 작성] WI-038 라우트 POST /api/spaces/[id]/livekit/moderate를 MemberActionsMenu에 배선(participantIdentity prop·두 액션 명시·refetch 미호출·메뉴/액션 게이트 분리). 게이트 tsc0/lint0err/vitest 541→550/build0. Vercel 전용. develop PR 생성 대기. 다음: WI-040(귓속말 발견성·P3 선택) 또는 사용자 기능 큐 7/8(8/8 가능) 보고 후 승격 검토."
 }

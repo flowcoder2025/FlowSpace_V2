@@ -1,0 +1,16 @@
+WI=WI-039-feat
+commit=21f5c4f
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-039.codex.json
+evaluator=.flowset/eval-results/WI-039.eval.json
+merged=.flowset/eval-results/WI-039.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:550pass(541→550),build:0
+codexVerdict=WARNING(구현 결함 0·유일 P3=read-only 샌드박스 vitest 미실행 환경제약·tsc/lint 직접 통과)
+evaluatorVerdict=WARNING:9.77(P0/P1/P2/fixNow=0, P3x3 defer, 변이검증 5/5 검출)
+blockingIssues=0
+deferredP2=0
+deferredP3=4
+rounds=1
+note=듀얼 블라인드 1R 수렴 — 양 검증자 구현 결함 0. WI-038 서버 라우트 POST /api/spaces/[id]/livekit/moderate {identity,muted}(타인 음성 강제 음소거)를 인-스페이스 참가자 패널 UI에 연결하는 순수 프론트엔드 작업. 백엔드(라우트/스키마/소켓/Prisma) 무변경 = Vercel 전용. 설계 codex consult 1R 수렴(Q1~Q5). (A) MemberActionsMenu: participantIdentity prop 추가(LiveKit identity user-/guest- — track.participantId, userId 재구성 금지=계약 복제·게스트 차단 회피) + runVoiceAction(muted: boolean)이 POST /livekit/moderate {identity,muted} 호출. 음성 강제 음소거(muted:true)/음성 발언 허용(muted:false) **두 액션 명시** — track.isAudioMuted로 토글 라벨 결정 안 함(self-mute/moderator-mute 구별 불가 → self-mute 상태에서 "해제" 표시 시 unmute가 force-unmute 아니라 무변화=혼란 회피). unmute=publish 권한 복원만이라 "해제" 아닌 "발언 허용" 표기. (B) ParticipantPanel: VideoTile 메뉴(LiveKit room 참가자)에만 participantIdentity={track.participantId} 전달 — 비-미디어 소켓 전용 아바타 리스트 플레이어는 미전달(음성 액션 미노출·getParticipant 404 회피). (C) SPACE_COPY: voiceSectionLabel/voiceActions/voiceError(라우트 code→한글 매핑·서버 영문 미노출·미지 code는 actionFailed 폴백). 핵심 설계: **메뉴 가시성 게이트(member/actorRole/canActOn)와 음성 액션 게이트(participantIdentity)를 분리** — 음성 액션이 기존 채팅/킥/밴 권한 모델을 흐리지 않게(codex 놓칠위험 반영). 음성 액션은 SpaceMember/restriction 무변경 → onActionDone(refetch) 미호출(실제 오디오 상태는 LiveKit 이벤트로 갱신). runVoiceAction useCallback은 early-return 앞 배치(hooks 규칙). loading 가드로 중복 클릭/race 차단. 라우트가 hard gate(auth/self/actor-role/OWNER 보호/canActOn 재검증) — participantIdentity만으론 권한 우회 불가. 식별자 정확성: track.participantId=participant.identity(LiveKit), userId/memberId 혼입 0(테스트가 body not.toContain memberId 단언). 회귀 테스트 +9(identity 게이트·moderate POST 계약·refetch 미호출·code 한글 매핑·미지code 폴백·networkError·성공 메뉴 닫힘·게이트 미통과 시 메뉴 미렌더). 게이트 tsc0/lint0err/vitest 541→550/build0. 변이검증 evaluator 5/5(M1 identity 게이트·M2 refetch 억제·M3 code 매핑·M4 mute 방향·M5 networkError). impl 21f5c4f. Vercel 전용(server/·prisma/ 무관 — OCI 소켓 재배포·prod DB 마이그레이션 불요). main 미승격. 잔여 defer P3x4: ①codex 환경(vitest 미실행) ②guest-* 음성 UI 도달 불가(설계대로 등록 멤버 1차 범위·WI-035 일관·게스트 음성 제어=후속 WI) ③채팅/음성 loading·error 공유 상태(직렬 단일-대상 메뉴라 수용·동시 트리거 추가 시만 분리) ④voiceError가 code 있는 응답만 커버(code 없는 401/403은 actionFailed 폴백·영문 누출0·백엔드 변경 필요라 범위 밖). 후속: WI-040(귓속말 발견성·P3 선택) / guest-* 음성 제어(신규 후속).
+createdAt=2026-06-23T22:32:00Z

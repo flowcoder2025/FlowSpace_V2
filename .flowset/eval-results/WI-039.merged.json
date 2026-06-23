@@ -1,0 +1,46 @@
+{
+  "wi": "WI-039-feat",
+  "commit": "21f5c4f",
+  "rounds": 1,
+  "blocking": { "P0": 0, "P1": 0, "P2": 0, "fixNow": 0 },
+  "codexVerdict": "WARNING",
+  "evaluatorVerdict": "WARNING",
+  "evaluatorWeightedTotal": 9.77,
+  "issues": [
+    {
+      "severity": "P3",
+      "source": "codex",
+      "location": "validation: vitest run (read-only sandbox)",
+      "description": "codex read-only 샌드박스에서 vitest child process spawn이 EPERM으로 막혀 미실행. tsc/lint는 직접 통과 확인. 구현 결함 아님(환경 제약).",
+      "defer": true,
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": "evaluator",
+      "location": "ParticipantPanel.tsx / member-actions-menu.tsx (guest-* 경로)",
+      "description": "guest-* 음성 액션은 UI에서 도달 불가 — managedUserIdFromIdentity가 guest-*를 null로 반환하고 메뉴는 non-null member를 요구. 라우트/prop은 게스트를 지원하나 렌더 경로 미연결. 설계 합의대로 등록 멤버만 1차 범위(WI-035 일관). 보안 결함 아님 — 기능 커버리지 갭. 게스트 음성 제어는 후속 WI.",
+      "defer": true,
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": "evaluator",
+      "location": "member-actions-menu.tsx (loading/error 공유 상태)",
+      "description": "채팅 액션과 음성 액션이 단일 loading/error 상태를 공유. 직렬 단일-대상 메뉴라 수용 가능. 동시 트리거가 추가될 때만 분리 필요.",
+      "defer": true,
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": "evaluator",
+      "location": "space-copy.ts voiceError / route.ts",
+      "description": "voiceError 매핑은 code를 가진 라우트 응답만 커버. code 없는 401/403(Forbidden/Cannot modify owner)은 actionFailed로 폴백(영문 누출 0·안전)하나 403 사유가 묻힘. code 추가는 백엔드 라우트 변경 필요(이 Vercel 전용 프론트 WI 범위 밖).",
+      "defer": true,
+      "fixNow": false
+    }
+  ],
+  "gates": { "tsc": 0, "lint": "0err(1 preexisting LiveKit warning)", "vitest": "550pass(541→550)", "build": 0 },
+  "mutationTesting": "evaluator 5/5 검출(identity 게이트·refetch 억제·code 매핑·mute 버튼 방향·networkError 경로)",
+  "note": "1R 수렴. 양 검증자 구현 결함 0. codex 유일 이슈=환경 P3(vitest 미실행). evaluator P3x3 전부 scope/개선 defer. Vercel 전용(server/·prisma/ 무관)."
+}
