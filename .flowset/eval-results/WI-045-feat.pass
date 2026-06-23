@@ -1,0 +1,14 @@
+WI=WI-045-feat
+commit=d1b18b0
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-045-feat.codex-r3.json
+evaluator=.flowset/eval-results/WI-045-feat.eval.json
+merged=.flowset/eval-results/WI-045-feat.merged.json
+gates=tsc,lint,vitest,build,esbuild
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:579pass(563→579 +16),build:0,esbuild:0(src 입력 4개 불변)
+codexVerdict=PASS(r1 FAIL P1×2→r2 WARNING P2→r3 PASS 0 issues)
+evaluatorVerdict=PASS:9.71(r1 WARNING 9.53→r2 PASS, P0/P1/P2/fixNow=0, P3×3 defer)
+blockingIssues=0
+deferredP3=3
+rounds=3
+note=사용자 라이브 제보 강퇴/차단 반-구현 결함 3건 완성. 설계 codex consult 1R 수렴(kick=현재 세션만 강제 퇴장·재입장O / ban=영구+해제(unban) / 둘 다 LiveKit 화상 제거). (1) server/handlers/enforce.ts kick postcondition member===null→member!==null&&restriction!==BANNED(삭제 안 하므로 유효 멤버 확인). (2) admin/members PATCH: kick=spaceMember.delete 제거(멤버 유지·재입장 허용 room.ts !member 게이트 통과)+enforce kick(소켓 disconnect)+removeSpaceParticipant(LiveKit 화상) / ban=restriction BANNED+enforce+removeSpaceParticipant / unban 신규=restriction NONE·enforce 미발송(actionLabel!=='unban' 가드·차단 유저 오프라인). (3) 신규 src/features/space/livekit-moderation/internal/eviction.ts(resolveLiveKitConfig moderate서 추출·공용 + removeSpaceParticipant best-effort try/catch: 미설정 not_configured·throw remove_failed·throw 안 함·로깅) + moderate 라우트 공용 config import. (4) member-actions-menu.tsx: isBanned면 '차단 해제'(unban)만(mute/kick/ban/음성 숨김)·showVoiceActions=identity&&!isBanned. (5) space-copy.ts actions.unban. **codex 적대검증 적출(듀얼블라인드 가치): livekit/token/route.ts가 SpaceMember 존재만 확인하고 restriction 미검사 → 차단 유저가 화상 토큰 재발급받아 ban removeSpaceParticipant 우회** → select restriction+BANNED 403 code:BANNED(owner 예외 없이 소켓 room.ts BANNED 게이트와 일관·codex r2서 owner예외 추가지적). 회귀 테스트 +16(eviction 6·admin route 4·menu 2·token route 4). 듀얼 블라인드 3R 수렴 codex r1 FAIL(P1×2 tsc·token우회)→r2 WARNING(P2 owner예외)→r3 PASS 0 issues·evaluator r1 WARNING 9.53(P2 tsc)→r2 PASS 9.71. 변이검증 5종(kick LiveKit·unban enforce 가드·BANNED 가드·select restriction·owner예외 재도입 전부 FAIL 검출). 게이트 tsc0/lint0err/vitest 563→579/build0/esbuild0(OCI COPY 완전). impl 66d3b19/r2 9c61409/r3 d1b18b0. **server/enforce.ts 변경 — 승격 시 OCI 소켓 재배포 필요(버전스큐: 구 OCI kick postcondition member===null라 신 Vercel kick[멤버 유지] dispatch를 거부 → OCI 선배포 필요). prisma 무관(restriction enum 기존)=마이그레이션 불요.** Vercel+OCI 승격. 잔여 defer P3×3: DEV키 중복·게스트 화상 미커버·EvictionResult.reason 미반영. main 미승격.

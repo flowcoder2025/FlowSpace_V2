@@ -1,0 +1,18 @@
+{
+  "wi": "WI-045-feat",
+  "commit": "d1b18b0",
+  "rounds": 3,
+  "blocking": { "P0": 0, "P1": 0, "P2": 0, "fixNow": 0 },
+  "codexVerdict": "PASS",
+  "evaluatorVerdict": "PASS",
+  "evaluatorWeightedTotal": 9.71,
+  "convergence": "codex r1 FAIL(P1×2: tsc TS2540·token ban LiveKit 우회)→r2 WARNING(P2 token owner예외)→r3 PASS 0 issues / evaluator r1 WARNING 9.53(P2 tsc)→r2 PASS 9.71",
+  "issues": [
+    { "severity": "P3", "source": "evaluator", "location": "eviction.ts / token/route.ts", "description": "DEV_API_KEY/SECRET이 eviction.ts·token route에 중복(token 사본 선재·이번 회귀 아님).", "defer": true, "fixNow": false },
+    { "severity": "P3", "source": "evaluator", "location": "removeSpaceParticipant (guest)", "description": "게스트(userId=null) 화상 제거 미커버 — 확정 모델이 등록 사용자 한정(WI-035 일관). guest-* 음성/화상 제어는 후속.", "defer": true, "fixNow": false },
+    { "severity": "P3", "source": "evaluator", "location": "EvictionResult.reason", "description": "best-effort 결과 reason이 응답 미반영(의도된 한계·서버 로그로 진단).", "defer": true, "fixNow": false }
+  ],
+  "gates": { "tsc": 0, "lint": "0err(1 preexisting LiveKit warning)", "vitest": "579pass(563→579, +16)", "build": 0, "esbuild": "0(src 입력 4개 불변·OCI COPY 완전)" },
+  "mutationTesting": "codex/evaluator 변이검증: kick LiveKit 제거→FAIL·unban enforce 가드 제거→FAIL·BANNED 가드 제거→token FAIL·select restriction 제거→token FAIL(가드 silent 미발화 포착)·owner예외 재도입→token FAIL",
+  "note": "사용자 라이브 제보 강퇴/차단 반-구현 결함 3건 완성: ①kick 멤버 삭제→재입장 불가 ②kick/ban LiveKit 화상 미제거 ③unban UI 없음. 설계 codex consult 1R 수렴(kick=임시·재입장O / ban=영구+unban / 둘 다 화상 제거). kick=delete 제거+enforce kick+removeSpaceParticipant·enforce.ts postcondition member!==null&&!BANNED / ban=BANNED+enforce+removeSpaceParticipant / unban=NONE DB-only·enforce 미발송 / menu banned→unban만 / 신규 eviction.ts(config 공용추출+removeSpaceParticipant best-effort) / **codex 적출 token route ban 우회**(BANNED 유저 화상 토큰 재발급)→select restriction+BANNED 403(owner 예외 없이 소켓 게이트와 일관). server/enforce.ts 변경=OCI 재배포 필요·prisma 무관(restriction enum 기존). Vercel+OCI 승격."
+}
