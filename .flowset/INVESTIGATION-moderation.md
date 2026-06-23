@@ -13,6 +13,16 @@
 
 → **소켓 enforce 계층(mute/kick/ban 실시간)과 LiveKit 계층(음성/화상) 둘 다 함께 실패.** 함께 실패 = 공유 불변식이 깨짐.
 
+## ✅ 이번 세션 검증 결과 (2026-06-24) — codex 1순위 반증, #2로 좁힘
+- **두 참가자는 다른 계정**(같은 PC·다른 브라우저). → codex 놓칠위험(같은 계정 다중탭) **배제**.
+- **제어평면 URL 대조(flowspace-v2 prod env 실측)** — codex 1순위(제어평면 불일치) **반증**:
+  - LiveKit: 서버 `LIVEKIT_URL=https://space-livekit.flow-coder.com` ↔ 클라 `NEXT_PUBLIC_LIVEKIT_URL=wss://space-livekit.flow-coder.com` = **같은 호스트**(scheme만 https REST/wss ws — 정상).
+  - 소켓: 서버 `SOCKET_INTERNAL_URL=https://space-socket.flow-coder.com` ↔ 클라 `NEXT_PUBLIC_SOCKET_URL=https://space-socket.flow-coder.com` = **같은 호스트**.
+  - `SOCKET_INTERNAL_SECRET`·`SOCKET_INTERNAL_URL` flowspace-v2 prod에 정상 존재(2h 전 설정).
+- **도달성 실측**: LiveKit REST `POST /twirp/livekit.RoomService/ListRooms`→**401**(=endpoint 정상·서명만 없음) / 소켓 도메인→200 / `/internal/enforce` 합성 probe→409(HMAC 통과·postcondition만 거부, 이전 세션).
+- **결론: 제어평면(URL/인스턴스/도달성)은 정상.** 근본은 **#2 식별자 불일치** 또는 런타임 상태(stale tile·room/identity·socket presence)로 좁혀짐. 다음 세션은 아래 1·3·4번(런타임 캡처/OCI 로그/4값 정렬)부터.
+- ⚠️ **함정(이번 세션 실수)**: `vercel link --yes`가 **flowspace-v2가 아닌 V1 `flowspace` 프로젝트로 재링크**해 env가 다 틀려 보였음. `.vercel/project.json` 정답=`prj_W2Rn0yC3RHdLyqVQpPcvycjDa9Vl`/`flowspace-v2`. **env 작업 후 `.vercel/project.json` projectName 반드시 확인**. `vercel env ls --scope flowcoder`는 링크 무관 동작하나 `env pull`은 링크 따라감. `vercel link`는 `.env.local` 생성+`.gitignore` 수정 부작용(삭제·복원 필요).
+
 ## codex 근본 원인 가설 (consult 2026-06-24, scratchpad/consult-moderation-rootcause.out.txt)
 ### 1순위 — 제어 평면(control plane) 불일치
 **서버가 보는 인스턴스 ≠ 사용자가 실제 붙은 인스턴스.**
