@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
-import { processAssetGeneration, GENERATION_FAILURE_MESSAGE } from "@/features/assets";
+import {
+  processAssetGeneration,
+  buildStoredAssetMetadata,
+  GENERATION_FAILURE_MESSAGE,
+} from "@/features/assets";
 import type { CreateAssetParams } from "@/features/assets";
 
 const ASSET_TYPE_MAP = {
@@ -88,7 +92,10 @@ export async function POST(request: Request) {
             thumbnailPath: metadata.thumbnailPath,
             fileSize: metadata.fileSize,
             comfyuiJobId: metadata.comfyuiJobId,
-            metadata: JSON.parse(JSON.stringify(metadata)),
+            // WI-026: 전체 metadata(prompt/workflow/comfyuiJobId 포함)를 통째
+            // 저장하지 않고 공개 런타임 필드만 저장(저장면 축소·심층 방어).
+            // 민감 필드는 top-level 컬럼(prompt/workflow/comfyuiJobId)에 보존된다.
+            metadata: buildStoredAssetMetadata(metadata),
           },
         });
       })

@@ -1,4 +1,5 @@
 import type { AssetType, AssetStatus, Prisma } from "@prisma/client";
+import type { GeneratedAssetMetadata } from "./types";
 
 /**
  * GeneratedAsset 공개 응답 DTO (WI-019)
@@ -92,6 +93,45 @@ function toPublicMetadata(
     }
   }
   return out;
+}
+
+/**
+ * 저장 시점 metadata 정규화 (WI-026) — 쓰기 계층 방어.
+ *
+ * generate/batch 라우트는 성공 시 `GeneratedAssetMetadata` **전체**를
+ * (`prompt`·`workflow`·`comfyuiJobId` 포함) `metadata`(Json) 컬럼에 통째 저장해
+ * 왔다. 이 값들은 이미 `prompt`/`workflow`/`comfyuiJobId` top-level 컬럼에도 있어
+ * 중복이며, 응답은 `toPublicMetadata`(allowlist)가 막지만 **저장면 자체가 넓다**:
+ * allowlist가 드리프트하거나 metadata에 신규 민감필드가 추가되면 재노출 위험.
+ *
+ * 이 빌더는 저장 시점에 런타임 공개 필드(`PUBLIC_METADATA_KEYS`)만 명시 구성한다.
+ * **읽기 측 allowlist(`toPublicMetadata`)와 동일한 키 SoT를 공유**하므로 저장면과
+ * 응답면이 한 곳에서 함께 좁아진다(WI-019/024 응답+저장 양쪽 차단 패턴의 저장 측).
+ *
+ * 저장 shape는 현 상세 응답 flat metadata와 동일하게 유지된다 — 따라서 소비처
+ * (game-loader `...asset.metadata`, avatar/sprite-generator·asset-loader의
+ * `metadata?.frameWidth` 폴백)는 무회귀다.
+ *
+ * @param metadata 후처리 완료 메타데이터(전체 필드 보유)
+ * @param extra 저장 전용 운영 키(예: batch의 `batchId` — batch 상태 조회가
+ *   `metadata.path:["batchId"]`로 의존). public allowlist에는 없어 응답엔 미노출.
+ *   allowlist 공개 키와 충돌하면 extra가 우선한다(운영 키 의도 보존).
+ */
+export function buildStoredAssetMetadata(
+  metadata: GeneratedAssetMetadata,
+  extra?: Prisma.InputJsonObject
+): Prisma.InputJsonObject {
+  const src = metadata as unknown as Record<string, unknown>;
+  const out: Record<string, Prisma.InputJsonValue> = {};
+  for (const key of PUBLIC_METADATA_KEYS) {
+    const value = src[key];
+    if (value !== undefined) {
+      // PUBLIC_METADATA_KEYS는 GeneratedAssetMetadata의 JSON-안전 스칼라
+      // (number/string)만 가리키므로 InputJsonValue 캐스트가 안전하다.
+      out[key] = value as Prisma.InputJsonValue;
+    }
+  }
+  return extra ? { ...out, ...extra } : out;
 }
 
 /**

@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import type { Prisma } from "@prisma/client";
 import {
   toPublicGeneratedAsset,
+  buildStoredAssetMetadata,
   PUBLIC_METADATA_KEYS,
   type GeneratedAssetForPublic,
 } from "./public-asset";
+import type { GeneratedAssetMetadata } from "./types";
 
 /**
  * COMPLETED 자산 row fixture.
@@ -215,5 +217,154 @@ describe("toPublicGeneratedAsset", () => {
   it("user는 {id,name}만 매핑한다", () => {
     const result = toPublicGeneratedAsset(makeAssetRow());
     expect(result.user).toEqual({ id: "user-1", name: "홍길동" });
+  });
+});
+
+/**
+ * 후처리 완료 메타데이터 fixture — generate/batch 라우트가 .then(metadata)로 받는
+ * `GeneratedAssetMetadata` 전체 형태. 민감/내부 필드를 모두 포함한다.
+ */
+function makeFullMetadata(
+  overrides: Partial<GeneratedAssetMetadata> = {}
+): GeneratedAssetMetadata {
+  return {
+    id: "asset-1",
+    type: "character",
+    name: "전사",
+    prompt: "secret generation prompt",
+    workflow: "character-default",
+    width: 1024,
+    height: 1024,
+    frameWidth: 128,
+    frameHeight: 128,
+    columns: 8,
+    rows: 4,
+    filePath: "/assets/generated/characters/x.png",
+    thumbnailPath: "/assets/generated/thumbnails/x.png",
+    fileSize: 9999,
+    format: "png",
+    comfyuiJobId: "comfy-job-xyz",
+    seed: 42,
+    generatedAt: "2026-06-22T00:00:00.000Z",
+    processingTime: 12345,
+    status: "completed",
+    ...overrides,
+  };
+}
+
+describe("buildStoredAssetMetadata", () => {
+  it("저장값은 정확히 공개 런타임 키 집합만 포함한다 (전체 metadata 통째 저장 금지)", () => {
+    const stored = buildStoredAssetMetadata(makeFullMetadata());
+    // 리터럴 기대값으로 잠근다 — PUBLIC_METADATA_KEYS를 오라클로 쓰지 않아
+    // 키 집합이 의도치 않게 넓어지면(민감 키 유입) 단언이 깨진다.
+    expect(Object.keys(stored).sort()).toEqual(
+      [
+        "columns",
+        "format",
+        "frameHeight",
+        "frameWidth",
+        "generatedAt",
+        "height",
+        "processingTime",
+        "rows",
+        "seed",
+        "width",
+      ].sort()
+    );
+  });
+
+  it("민감/내부 필드(prompt/workflow/comfyuiJobId)와 top-level 중복 필드를 저장하지 않는다", () => {
+    const stored = buildStoredAssetMetadata(makeFullMetadata());
+    expect(stored.prompt).toBeUndefined();
+    expect(stored.workflow).toBeUndefined();
+    expect(stored.comfyuiJobId).toBeUndefined();
+    // top-level 컬럼과 중복되던 필드도 metadata에는 저장하지 않는다
+    expect(stored.id).toBeUndefined();
+    expect(stored.type).toBeUndefined();
+    expect(stored.name).toBeUndefined();
+    expect(stored.status).toBeUndefined();
+    expect(stored.filePath).toBeUndefined();
+    expect(stored.thumbnailPath).toBeUndefined();
+    expect(stored.fileSize).toBeUndefined();
+  });
+
+  it("공개 런타임 값은 보존한다", () => {
+    const stored = buildStoredAssetMetadata(makeFullMetadata());
+    expect(stored.width).toBe(1024);
+    expect(stored.height).toBe(1024);
+    expect(stored.frameWidth).toBe(128);
+    expect(stored.frameHeight).toBe(128);
+    expect(stored.columns).toBe(8);
+    expect(stored.rows).toBe(4);
+    expect(stored.format).toBe("png");
+    expect(stored.seed).toBe(42);
+    expect(stored.generatedAt).toBe("2026-06-22T00:00:00.000Z");
+    expect(stored.processingTime).toBe(12345);
+  });
+
+  it("undefined인 선택 필드(frameWidth/columns/rows/seed)는 키 자체를 생략한다", () => {
+    const stored = buildStoredAssetMetadata(
+      makeFullMetadata({
+        frameWidth: undefined,
+        frameHeight: undefined,
+        columns: undefined,
+        rows: undefined,
+        seed: undefined,
+      })
+    );
+    expect("frameWidth" in stored).toBe(false);
+    expect("frameHeight" in stored).toBe(false);
+    expect("columns" in stored).toBe(false);
+    expect("rows" in stored).toBe(false);
+    expect("seed" in stored).toBe(false);
+    // 필수 공개 필드는 그대로 남는다
+    expect(stored.width).toBe(1024);
+    expect(stored.format).toBe("png");
+  });
+
+  it("extra 운영 키(batchId)는 저장값에 병합된다 (batch 상태 조회 의존성 보존)", () => {
+    const stored = buildStoredAssetMetadata(makeFullMetadata(), {
+      batchId: "batch-77",
+    });
+    expect(stored.batchId).toBe("batch-77");
+    // 여전히 민감 필드는 없다
+    expect(stored.prompt).toBeUndefined();
+    expect(stored.workflow).toBeUndefined();
+  });
+
+  it("extra 미지정 시 batchId 키가 없다 (단일 생성 경로)", () => {
+    const stored = buildStoredAssetMetadata(makeFullMetadata());
+    expect("batchId" in stored).toBe(false);
+  });
+
+  it("저장값을 응답 정규화에 통과시키면 공개 키만 남는다 (저장면=응답면 SoT 일치)", () => {
+    // 핵심 불변식: 저장 빌더가 만든 metadata를 toPublicMetadata(=응답 allowlist)에
+    // 통과시켜도 형태가 그대로다(batchId만 응답에서 제외). 저장면과 응답면이 동일
+    // 키 SoT를 공유함을 end-to-end로 잠근다 — 응답 shape 무회귀 + batchId storage-only.
+    const stored = buildStoredAssetMetadata(makeFullMetadata(), {
+      batchId: "batch-77",
+    });
+    const response = toPublicGeneratedAsset(
+      makeAssetRow({ metadata: stored as unknown as Prisma.JsonValue })
+    );
+    expect(Object.keys(response.metadata as Record<string, unknown>).sort()).toEqual(
+      [
+        "columns",
+        "format",
+        "frameHeight",
+        "frameWidth",
+        "generatedAt",
+        "height",
+        "processingTime",
+        "rows",
+        "seed",
+        "width",
+      ].sort()
+    );
+    // batchId는 저장엔 있으나(운영 키) 응답엔 없다
+    expect(stored.batchId).toBe("batch-77");
+    expect(
+      (response.metadata as Record<string, unknown>).batchId
+    ).toBeUndefined();
   });
 });
