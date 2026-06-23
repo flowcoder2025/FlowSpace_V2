@@ -9,6 +9,7 @@ import {
 } from "@/components/dashboard/date-range";
 import { ExportCsvButton } from "@/components/dashboard/export-csv-button";
 import { logsToCsv, downloadCsv, csvFilename } from "@/components/dashboard/csv-export";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
 
 // 표시용 이벤트 타입 옵션(서버는 SpaceEventType enum으로 검증 — SSOT). "" = 전체.
@@ -58,7 +59,7 @@ export default function LogsPage() {
         if (endInstant) qs.set("endDate", endInstant);
 
         const res = await fetch(`/api/spaces/${spaceId}/admin/logs?${qs}`);
-        if (!res.ok) throw new Error("Failed to load logs");
+        if (!res.ok) throw new Error(DASHBOARD_COPY.LOGS.loadError);
         const data = await res.json();
 
         if (nextCursor) {
@@ -70,7 +71,7 @@ export default function LogsPage() {
         setHasMore(!!data.nextCursor);
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "로그를 불러오지 못했습니다.");
+        setError(err instanceof Error ? err.message : DASHBOARD_COPY.LOGS.loadError);
       } finally {
         setIsLoading(false);
       }
@@ -85,18 +86,18 @@ export default function LogsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-ink">Event Logs</h1>
+        <h1 className="text-2xl font-bold text-ink">{DASHBOARD_COPY.LOGS.title}</h1>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            aria-label="이벤트 타입 필터"
+            aria-label={DASHBOARD_COPY.LOGS.typeFilterAriaLabel}
             className="text-sm border border-line rounded px-3 py-1.5"
           >
-            <option value="">All Events</option>
+            <option value="">{DASHBOARD_COPY.LOGS.allEvents}</option>
             {EVENT_TYPES.filter(Boolean).map((t) => (
               <option key={t} value={t}>
-                {t}
+                {DASHBOARD_COPY.eventTypeLabel(t)}
               </option>
             ))}
           </select>
@@ -104,7 +105,7 @@ export default function LogsPage() {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            aria-label="시작 날짜"
+            aria-label={DASHBOARD_COPY.LOGS.startDateAriaLabel}
             className="text-sm border border-line rounded px-3 py-1.5"
           />
           <span className="text-ink-muted text-sm">~</span>
@@ -112,12 +113,12 @@ export default function LogsPage() {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            aria-label="종료 날짜"
+            aria-label={DASHBOARD_COPY.LOGS.endDateAriaLabel}
             className="text-sm border border-line rounded px-3 py-1.5"
           />
           <ExportCsvButton
             disabled={logs.length === 0}
-            label={`CSV 내보내기 (로드된 ${logs.length}건)`}
+            label={DASHBOARD_COPY.LOGS.csvLabel(logs.length)}
             onExport={() =>
               downloadCsv(csvFilename("logs", spaceId, new Date()), logsToCsv(logs))
             }

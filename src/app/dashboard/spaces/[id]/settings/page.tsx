@@ -1,6 +1,7 @@
 import { requireSpaceAdmin } from "@/lib/admin-guard";
 import { prisma } from "@/lib/prisma";
 import { SpaceSettingsForm } from "@/components/dashboard/space-settings-form";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -23,12 +24,12 @@ export default async function SettingsPage({ params }: PageProps) {
   });
 
   if (!space) {
-    return <div className="text-red-600">Space not found</div>;
+    return <div className="text-red-600">{DASHBOARD_COPY.SETTINGS.notFound}</div>;
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-ink">Settings</h1>
+      <h1 className="text-2xl font-bold text-ink">{DASHBOARD_COPY.SETTINGS.title}</h1>
       <div className="bg-white rounded-lg border border-line p-6 max-w-2xl">
         <SpaceSettingsForm
           spaceId={id}

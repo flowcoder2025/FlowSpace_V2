@@ -37,35 +37,35 @@ describe("membersToCsv", () => {
       }),
     ]);
     expect(csv).toBe(
-      "Name,Email,Role,Restriction,Guest,Joined\r\n" +
-        "홍길동,h@x.com,OWNER,NONE,No,2026-06-23T00:00:00.000Z"
+      "이름,이메일,역할,제재,게스트,가입일\r\n" +
+        "홍길동,h@x.com,소유자,없음,아니오,2026-06-23T00:00:00.000Z"
     );
   });
 
-  it("게스트 멤버는 nickname을 이름으로, Guest=Yes, email 빈값", () => {
+  it("게스트 멤버는 nickname을 이름으로, Guest=예, email 빈값", () => {
     const csv = membersToCsv([
       member({ guestSession: { id: "g1", nickname: "게스트1" } }),
     ]);
     const row = csv.split("\r\n")[1];
-    expect(row).toBe("게스트1,,PARTICIPANT,NONE,Yes,2026-06-23T00:00:00.000Z");
+    expect(row).toBe("게스트1,,참여자,없음,예,2026-06-23T00:00:00.000Z");
   });
 
   it("이름 폴백: user.name 없으면 displayName", () => {
     const csv = membersToCsv([member({ displayName: "표시이름" })]);
     expect(csv.split("\r\n")[1]).toBe(
-      "표시이름,,PARTICIPANT,NONE,No,2026-06-23T00:00:00.000Z"
+      "표시이름,,참여자,없음,아니오,2026-06-23T00:00:00.000Z"
     );
   });
 
-  it("이름·이메일이 전혀 없으면 화면과 동일하게 Unknown", () => {
+  it("이름·이메일이 전혀 없으면 화면과 동일하게 '알 수 없음'", () => {
     const csv = membersToCsv([member({})]);
     expect(csv.split("\r\n")[1]).toBe(
-      "Unknown,,PARTICIPANT,NONE,No,2026-06-23T00:00:00.000Z"
+      "알 수 없음,,참여자,없음,아니오,2026-06-23T00:00:00.000Z"
     );
   });
 
   it("빈 문자열 이름은 화면처럼 다음 폴백으로 넘어간다(?? 아닌 || 체인)", () => {
-    // user.name="" → guest nickname → displayName → "Unknown" 순(MemberTable 일치).
+    // user.name="" → guest nickname → displayName → "알 수 없음" 순(MemberTable 일치).
     const csv = membersToCsv([
       member({
         user: { id: "u1", name: "", email: "e@x.com", image: null },
@@ -73,12 +73,12 @@ describe("membersToCsv", () => {
       }),
     ]);
     expect(csv.split("\r\n")[1]).toBe(
-      "표시이름,e@x.com,PARTICIPANT,NONE,No,2026-06-23T00:00:00.000Z"
+      "표시이름,e@x.com,참여자,없음,아니오,2026-06-23T00:00:00.000Z"
     );
   });
 
   it("멤버가 없으면 헤더만", () => {
-    expect(membersToCsv([])).toBe("Name,Email,Role,Restriction,Guest,Joined");
+    expect(membersToCsv([])).toBe("이름,이메일,역할,제재,게스트,가입일");
   });
 });
 
@@ -90,15 +90,15 @@ describe("logsToCsv", () => {
     user: null,
   };
 
-  it("헤더 + null payload는 빈 Details, user 없으면 빈값", () => {
+  it("헤더 + null payload는 빈 상세, user 없으면 빈값", () => {
     const csv = logsToCsv([base]);
     expect(csv).toBe(
-      "Time,Event Type,User,Details\r\n" +
-        "2026-06-23T01:02:03.000Z,ENTER,,"
+      "시각,이벤트 유형,사용자,상세\r\n" +
+        "2026-06-23T01:02:03.000Z,입장,,"
     );
   });
 
-  it("payload는 JSON 직렬화, user.name 우선", () => {
+  it("payload는 JSON 직렬화, user.name 우선, eventType은 한글 라벨", () => {
     const csv = logsToCsv([
       {
         ...base,
@@ -108,21 +108,21 @@ describe("logsToCsv", () => {
       },
     ]);
     expect(csv.split("\r\n")[1]).toBe(
-      '2026-06-23T01:02:03.000Z,ADMIN_ACTION,관리자,"{""action"":""kick""}"'
+      '2026-06-23T01:02:03.000Z,관리자 작업,관리자,"{""action"":""kick""}"'
     );
   });
 
   it("user.name 없으면 email 폴백", () => {
     const csv = logsToCsv([{ ...base, user: { name: null, email: "a@x.com" } }]);
-    expect(csv.split("\r\n")[1]).toBe("2026-06-23T01:02:03.000Z,ENTER,a@x.com,");
+    expect(csv.split("\r\n")[1]).toBe("2026-06-23T01:02:03.000Z,입장,a@x.com,");
   });
 
-  it("직렬화 불가(순환참조) payload는 [unserializable]", () => {
+  it("직렬화 불가(순환참조) payload는 [직렬화 불가]", () => {
     const circular: Record<string, unknown> = {};
     circular.self = circular;
     const csv = logsToCsv([{ ...base, payload: circular }]);
     expect(csv.split("\r\n")[1]).toBe(
-      "2026-06-23T01:02:03.000Z,ENTER,,[unserializable]"
+      "2026-06-23T01:02:03.000Z,입장,,[직렬화 불가]"
     );
   });
 });
@@ -140,7 +140,7 @@ describe("analyticsToCsv", () => {
       ],
     };
     expect(analyticsToCsv(data)).toBe(
-      "Date,Messages,Visitors\r\n" +
+      "날짜,메시지,방문자\r\n" +
         "2026-06-01,5,0\r\n" +
         "2026-06-02,0,1\r\n" +
         "2026-06-03,2,4"
@@ -149,7 +149,7 @@ describe("analyticsToCsv", () => {
 
   it("빈 시계열은 헤더만", () => {
     expect(analyticsToCsv({ dailyMessages: [], dailyVisitors: [] })).toBe(
-      "Date,Messages,Visitors"
+      "날짜,메시지,방문자"
     );
   });
 });

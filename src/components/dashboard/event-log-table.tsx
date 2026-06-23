@@ -1,6 +1,7 @@
 "use client";
 
 import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 interface EventLog {
   id: string;
@@ -32,10 +33,10 @@ export function EventLogTable({ logs, onLoadMore, hasMore, isLoading }: EventLog
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line text-left text-ink-muted">
-            <th className="pb-3 font-medium">Event</th>
-            <th className="pb-3 font-medium">User</th>
-            <th className="pb-3 font-medium">Details</th>
-            <th className="pb-3 font-medium text-right">Time</th>
+            <th className="pb-3 font-medium">{DASHBOARD_COPY.LOGS.table.event}</th>
+            <th className="pb-3 font-medium">{DASHBOARD_COPY.LOGS.table.user}</th>
+            <th className="pb-3 font-medium">{DASHBOARD_COPY.LOGS.table.details}</th>
+            <th className="pb-3 font-medium text-right">{DASHBOARD_COPY.LOGS.table.time}</th>
           </tr>
         </thead>
         <tbody>
@@ -47,7 +48,7 @@ export function EventLogTable({ logs, onLoadMore, hasMore, isLoading }: EventLog
                     EVENT_COLORS[log.eventType] || "bg-cream-deep text-ink-muted"
                   }`}
                 >
-                  {log.eventType}
+                  {DASHBOARD_COPY.eventTypeLabel(log.eventType)}
                 </span>
               </td>
               <td className="py-2 text-ink-soft">
@@ -71,7 +72,7 @@ export function EventLogTable({ logs, onLoadMore, hasMore, isLoading }: EventLog
             disabled={isLoading}
             className="px-4 py-2 text-sm text-ink hover:text-brand-deep disabled:opacity-50"
           >
-            {isLoading ? "Loading..." : "Load more"}
+            {isLoading ? DASHBOARD_COPY.COMMON.loading : DASHBOARD_COPY.COMMON.loadMore}
           </button>
         </div>
       )}

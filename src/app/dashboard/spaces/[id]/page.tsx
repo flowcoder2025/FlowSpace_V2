@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { AnnounceForm } from "@/components/dashboard/announce-form";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
 
 interface Stats {
@@ -29,7 +30,7 @@ export default function DashboardOverviewPage() {
   useEffect(() => {
     fetch(`/api/spaces/${spaceId}/admin/stats`)
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to load stats");
+        if (!res.ok) throw new Error(DASHBOARD_COPY.OVERVIEW.loadError);
         return res.json();
       })
       .then(setStats)
@@ -41,21 +42,21 @@ export default function DashboardOverviewPage() {
   }
 
   if (!stats) {
-    return <div className="text-ink-muted text-sm">Loading...</div>;
+    return <div className="text-ink-muted text-sm">{DASHBOARD_COPY.COMMON.loading}</div>;
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-ink">{DASHBOARD_COPY.OVERVIEW.title}</h1>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Total Members" value={stats.memberCount} />
-        <StatCard label="Total Messages" value={stats.messageCount} />
+        <StatCard label={DASHBOARD_COPY.OVERVIEW.totalMembers} value={stats.memberCount} />
+        <StatCard label={DASHBOARD_COPY.OVERVIEW.totalMessages} value={stats.messageCount} />
         <StatCard
-          label="Today Messages"
+          label={DASHBOARD_COPY.OVERVIEW.todayMessages}
           value={stats.todayMessageCount}
-          description="오늘 자정 이후"
+          description={DASHBOARD_COPY.OVERVIEW.todayMessagesDesc}
         />
       </div>
 
@@ -64,19 +65,19 @@ export default function DashboardOverviewPage() {
 
       {/* Recent Activity */}
       <div className="bg-white rounded-lg border border-line p-5">
-        <h3 className="text-sm font-semibold text-ink-soft mb-3">Recent Activity</h3>
+        <h3 className="text-sm font-semibold text-ink-soft mb-3">{DASHBOARD_COPY.OVERVIEW.recentActivity}</h3>
         {stats.recentActivity.length === 0 ? (
-          <p className="text-sm text-ink-light">No recent activity</p>
+          <p className="text-sm text-ink-light">{DASHBOARD_COPY.OVERVIEW.noRecentActivity}</p>
         ) : (
           <ul className="space-y-2">
             {stats.recentActivity.map((event) => (
               <li key={event.id} className="flex items-center justify-between text-sm">
                 <div>
                   <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-cream-deep text-ink-muted mr-2">
-                    {event.eventType}
+                    {DASHBOARD_COPY.eventTypeLabel(event.eventType)}
                   </span>
                   <span className="text-ink-soft">
-                    {event.user?.name || event.user?.email || "Unknown"}
+                    {event.user?.name || event.user?.email || DASHBOARD_COPY.COMMON.unknown}
                   </span>
                 </div>
                 <span className="text-xs text-ink-light">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 export interface Member {
   id: string;
@@ -46,11 +47,11 @@ export function MemberTable({ spaceId, members, onRefresh }: MemberTableProps) {
       });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || "Action failed");
+        alert(data.error || DASHBOARD_COPY.MEMBERS.actionFailed);
       }
       onRefresh();
     } catch {
-      alert("Network error");
+      alert(DASHBOARD_COPY.COMMON.networkError);
     } finally {
       setActionLoading(null);
     }
@@ -61,16 +62,16 @@ export function MemberTable({ spaceId, members, onRefresh }: MemberTableProps) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line text-left text-ink-muted">
-            <th className="pb-3 font-medium">Name</th>
-            <th className="pb-3 font-medium">Role</th>
-            <th className="pb-3 font-medium">Status</th>
-            <th className="pb-3 font-medium">Joined</th>
-            <th className="pb-3 font-medium text-right">Actions</th>
+            <th className="pb-3 font-medium">{DASHBOARD_COPY.MEMBERS.table.name}</th>
+            <th className="pb-3 font-medium">{DASHBOARD_COPY.MEMBERS.table.role}</th>
+            <th className="pb-3 font-medium">{DASHBOARD_COPY.MEMBERS.table.status}</th>
+            <th className="pb-3 font-medium">{DASHBOARD_COPY.MEMBERS.table.joined}</th>
+            <th className="pb-3 font-medium text-right">{DASHBOARD_COPY.MEMBERS.table.actions}</th>
           </tr>
         </thead>
         <tbody>
           {members.map((m) => {
-            const name = m.user?.name || m.guestSession?.nickname || m.displayName || "Unknown";
+            const name = m.user?.name || m.guestSession?.nickname || m.displayName || DASHBOARD_COPY.COMMON.unknown;
             const isOwner = m.role === "OWNER";
             const isLoading = actionLoading === m.id;
 
@@ -82,18 +83,18 @@ export function MemberTable({ spaceId, members, onRefresh }: MemberTableProps) {
                     <div className="text-xs text-ink-light">{m.user.email}</div>
                   )}
                   {m.guestSession && (
-                    <div className="text-xs text-ink-light">Guest</div>
+                    <div className="text-xs text-ink-light">{DASHBOARD_COPY.MEMBERS.guest}</div>
                   )}
                 </td>
                 <td className="py-3">
                   <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${ROLE_COLORS[m.role]}`}>
-                    {m.role}
+                    {DASHBOARD_COPY.roleLabel(m.role)}
                   </span>
                 </td>
                 <td className="py-3">
                   {m.restriction !== "NONE" && (
                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${RESTRICTION_COLORS[m.restriction]}`}>
-                      {m.restriction}
+                      {DASHBOARD_COPY.restrictionLabel(m.restriction)}
                     </span>
                   )}
                 </td>
@@ -118,16 +119,16 @@ export function MemberTable({ spaceId, members, onRefresh }: MemberTableProps) {
                         }}
                         className="text-xs border border-line rounded px-2 py-1 bg-white disabled:opacity-50"
                       >
-                        <option value="">Actions...</option>
+                        <option value="">{DASHBOARD_COPY.MEMBERS.actions.placeholder}</option>
                         {m.restriction === "MUTED" ? (
-                          <option value="unmute">Unmute</option>
+                          <option value="unmute">{DASHBOARD_COPY.MEMBERS.actions.unmute}</option>
                         ) : (
-                          <option value="mute">Mute</option>
+                          <option value="mute">{DASHBOARD_COPY.MEMBERS.actions.mute}</option>
                         )}
-                        <option value="kick">Kick</option>
-                        <option value="ban">Ban</option>
-                        <option value="role:STAFF">Set Staff</option>
-                        <option value="role:PARTICIPANT">Set Participant</option>
+                        <option value="kick">{DASHBOARD_COPY.MEMBERS.actions.kick}</option>
+                        <option value="ban">{DASHBOARD_COPY.MEMBERS.actions.ban}</option>
+                        <option value="role:STAFF">{DASHBOARD_COPY.MEMBERS.actions.setStaff}</option>
+                        <option value="role:PARTICIPANT">{DASHBOARD_COPY.MEMBERS.actions.setParticipant}</option>
                       </select>
                     </div>
                   )}

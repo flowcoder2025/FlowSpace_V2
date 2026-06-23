@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 interface DashboardSidebarProps {
   spaceId: string;
@@ -9,13 +10,13 @@ interface DashboardSidebarProps {
 }
 
 const SIDEBAR_ITEMS = [
-  { label: "Overview", segment: "" },
-  { label: "Members", segment: "/members" },
-  { label: "Messages", segment: "/messages" },
-  { label: "Logs", segment: "/logs" },
-  { label: "Media", segment: "/media" },
-  { label: "Analytics", segment: "/analytics" },
-  { label: "Settings", segment: "/settings" },
+  { label: DASHBOARD_COPY.NAV.items.overview, segment: "" },
+  { label: DASHBOARD_COPY.NAV.items.members, segment: "/members" },
+  { label: DASHBOARD_COPY.NAV.items.messages, segment: "/messages" },
+  { label: DASHBOARD_COPY.NAV.items.logs, segment: "/logs" },
+  { label: DASHBOARD_COPY.NAV.items.media, segment: "/media" },
+  { label: DASHBOARD_COPY.NAV.items.analytics, segment: "/analytics" },
+  { label: DASHBOARD_COPY.NAV.items.settings, segment: "/settings" },
 ] as const;
 
 export function DashboardSidebar({ spaceId, spaceName }: DashboardSidebarProps) {
@@ -27,10 +28,10 @@ export function DashboardSidebar({ spaceId, spaceName }: DashboardSidebarProps) 
       {/* Header */}
       <div className="p-4 border-b border-cream/10">
         <Link href="/my-spaces" className="text-xs text-ink-muted hover:text-ink-light">
-          &larr; Back to Spaces
+          {DASHBOARD_COPY.NAV.backToSpaces}
         </Link>
         <h2 className="mt-2 text-sm font-semibold text-white truncate">{spaceName}</h2>
-        <p className="text-xs text-ink-muted">Admin Dashboard</p>
+        <p className="text-xs text-ink-muted">{DASHBOARD_COPY.NAV.adminDashboard}</p>
       </div>
 
       {/* Navigation */}
@@ -64,7 +65,7 @@ export function DashboardSidebar({ spaceId, spaceName }: DashboardSidebarProps) 
           href={`/space/${spaceId}`}
           className="block text-xs text-ink-muted hover:text-ink-light"
         >
-          Open Space &rarr;
+          {DASHBOARD_COPY.NAV.openSpace}
         </Link>
       </div>
     </aside>
