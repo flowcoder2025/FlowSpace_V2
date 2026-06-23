@@ -2,30 +2,39 @@
   "reviewer": "evaluator",
   "schemaVersion": 1,
   "scores": {
-    "completeness": 9.6,
+    "completeness": 9.9,
     "consistency": 9.9,
-    "specificity": 10,
-    "actionability": 9.8
+    "specificity": 9.8,
+    "actionability": 9.7
   },
-  "weightedTotal": 9.78,
+  "weightedTotal": 9.85,
   "verdict": "WARNING",
   "issues": [
     {
       "severity": "P3",
-      "location": "src/app/api/spaces/[id]/admin/stats/route.ts:41-48 → src/app/dashboard/spaces/[id]/page.tsx:12-18,70-86",
-      "description": "WI 본문은 logs API를 'payload 노출 차단의 단일 chokepoint'로 명시하나(route.ts:74-75, space-event-log-payload.ts:14-18), 검증 결과 GET /api/spaces/[id]/admin/stats 의 recentActivity 가 동일 raw SpaceEventLog.findMany 결과(payload + 내부 스칼라 spaceId/userId/guestSessionId/participantId)를 정규화 없이 응답으로 반환하는 병렬 경로다. 대시보드 오버뷰 page.tsx:17 타입이 이미 payload?: Record<string, unknown> 로 선언돼 있다. 현 누출은 0(현 payload는 operational ID·비밀 없음, 그리고 오버뷰 페이지는 payload를 렌더하지 않음 — eventType/user/createdAt만 표시) → P0/P1 아님. 그러나 이는 본 WI가 닫으려는 바로 그 회귀 레일(향후 event type이 payload에 email/inviteCode/accessSecret/prompt 추가 시 동시 노출)과 동형이며, stats 경로는 deny-by-default 정규화에서 빠져 있어 'single chokepoint' 주장이 사실과 어긋난다(SpaceEventLog payload→응답 경로가 logs 외에 하나 더 존재). 변이검증 무관 — 코드/grep 실측(recentActivity·admin/stats grep src/** 전수).",
-      "recommendation": "stats/route.ts 의 recentActivity 도 items.map(toPublicSpaceEventLog) 로 동일 정규화(또는 recentActivity 전용 lean 매퍼 재사용)하여 chokepoint 주장과 실제를 일치시킨다. page.tsx:17 의 payload 타입도 PublicSpaceEventPayload 로 통일. 후속 WI(예: WI-033)로 분리 가능.",
+      "location": "src/lib/space-event-log-payload.ts:35-44 (PUBLIC_SPACE_EVENT_PAYLOAD_KEYS) ↔ 5 write sites",
+      "description": "allowlist 8키는 현존 5개 write site(livekit/webhook trackType·trackSource·participantName / admin/announce action·messageId / admin/members kick action·targetName / admin/members 제재 action·targetMemberId·targetName / admin/messages action·messageId·senderName)를 실측 전수 검증한 결과 누락·잉여 0으로 정확히 일치한다. 다만 write site ↔ allowlist를 묶는 자동 가드(컴파일타임/테스트)가 없어, 향후 새 write site가 비민감 operational 키를 추가하면 deny-by-default로 응답에서 조용히 탈락(기능 누락 가능)하고, 반대로 민감 키를 신규 등재하면 노출될 수 있다. 현재는 정상이며 의도된 deny-by-default 설계.",
+      "recommendation": "(선택) SpaceEventLog payload 작성 타입을 allowlist 키 union으로 좁히거나, write site별 payload 타입을 allowlist에서 파생시켜 drift를 컴파일타임에 검출. WI-032 backlog 항목과 일관.",
       "defer": true,
-      "deferRationale": "현 누출 0(payload operational·비밀 없음 + 오버뷰 페이지 payload 미렌더). WI-032 핵심 수용 기준(logs API 3경로 차단)은 완전 충족됐고, stats recentActivity 는 동일 클래스의 후속 강화 표면이라 별도 WI로 처리해도 안전. P0/P1 부재이므로 .pass 차단 사유 아님. 단 WI 본문의 'single chokepoint' 문구는 부정확하므로 후속에서 보정 권고.",
+      "deferRationale": "현 누출 0·allowlist 정확 일치 실증. drift 가드 부재는 향후 event type 확장 시점 위험으로, 본 WI 수용 기준(현 payload 노출 차단)을 침해하지 않음. 자동 drift 가드는 별도 개선 범위.",
       "fixNow": false
     },
     {
       "severity": "P3",
-      "location": "src/components/dashboard/csv-export.ts:77-84 (stringifyPayload try/catch UNSERIALIZABLE_PAYLOAD)",
-      "description": "WI-031 잔존 방어코드. payload가 이제 API allowlist(toPublicSpaceEventPayload)로 8개 JSON-safe 키만 통과하므로 CSV/화면에 도달하는 payload는 항상 JSON.stringify 가능(순환참조 불가 — allowlist out 객체는 원본 일부 키 얕은 복사). 따라서 stringifyPayload 의 try/catch 와 UNSERIALIZABLE_PAYLOAD 분기는 사실상 도달 불가능한 dead-defensive 경로가 됐다(csv-export.test.ts:120 순환참조 테스트는 정규화 우회 직접 입력으로만 트리거). 결함 아닌 잔여 부채 — 무해(안전망 유지).",
-      "recommendation": "허용: 안전망으로 잔류해도 무해. 정리 시 stringifyPayload 단순화(payload는 항상 직렬화 가능) 또는 주석으로 'API 정규화 후 도달 불가, 직접 호출 방어용' 명시. 즉시 조치 불요.",
+      "location": "src/components/dashboard/event-log-table.tsx:57",
+      "description": "Details 셀이 정규화된 payload를 `JSON.stringify(log.payload)`로 raw 렌더한다. 현재 8키 allowlist 값은 전부 operational(action/대상ID/표시명/미디어 종류)이라 비밀이 아니며, API 응답 DTO가 이미 차단하므로 화면은 안전하다. 다만 향후 allowlist에 등재되는 신규 키가 (잘못) 민감 값을 담으면 화면+CSV가 동시 raw 노출된다 — 단일 차단 지점(응답 DTO)에 전적 의존.",
+      "recommendation": "(선택) 화면/CSV Details 렌더 시 표시 화이트리스트 또는 키별 포맷터를 두어 응답 DTO와 이중 방어. 현 단계는 불필요.",
       "defer": true,
-      "deferRationale": "동작 무변경·무해한 방어 잔여. logsToCsv 는 PublicSpaceEventPayload 를 받으므로 안전망 유지가 명확성에 해롭지 않음. 정리 부채로 흡수.",
+      "deferRationale": "차단은 응답 DTO 계층에서 단일 chokepoint로 처리하는 것이 WI 설계 의도(화면/CSV 이중 sanitize 회피, codex consult 합의)이며 현 키 집합은 비민감. 화면 raw 렌더는 정규화된 안전 데이터만 받음.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/space-event-log-payload.ts:54-75 (toPublicSpaceEventPayload)",
+      "description": "allowlist 키의 '값'은 형태 검증 없이 그대로 통과한다(테스트 L72-88이 중첩 객체 값도 보존함을 명시). 키는 막지만 허용 키의 값이 중첩 객체/배열이면 그 내부에 민감 데이터가 들어와도 통과한다. 현 5개 write site는 모든 허용 키에 string/null 스칼라만 넣으므로 실표면 0. SUSPECTED: 향후 허용 키 값에 객체를 넣는 write site가 생기면 값 내부는 정규화되지 않음.",
+      "recommendation": "(선택) 허용 키 값을 스칼라(string/number/boolean/null)로 제한하는 값 타입 가드 추가, 또는 write site 계약에 '허용 키 값=스칼라' 명문화.",
+      "defer": true,
+      "deferRationale": "현 write site 전수가 허용 키에 스칼라만 저장(실측). 값 형태 가드는 키 allowlist의 핵심 방어를 넘어선 심화 강건화로 현 누출 0.",
       "fixNow": false
     }
   ]

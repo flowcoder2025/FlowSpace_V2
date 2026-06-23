@@ -1,0 +1,27 @@
+{
+  "wi": "WI-032-fix",
+  "title": "어드민 로그 SpaceEvent payload 응답 allowlist 정형화 + lean DTO",
+  "finalCommit": "b6e3811",
+  "rounds": 2,
+  "codex": {
+    "r1": { "verdict": "WARNING", "issues": 1, "note": "P2/fixNow — admin/stats recentActivity 병렬 raw 반환 경로(single chokepoint 주장 부정확)" },
+    "r2": { "verdict": "PASS", "issues": 0, "note": "stats 정규화 + 회귀 테스트로 P2 해소 확인" },
+    "artifact": ".flowset/eval-results/WI-032.codex-r2.json"
+  },
+  "evaluator": {
+    "verdict": "WARNING",
+    "weightedTotal": 9.85,
+    "scores": { "completeness": 9.9, "consistency": 9.9, "specificity": 9.8, "actionability": 9.7 },
+    "blocking": { "P0": 0, "P1": 0, "P2": 0 },
+    "deferredP3": 3,
+    "mutationTesting": "M1 allowlist passthrough(10 FAIL)/M2 lean DTO spread(3 FAIL)/M3 빈결과→{}(4 FAIL), 전부 원복 clean",
+    "artifact": ".flowset/eval-results/WI-032-fix.eval.json"
+  },
+  "convergence": "양 검증자가 r1에서 admin/stats recentActivity 병렬 누출 경로를 독립 수렴 발견(codex P2/fixNow·evaluator P3) → r2 즉시 해소(stats route toPublicSpaceEventLog + 회귀 테스트 + 전수 grep으로 제3 경로 부재 실증). codex r2 PASS·evaluator 최종 HEAD 9.85.",
+  "gates": { "tsc": 0, "lint": "0err(1 preexisting LiveKit warning)", "vitest": "364→384", "build": 0 },
+  "deferred": [
+    "allowlist↔write site 자동 drift 가드 부재(현 정확 일치·deny-by-default 의도)",
+    "event-log-table Details JSON.stringify raw 렌더(키 비민감·응답 DTO chokepoint 의존)",
+    "허용 키 '값' 형태 미검증(현 write site 전부 스칼라·실표면 0)"
+  ]
+}
