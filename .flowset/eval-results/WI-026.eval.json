@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.9,
+    "consistency": 10.0,
+    "specificity": 9.9,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.87,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "scripts/backfill-stored-asset-metadata.mjs:32-43",
+      "description": "백필 스크립트가 PUBLIC_METADATA_KEYS를 손으로 복사한 리터럴(10키)로 미러링한다(.mjs라 TS 상수 직접 import 불가, 주석 L30-31로 명시). 드리프트 자동 가드가 없다 — 향후 src의 allowlist가 바뀌면 백필 키 집합이 조용히 어긋나 정화 결과가 신규 저장 shape와 불일치할 수 있다. 단, dry-run 기본·prod 사용자 게이트라 폭발 반경은 좁고, 현 시점 두 리터럴은 일치(직접 대조 실측 확인).",
+      "recommendation": "백필 키 리터럴 ↔ src PUBLIC_METADATA_KEYS 동기성을 잠그는 경량 동기 테스트(예: public-asset.test.ts에서 백필이 기대하는 키 집합을 별도 리터럴로 재단언)를 추가하거나, 백필 실행 시 src 키와 cross-check하는 한 줄 가드를 두면 드리프트가 즉시 드러난다.",
+      "defer": true,
+      "deferRationale": "현 시점 두 리터럴 일치 실측 확인. dry-run 기본·prod 게이트로 잘못된 정화가 사용자 승인 없이 적용 불가. allowlist 자체는 src 측 리터럴-키 단언(공개+저장 양면)으로 변이검증상 강건히 잠겨 있어, 백필 미러 드리프트는 운영 스크립트 한정 저위험 잔여 부채.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "scripts/backfill-stored-asset-metadata.mjs:46,61-69",
+      "description": "SUSPECTED: ALLOWED_STORED_KEYS는 공개키+batchId만 포함하므로, COMPLETED 행이 가상의 'error' 키를 보유한 경우 normalizeStored가 그것을 제거한다. 주석(L16-17)은 'error 키는 WI-024 정책이라 건드리지 않는다'고 하나, 이는 FAILED 행 가정이다. COMPLETED 행에 error가 남아 있으면(이상 데이터) 제거된다. 실해(實害)는 없거나 오히려 바람직(COMPLETED엔 error 불필요·응답은 WI-024가 이미 차단)하나 주석의 'error 미간섭' 서술과 미묘한 불일치.",
+      "recommendation": "주석을 'COMPLETED 대상이므로 정상 행엔 error가 없고, 잔존 시 제거는 무해(응답은 WI-024 allowlist가 이미 차단)'로 정밀화하거나, 의도를 명문화. 코드 변경 불필요.",
+      "defer": true,
+      "deferRationale": "COMPLETED 행이 error를 갖는 것 자체가 비정상이며, 제거되어도 응답 노출은 WI-019/024 allowlist가 독립적으로 막아 보안·동작 회귀 없음. 문서 정밀화 수준의 nit.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/assets/internal/public-asset.ts:124,131",
+      "description": "buildStoredAssetMetadata가 `metadata as unknown as Record<string, unknown>` 후 `value as Prisma.InputJsonValue`로 이중 캐스트한다. PUBLIC_METADATA_KEYS가 가리키는 GeneratedAssetMetadata 필드는 전부 number/string/optional(JSON-안전 스칼라)이라 현 시점 캐스트는 안전(타입 실측 확인). 다만 향후 allowlist에 비-스칼라(객체/배열) 필드가 추가되면 캐스트가 타입 체커를 우회해 InputJsonValue 위반을 런타임으로 미룰 수 있다.",
+      "recommendation": "현 구현 유지 가능. 향후 비-스칼라 공개키 도입 시 캐스트 대신 명시적 JSON 직렬화 가능성 검증을 권고(주석에 이미 안전 근거 명시됨).",
+      "defer": true,
+      "deferRationale": "현 PUBLIC_METADATA_KEYS 전 필드 스칼라라 캐스트 안전 실증. tsc 0·build 0. 비-스칼라 공개키 도입은 가설적 미래 변경이며 그 시점에 다뤄도 충분.",
+      "fixNow": false
+    }
+  ]
+}
