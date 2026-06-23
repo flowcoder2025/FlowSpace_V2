@@ -1,0 +1,38 @@
+{
+  "wi": "WI-041-fix",
+  "commit": "070b371",
+  "rounds": 1,
+  "blocking": { "P0": 0, "P1": 0, "P2": 0, "fixNow": 0 },
+  "codexVerdict": "PASS",
+  "evaluatorVerdict": "PASS",
+  "evaluatorWeightedTotal": 9.83,
+  "issues": [
+    {
+      "severity": "P3",
+      "source": "evaluator",
+      "location": "space-settings-form.tsx (STAFF 경로 handleChange/setState)",
+      "description": "canEdit=false에서도 handleChange/setState 코드가 잔존하나 입력이 전부 disabled라 도달 불가. 매트릭스 테스트가 누락 회귀를 가드. 정리성 P3.",
+      "defer": true,
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": "evaluator",
+      "location": "settings/page.tsx (canEditSettings/canDelete 동일 표현식)",
+      "description": "canEditSettings와 canDelete가 현재 동일 표현식(owner||superAdmin)으로 분리됨. 의도적 — 의미상 별도 서버 게이트(PATCH/DELETE) 미러로 향후 정책 발산 대비. 페이지 테스트가 양 게이트 독립 검증. 설계 판단 P3.",
+      "defer": true,
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "source": "evaluator",
+      "location": "validation: 평가 샌드박스 vitest 환경",
+      "description": "평가 샌드박스에서 vitest 17/17·tsc0 독립 재현(EPERM 없이). 구현 결함 아님(환경 기록).",
+      "defer": true,
+      "fixNow": false
+    }
+  ],
+  "gates": { "tsc": 0, "lint": "0err(1 preexisting LiveKit warning)", "vitest": "561pass(550→561)", "build": 0 },
+  "mutationTesting": "evaluator 3/3 검출(M1 submit 가드 제거→form FAIL·M2 access-type disabled 제거→matrix FAIL·M3 canEditSettings=true 강제→page STAFF·드리프트 2건 FAIL, 전부 원복 clean)",
+  "note": "듀얼 블라인드 1R 수렴 — codex PASS 0 issues·evaluator PASS 9.83. 양 검증자 구현 결함 0. 설정 편집 권한 정합(WI-037 codex consult 놓칠위험): 설정 페이지는 requireSpaceAdmin(OWNER/STAFF/superAdmin)로 STAFF 진입 가능하나 PATCH /api/spaces/[id]는 owner/superAdmin만(STAFF 403) → STAFF가 폼 보고 저장 시 'Forbidden' 혼란. 보수적 수정(PATCH STAFF 확대는 별도 정책 결정이라 안 함): canEditSettings(=PATCH 게이트 ownerId===userId||isSuperAdmin의 정확한 De Morgan 미러)로 STAFF에게 폼 읽기전용화 — 입력 6개(input/textarea/select/color) 전부 disabled + 저장 버튼 숨김 + readOnlyNotice 안내 + handleSubmit !canEdit 가드(이중방어, closure prop 기반이라 DOM 조작 우회 불가). 서버 PATCH 403이 근본 게이트. 데이터 드리프트(role=OWNER이나 ownerId 불일치·비-super) 시 canEdit=false로 서버 403과 일관. 양 검증자 독립 확인: 미러 정확성·입력 전수 차단·STAFF 편집 도달 경로 0·무회귀(canEdit 필수 prop 추가 tsc0·유일 호출부=settings/page)·하드코딩/영문 누출 0·readOnlyNotice 카피 SoT. Vercel 전용(server/·prisma/ 무관 — OCI 재배포·prod DB 마이그레이션 불요). main 미승격. 잔여 defer P3x3 전부 정리성/설계판단/환경."
+}

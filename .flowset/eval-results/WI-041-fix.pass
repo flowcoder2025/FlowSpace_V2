@@ -1,0 +1,16 @@
+WI=WI-041-fix
+commit=070b371
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-041-fix.codex.json
+evaluator=.flowset/eval-results/WI-041-fix.eval.json
+merged=.flowset/eval-results/WI-041-fix.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:561pass(550→561),build:0
+codexVerdict=PASS(0 issues·구현 결함 0)
+evaluatorVerdict=PASS:9.83(P0/P1/P2/fixNow=0, P3x3 defer, 변이검증 3/3 검출)
+blockingIssues=0
+deferredP2=0
+deferredP3=3
+rounds=1
+note=듀얼 블라인드 1R 수렴 — codex PASS 0 issues·evaluator PASS 9.83. 양 검증자 구현 결함 0. WI-037 codex consult 놓칠위험 해소(설정 편집 권한 정합). 설정 페이지(settings/page.tsx)는 requireSpaceAdmin(OWNER/STAFF/superAdmin)로 STAFF 진입 가능하나 저장 라우트 PATCH /api/spaces/[id](route.ts:94)는 space.ownerId!==userId && !isSuperAdmin → 403으로 owner/superAdmin만 → STAFF가 폼 보고 값 바꿔 저장 시 'Forbidden' '보이는데 저장 실패' 혼란. 설계 codex consult 1R 수렴(보수적 — PATCH STAFF 확대는 권한 정책 변경이라 별도 결정, 이번 WI 안 함): STAFF에게 폼 읽기전용. (A) settings/page.tsx — isOwnerOrSuperAdmin = ctx.isSuperAdmin || space.ownerId === ctx.userId 공유 const → canEditSettings(PATCH 게이트 정확한 De Morgan 미러)·canDelete(DELETE 게이트 미러) 별도 변수(현재 표현식 같지만 의미상 다른 서버 게이트 미러·향후 정책 발산 대비). SpaceSettingsForm에 canEdit={canEditSettings} 전달. (B) space-settings-form.tsx — canEdit:boolean prop. false면 입력 6개(name/description/maxUsers/accessType/primaryColor/loadingMessage = input/textarea/select/color) 전부 disabled + 저장 버튼 미렌더 + 상단 readOnlyNotice 안내(role=status) + handleSubmit 시작 if(!canEdit) return 가드(이중방어 — 서버 403 근본·클라 가드는 Enter 제출/disabled 누락/DOM 조작 차단, closure prop 기반). (C) dashboard-copy.ts — SETTINGS.readOnlyNotice 한글 카피(하드코딩0·SoT). 양 검증자 독립 확인: canEditSettings가 PATCH 게이트 정확 미러(동일 SoT space.ownerId+session.isSuperAdmin·requireSpaceAdmin role 아님)·입력 6/6 disabled(INPUT_IDS 완전 일치)·저장버튼 미렌더·submit 가드·서버 403 근본 게이트로 STAFF 편집 도달 경로 0·데이터 드리프트(role=OWNER이나 ownerId 불일치) 시 canEdit=false 일관·무회귀(canEdit 필수 prop 추가 tsc0·유일 호출부 settings/page·DeleteSpaceSection WI-037 게이팅 보존)·server/prisma 무변경. 회귀 테스트 +11(form 7: 안내 노출/저장버튼 미렌더/입력 전수 disabled/submit 미발송 · 안내 미노출/입력 enabled/PATCH 호출+성공 / page canEdit 게이팅 4: owner·superAdmin·STAFF·드리프트 OWNER ownerId 미러). 게이트 tsc0/lint0err(선재 LiveKit 경고1·WI무관)/vitest 550→561(+11)/build0. 변이검증 evaluator 3/3(M1 submit 가드 제거→form fetch 호출 FAIL·M2 access-type disabled 제거→matrix FAIL·M3 canEditSettings=true 강제→page STAFF·드리프트 2건 FAIL, 원복 clean). impl 070b371. Vercel 전용(server/·prisma/ 무관 — OCI 소켓 재배포·prod DB 마이그레이션 불요). main 미승격. 잔여 defer P3x3: ①STAFF 경로 handleChange/setState 잔존(disabled로 도달 불가·매트릭스 테스트 가드·정리성) ②canEditSettings/canDelete 동일 표현식 분리(의도적·미래 발산 대비·양 게이트 독립 검증) ③평가 샌드박스 vitest 환경 기록(EPERM 없이 17/17·구현 결함 아님). 후속: develop→main 승격 검토(WI-026/033~039+041 누적·server/prisma 포함 = OCI 재배포+prod 마이그레이션 승인 게이트·codex 권고 순서 WI-041→승격) / WI-042(대시보드 archived 가드)·WI-040(귓속말 발견성)·WI-043(공용 Dialog a11y).
+createdAt=2026-06-23T23:15:00Z
