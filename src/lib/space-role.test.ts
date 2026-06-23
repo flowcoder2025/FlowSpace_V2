@@ -11,19 +11,29 @@ import {
 // ============================================================
 
 describe("resolveSpaceRoleDecision", () => {
-  describe("멤버 행 있음 → use(그 role) — isOwner/accessType 무관", () => {
+  describe("멤버 행 있음(비BANNED) → use(그 role) — isOwner/accessType 무관", () => {
     it.each(["OWNER", "STAFF", "PARTICIPANT"] as const)(
       "memberRole=%s → use %s",
       (role) => {
         expect(
-          resolveSpaceRoleDecision({ memberRole: role, isOwner: false, accessType: "PUBLIC" })
+          resolveSpaceRoleDecision({
+            memberRole: role,
+            restriction: "NONE",
+            isOwner: false,
+            accessType: "PUBLIC",
+          })
         ).toEqual({ action: "use", role });
       }
     );
 
     it("PRIVATE 스페이스라도 기존 멤버면 redirect 아닌 use", () => {
       expect(
-        resolveSpaceRoleDecision({ memberRole: "STAFF", isOwner: false, accessType: "PRIVATE" })
+        resolveSpaceRoleDecision({
+          memberRole: "STAFF",
+          restriction: "NONE",
+          isOwner: false,
+          accessType: "PRIVATE",
+        })
       ).toEqual({ action: "use", role: "STAFF" });
     });
 
@@ -31,21 +41,65 @@ describe("resolveSpaceRoleDecision", () => {
       // server/handlers/room.ts 는 SpaceMember.role 만 권위로 본다.
       // space.ownerId 로 OWNER 를 파생하면 소켓(STAFF)과 발산한다.
       expect(
-        resolveSpaceRoleDecision({ memberRole: "STAFF", isOwner: true, accessType: "PUBLIC" })
+        resolveSpaceRoleDecision({
+          memberRole: "STAFF",
+          restriction: "NONE",
+          isOwner: true,
+          accessType: "PUBLIC",
+        })
       ).toEqual({ action: "use", role: "STAFF" });
     });
+
+    it("MUTED 멤버는 입장 허용(use) — 소켓은 BANNED만 거부", () => {
+      expect(
+        resolveSpaceRoleDecision({
+          memberRole: "PARTICIPANT",
+          restriction: "MUTED",
+          isOwner: false,
+          accessType: "PUBLIC",
+        })
+      ).toEqual({ action: "use", role: "PARTICIPANT" });
+    });
+  });
+
+  describe("BANNED 멤버 → redirect (role 무관, 소켓 join:space 정합)", () => {
+    it.each(["OWNER", "STAFF", "PARTICIPANT"] as const)(
+      "BANNED %s → redirect (admin이어도 에디터/관리 UI 미노출)",
+      (role) => {
+        // 맵 편집 HTTP 라우트가 BANNED 미검사이므로, role을 주면 BANNED admin이
+        // 에디터로 맵을 편집할 수 있다 → role보다 BANNED를 먼저 차단해야 한다.
+        expect(
+          resolveSpaceRoleDecision({
+            memberRole: role,
+            restriction: "BANNED",
+            isOwner: role === "OWNER",
+            accessType: "PUBLIC",
+          })
+        ).toEqual({ action: "redirect" });
+      }
+    );
   });
 
   describe("멤버 행 없음 → 가입/거부 결정", () => {
     it("오너인데 멤버 행 없음 → create OWNER (self-heal, 합성 아님)", () => {
       expect(
-        resolveSpaceRoleDecision({ memberRole: null, isOwner: true, accessType: "PRIVATE" })
+        resolveSpaceRoleDecision({
+          memberRole: null,
+          restriction: null,
+          isOwner: true,
+          accessType: "PRIVATE",
+        })
       ).toEqual({ action: "create", role: "OWNER" });
     });
 
     it("PUBLIC 비멤버 → create PARTICIPANT (자동 가입)", () => {
       expect(
-        resolveSpaceRoleDecision({ memberRole: null, isOwner: false, accessType: "PUBLIC" })
+        resolveSpaceRoleDecision({
+          memberRole: null,
+          restriction: null,
+          isOwner: false,
+          accessType: "PUBLIC",
+        })
       ).toEqual({ action: "create", role: "PARTICIPANT" });
     });
 
@@ -53,7 +107,12 @@ describe("resolveSpaceRoleDecision", () => {
       "%s 비멤버 → redirect (초대 코드로만 가입)",
       (accessType) => {
         expect(
-          resolveSpaceRoleDecision({ memberRole: null, isOwner: false, accessType })
+          resolveSpaceRoleDecision({
+            memberRole: null,
+            restriction: null,
+            isOwner: false,
+            accessType,
+          })
         ).toEqual({ action: "redirect" });
       }
     );
@@ -65,13 +124,23 @@ describe("resolveSpaceRoleDecision", () => {
       // 비멤버 superAdmin도 소켓 join:space 가 NOT_A_MEMBER 로 거부하므로
       // 클라가 OWNER UI 를 보이면 발산한다 → 동일 결정(redirect).
       expect(
-        resolveSpaceRoleDecision({ memberRole: null, isOwner: false, accessType: "PRIVATE" })
+        resolveSpaceRoleDecision({
+          memberRole: null,
+          restriction: null,
+          isOwner: false,
+          accessType: "PRIVATE",
+        })
       ).toEqual({ action: "redirect" });
     });
 
     it("superAdmin이 실제 멤버이면 자기 멤버 role 그대로", () => {
       expect(
-        resolveSpaceRoleDecision({ memberRole: "PARTICIPANT", isOwner: false, accessType: "PUBLIC" })
+        resolveSpaceRoleDecision({
+          memberRole: "PARTICIPANT",
+          restriction: "NONE",
+          isOwner: false,
+          accessType: "PUBLIC",
+        })
       ).toEqual({ action: "use", role: "PARTICIPANT" });
     });
   });
