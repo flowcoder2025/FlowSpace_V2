@@ -469,6 +469,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
 
             {/* LiveKit Media Layer */}
             <SpaceMediaLayer
+              spaceId={space.id}
               spaceName={space.name}
               spotlightUsers={spotlightUsers}
               isRecording={isRecording}

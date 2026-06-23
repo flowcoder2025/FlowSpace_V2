@@ -19,6 +19,7 @@ interface PlayerInfo {
 }
 
 interface SpaceMediaLayerProps {
+  spaceId: string;
   spaceName: string;
   spotlightUsers: Set<string>;
   isRecording: boolean;
@@ -29,6 +30,7 @@ interface SpaceMediaLayerProps {
 }
 
 export function SpaceMediaLayer({
+  spaceId,
   spaceName,
   spotlightUsers,
   isRecording,
@@ -136,6 +138,7 @@ export function SpaceMediaLayer({
           <ParticipantPanel
             participantTracks={participantTracks}
             localParticipantId={localParticipantId}
+            spaceId={spaceId}
             spaceName={spaceName}
             viewMode={viewMode}
             players={players}
