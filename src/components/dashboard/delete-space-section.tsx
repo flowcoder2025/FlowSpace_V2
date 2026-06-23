@@ -29,7 +29,9 @@ export function DeleteSpaceSection({ spaceId, spaceName }: DeleteSpaceSectionPro
   const [error, setError] = useState<string | null>(null);
 
   // 입력값이 스페이스 이름과 정확히 일치할 때만 삭제 활성(되돌릴 수 없는 액션 가드).
-  const canConfirm = confirmInput === spaceName && !isDeleting;
+  // spaceName.length > 0 가드: 빈 이름 스페이스(PATCH는 비-빈 이름 미강제 → 데이터 드리프트로
+  // 발생 가능)에서 빈 입력("")이 즉시 일치해 삭제가 무타이핑 활성되는 것을 차단한다.
+  const canConfirm = spaceName.length > 0 && confirmInput === spaceName && !isDeleting;
 
   const openModal = useCallback(() => {
     setConfirmInput("");
