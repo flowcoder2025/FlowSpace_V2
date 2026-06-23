@@ -1,13 +1,15 @@
 {
-  "activeWI": "WI-038-feat",
-  "lastWI": "WI-037-feat",
+  "activeWI": null,
+  "lastWI": "WI-038-feat",
   "nextQueue": ["WI-039", "WI-040"],
   "type": "feat",
-  "status": "IN_PROGRESS",
+  "status": "MERGED_TO_DEVELOP",
   "integrationBranch": "develop",
   "branch": "feature/WI-038-feat-livekit-moderator-mute",
+  "mergedPR": 41,
+  "mergeCommit": "6f197bb",
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "ed266b6",
-  "note": "[ACTIVE: WI-038-feat — 사용자 기능 요청 큐 6/8] LiveKit moderator mute 서버 계약(타인 음성 강제 음소거·순 신규·P2). 설계 codex consult 1R 수렴(WI-038-consult-prompt.md). 확정: (Q1) 전용 라우트 POST /api/spaces/[id]/livekit/moderate body {identity,muted}. (Q2) room=space-{spaceId} 서버파생·identity allowlist user-/guest-만(dev-anon 거부)·self 거부·user-*는 SpaceMember.role canActOn 게이트·OWNER 보호 미러·guest-*는 최하위 항상 제재가능. (Q3) stickiness=(b) 권한회수 sticky-within-session: getParticipant로 tracks+permission 동시획득→updateParticipant permission atomic이라 canSubscribe/canPublish/canPublishData/hidden 보존+canPublishSources만 mic add/remove(codex risk#1). canPublishSources []=전체허용. 토큰grant 무변경(재접속시 mute소실=의도된한계). (Q4) unmute=권한복원만, force-unmute 안함. (Q5) LiveKit 미설정 503 LIVEKIT_NOT_CONFIGURED·getParticipant throw 404 PARTICIPANT_NOT_FOUND·mic track 없음 200 trackSid:null·LiveKit op throw 502 LIVEKIT_OPERATION_FAILED(raw 미노출). 순서=권한회수 먼저→track mute. (Q6) livekit 배럴 클라전용이라 server-safe 신규모듈 src/features/space/livekit-moderation/(enforce 패턴). (Q7) SpaceEventLog ADMIN_ACTION voiceMute/voiceUnmute. Vercel 전용(token grant·server/·prisma/ 무변경). === 직전: WI-037-feat develop 머지(PR#40 3b6d671). === 큐 잔여 WI-039(음성음소거 UI 연결·P2)/WI-040(귓속말 발견성·P3선택). 후속 BACKLOG: WI-041/042/043."
+  "lastVerifiedCommit": "3b8fed4",
+  "note": "[다음: WI-039-feat — 사용자 기능 요청 큐 7/8] WI-039 = 인-스페이스 UI에 음성 강제 음소거 액션 연결(WI-038 백엔드를 ParticipantPanel/MemberActionsMenu에 연결). 위험: '채팅 음소거'(WI-035 restriction) vs '음성 음소거'(WI-038 LiveKit) 라벨 혼동 → SPACE_COPY로 명확 구분. WI-038 라우트 POST /api/spaces/[id]/livekit/moderate {identity,muted} 호출. 클라는 participant.identity(user-/guest-) 보유. === 직전: ✅ WI-038-feat(LiveKit moderator mute 서버 계약) develop 머지(PR#41 merge 6f197bb·impl 0ede616/r2 3b8fed4). 전용 라우트 + server-safe 신규모듈 src/features/space/livekit-moderation(livekit 배럴 클라전용이라 enforce 패턴 분리). stickiness=권한회수(updateParticipant permission ATOMIC이라 current 전체 spread 보존+canPublishSources mic만 add/remove — codex r1 단독 P2 적출[evaluator도 r1 놓침]: ParticipantPermission 10필드 중 4개만 보존하면 미열거 5필드 false reset). mutePublishedTrack(trackSid 필요·getParticipant 1회로 tracks+permission 동시획득). unmute=권한복원만(force-unmute 안함). 실패 503/404/502. 듀얼 2R 수렴 codex r1 FAIL→r2 WARNING(환경 P3만)·evaluator 9.88. 게이트 tsc0/lint0err/vitest 501→541[+40]/build0. Vercel 전용(token grant·server/·prisma/ 무변경). main 미승격. 잔여 defer P3x3(부분성공 감사공백·getParticipant outage 404·식별자 charset). === 큐 잔여 WI-039(음성음소거 UI·P2)/WI-040(귓속말 발견성·P3선택). 후속 BACKLOG: WI-041(설정 PATCH 권한·STAFF)/WI-042(대시보드 archived 가드)/WI-043(공용 Dialog focus-trap a11y). 저우선: WI-025(표면0)/WI-028(운영 runbook)."
 }
