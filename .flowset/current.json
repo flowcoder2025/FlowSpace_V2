@@ -1,9 +1,10 @@
 {
   "activeWI": null,
   "lastWI": "WI-045-feat",
-  "nextQueue": ["WI-042", "WI-040", "WI-043"],
+  "nextQueue": ["INVESTIGATE-moderation-rootcause", "WI-042", "WI-040", "WI-043"],
+  "nextSessionTop": "🔴 .flowset/INVESTIGATION-moderation.md — 인-스페이스 멤버 제재(음소거/강퇴/차단/음성)가 라이브에서 실제 동작 안 함. 증분 패치(WI-035/038/039/044/045)가 근본 원인을 못 짚음. codex 1순위 가설: 제어평면 불일치(LIVEKIT_URL vs NEXT_PUBLIC_LIVEKIT_URL·SOCKET_INTERNAL_URL vs NEXT_PUBLIC_SOCKET_URL 다른 인스턴스) / 2순위: 식별자 불일치(DB SpaceMember.userId·socket.data.userId·LiveKit user-{id} 동일인 미확정). 음성 음소거가 'getParticipant 404 PARTICIPANT_NOT_FOUND'인데 비디오 타일은 보임 = 결정적 단서. 5단계 진단 시퀀스 문서에 있음. 증분 패치 금지·root cause 먼저. 사용자 지시로 다음 세션(프레시 컨텍스트) 처리.",
   "type": "feat",
-  "status": "PROMOTED_TO_MAIN_LIVE",
+  "status": "PROMOTED_TO_MAIN_LIVE_BUT_MODERATION_BROKEN",
   "integrationBranch": "develop",
   "branch": "develop",
   "mergedPR": 47,
