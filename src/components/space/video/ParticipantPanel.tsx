@@ -11,6 +11,8 @@
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { VideoTile } from "./VideoTile";
+import { MemberActionsMenu } from "../member-actions-menu";
+import { useSpaceMembers, managedUserIdFromIdentity } from "../use-space-members";
 import type { ParticipantTrack } from "@/features/space/livekit";
 
 export type ViewMode = "sidebar" | "grid" | "hidden";
@@ -23,6 +25,7 @@ interface PlayerInfo {
 interface ParticipantPanelProps {
   participantTracks: Map<string, ParticipantTrack>;
   localParticipantId: string | null;
+  spaceId: string;
   spaceName?: string;
   viewMode?: ViewMode;
   onViewModeChange?: (mode: ViewMode) => void;
@@ -37,6 +40,7 @@ interface ParticipantPanelProps {
 export function ParticipantPanel({
   participantTracks,
   localParticipantId,
+  spaceId,
   spaceName = "Space",
   viewMode: externalViewMode,
   onViewModeChange,
@@ -52,6 +56,13 @@ export function ParticipantPanel({
 
   const viewMode = externalViewMode ?? internalViewMode;
   const setViewMode = onViewModeChange ?? setInternalViewMode;
+
+  // 멤버 관리 스냅샷 — 패널이 보일 때만 조회(GET 403이면 관리 UI 자연 숨김).
+  const { membersByUserId, actorRole, refetch } = useSpaceMembers(
+    spaceId,
+    currentUserId ?? "",
+    viewMode !== "hidden" && !!currentUserId
+  );
 
   // 미디어 참가자 ID set
   const mediaParticipantIds = useMemo(
@@ -172,6 +183,12 @@ export function ParticipantPanel({
           const isLocal = track.participantId === localParticipantId;
           const hasScreenShare = !!track.screenTrack;
 
+          // LiveKit identity → 관리 대상 userId (user- 접두사만; guest-/dev-는 null).
+          const mediaUserId = managedUserIdFromIdentity(track.participantId);
+          const mediaMember = mediaUserId
+            ? membersByUserId.get(mediaUserId) ?? null
+            : null;
+
           return (
             <div key={track.participantId}>
               {hasScreenShare && (
@@ -196,6 +213,17 @@ export function ParticipantPanel({
                 globalOutputVolume={globalOutputVolume}
                 mirrorLocalVideo={mirrorLocalVideo}
                 isSpotlight={spotlightUsers.has(track.participantId)}
+                actionsSlot={
+                  <MemberActionsMenu
+                    spaceId={spaceId}
+                    target={{ userId: mediaUserId ?? "", nickname: track.participantName }}
+                    member={mediaMember}
+                    actorRole={actorRole}
+                    currentUserId={currentUserId ?? ""}
+                    onActionDone={refetch}
+                    align="left"
+                  />
+                }
               />
             </div>
           );
@@ -220,6 +248,16 @@ export function ParticipantPanel({
                 <span className="shrink-0 text-xs text-ink-muted">(나)</span>
               )}
             </div>
+            {!p.isSelf && (
+              <MemberActionsMenu
+                spaceId={spaceId}
+                target={{ userId: p.id, nickname: p.nickname }}
+                member={membersByUserId.get(p.id) ?? null}
+                actorRole={actorRole}
+                currentUserId={currentUserId ?? ""}
+                onActionDone={refetch}
+              />
+            )}
           </div>
         ))}
       </div>

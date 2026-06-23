@@ -13,7 +13,7 @@
  * - iOS Safari 오디오 autoplay 복구
  */
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useScreenRecorder } from "@/features/space/hooks";
 import type { ParticipantTrack } from "@/features/space/livekit";
@@ -29,6 +29,8 @@ interface VideoTileProps {
   globalOutputVolume?: number;
   mirrorLocalVideo?: boolean;
   isSpotlight?: boolean;
+  /** 멤버 관리 메뉴 등 좌상단 오버레이 슬롯(기존 우상단 컨트롤과 분리). */
+  actionsSlot?: ReactNode;
 }
 
 function formatRecordingTime(seconds: number): string {
@@ -51,6 +53,7 @@ export function VideoTile({
   globalOutputVolume = 100,
   mirrorLocalVideo = true,
   isSpotlight = false,
+  actionsSlot,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -338,6 +341,13 @@ export function VideoTile({
           playsInline
           className="hidden"
         />
+      )}
+
+      {/* 멤버 관리 슬롯 (좌상단 — 우상단 컨트롤과 분리). 내용 없으면 보이지 않음. */}
+      {actionsSlot && (
+        <div className={cn("absolute left-2 z-30", isRecording ? "top-11" : "top-2")}>
+          {actionsSlot}
+        </div>
       )}
 
       {isRecording && (
