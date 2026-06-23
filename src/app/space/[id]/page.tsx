@@ -72,7 +72,7 @@ export default async function SpacePage({ params }: PageProps) {
   if (decision.action === "create") {
     // owner=OWNER self-heal / PUBLIC 비멤버=PARTICIPANT 자동 가입.
     // upsert로 원자성 확보 — 동일 사용자 동시 첫 진입의 unique(spaceId,userId)
-    // 충돌(P2002→500)을 방지하고, 이미 있으면 기존 role을 그대로 반환한다.
+    // 충돌(P2002→500)을 방지하고, 이미 있으면 기존 행을 그대로 반환한다.
     const upserted = await prisma.spaceMember.upsert({
       where: { spaceId_userId: { spaceId: id, userId: user.id } },
       update: {},
@@ -82,9 +82,20 @@ export default async function SpacePage({ params }: PageProps) {
         displayName: user.name,
         role: decision.role,
       },
-      select: { role: true },
+      select: { role: true, restriction: true },
     });
-    role = upserted.role;
+    // upsert가 충돌 분기에서 기존 행을 반환할 수 있다(예: findUnique 직후 BANNED 처리된 행).
+    // 같은 결정 함수로 재평가해 BANNED 멤버가 role을 받지 않도록 보장(BANNED 단일 SoT).
+    const postDecision = resolveSpaceRoleDecision({
+      memberRole: upserted.role,
+      restriction: upserted.restriction,
+      isOwner,
+      accessType: space.accessType,
+    });
+    if (postDecision.action === "redirect") {
+      redirect("/my-spaces");
+    }
+    role = postDecision.role;
   }
 
   // avatarConfig에서 avatarString 추출, 없으면 userId 해시 폴백
