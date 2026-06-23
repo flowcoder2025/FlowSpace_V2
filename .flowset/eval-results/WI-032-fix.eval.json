@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.6,
+    "consistency": 9.9,
+    "specificity": 10,
+    "actionability": 9.8
+  },
+  "weightedTotal": 9.78,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/[id]/admin/stats/route.ts:41-48 → src/app/dashboard/spaces/[id]/page.tsx:12-18,70-86",
+      "description": "WI 본문은 logs API를 'payload 노출 차단의 단일 chokepoint'로 명시하나(route.ts:74-75, space-event-log-payload.ts:14-18), 검증 결과 GET /api/spaces/[id]/admin/stats 의 recentActivity 가 동일 raw SpaceEventLog.findMany 결과(payload + 내부 스칼라 spaceId/userId/guestSessionId/participantId)를 정규화 없이 응답으로 반환하는 병렬 경로다. 대시보드 오버뷰 page.tsx:17 타입이 이미 payload?: Record<string, unknown> 로 선언돼 있다. 현 누출은 0(현 payload는 operational ID·비밀 없음, 그리고 오버뷰 페이지는 payload를 렌더하지 않음 — eventType/user/createdAt만 표시) → P0/P1 아님. 그러나 이는 본 WI가 닫으려는 바로 그 회귀 레일(향후 event type이 payload에 email/inviteCode/accessSecret/prompt 추가 시 동시 노출)과 동형이며, stats 경로는 deny-by-default 정규화에서 빠져 있어 'single chokepoint' 주장이 사실과 어긋난다(SpaceEventLog payload→응답 경로가 logs 외에 하나 더 존재). 변이검증 무관 — 코드/grep 실측(recentActivity·admin/stats grep src/** 전수).",
+      "recommendation": "stats/route.ts 의 recentActivity 도 items.map(toPublicSpaceEventLog) 로 동일 정규화(또는 recentActivity 전용 lean 매퍼 재사용)하여 chokepoint 주장과 실제를 일치시킨다. page.tsx:17 의 payload 타입도 PublicSpaceEventPayload 로 통일. 후속 WI(예: WI-033)로 분리 가능.",
+      "defer": true,
+      "deferRationale": "현 누출 0(payload operational·비밀 없음 + 오버뷰 페이지 payload 미렌더). WI-032 핵심 수용 기준(logs API 3경로 차단)은 완전 충족됐고, stats recentActivity 는 동일 클래스의 후속 강화 표면이라 별도 WI로 처리해도 안전. P0/P1 부재이므로 .pass 차단 사유 아님. 단 WI 본문의 'single chokepoint' 문구는 부정확하므로 후속에서 보정 권고.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/components/dashboard/csv-export.ts:77-84 (stringifyPayload try/catch UNSERIALIZABLE_PAYLOAD)",
+      "description": "WI-031 잔존 방어코드. payload가 이제 API allowlist(toPublicSpaceEventPayload)로 8개 JSON-safe 키만 통과하므로 CSV/화면에 도달하는 payload는 항상 JSON.stringify 가능(순환참조 불가 — allowlist out 객체는 원본 일부 키 얕은 복사). 따라서 stringifyPayload 의 try/catch 와 UNSERIALIZABLE_PAYLOAD 분기는 사실상 도달 불가능한 dead-defensive 경로가 됐다(csv-export.test.ts:120 순환참조 테스트는 정규화 우회 직접 입력으로만 트리거). 결함 아닌 잔여 부채 — 무해(안전망 유지).",
+      "recommendation": "허용: 안전망으로 잔류해도 무해. 정리 시 stringifyPayload 단순화(payload는 항상 직렬화 가능) 또는 주석으로 'API 정규화 후 도달 불가, 직접 호출 방어용' 명시. 즉시 조치 불요.",
+      "defer": true,
+      "deferRationale": "동작 무변경·무해한 방어 잔여. logsToCsv 는 PublicSpaceEventPayload 를 받으므로 안전망 유지가 명확성에 해롭지 않음. 정리 부채로 흡수.",
+      "fixNow": false
+    }
+  ]
+}
