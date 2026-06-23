@@ -1,15 +1,15 @@
 {
   "activeWI": null,
-  "lastWI": "WI-036-fix",
-  "nextQueue": ["WI-037", "WI-038", "WI-039", "WI-040"],
-  "type": "fix",
-  "status": "MERGED_TO_DEVELOP",
+  "lastWI": "WI-037-feat",
+  "nextQueue": ["WI-038", "WI-039", "WI-040"],
+  "type": "feat",
+  "status": "PR_OPEN_DEVELOP",
   "integrationBranch": "develop",
-  "branch": "fix/WI-036-fix-space-archive-hardening",
-  "mergedPR": 39,
-  "mergeCommit": "c3a084b",
+  "branch": "feature/WI-037-feat-space-delete-ui",
+  "mergedPR": null,
+  "mergeCommit": null,
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "3646378",
-  "note": "[다음: WI-037-feat — 사용자 기능 요청 큐 5/8] WI-037 = 설정 화면 스페이스 삭제 UI(확인 모달 '삭제 시 접속자 추방·복구 불가' + DELETE /api/spaces/[id] 호출 + 성공 후 라우팅/목록 갱신, OWNER/superAdmin만 노출). WI-036 하드닝 완료로 선결조건 충족(archived space 접속자 잔류 UX 구멍=백엔드 추방으로 닫힘). === 직전: ✅ WI-036-fix(스페이스 archive 하드닝) develop 머지 완료(PR#39 merge c3a084b). DELETE가 status=ARCHIVED+deletedAt만 기록·접속자 방치하던 결함 해소. (A) Space.deletedBy String?+멱등 마이그레이션(ADD COLUMN IF NOT EXISTS·prod 승인 게이트) (B) enforce 계약 discriminated union(ArchiveEnforceRequest userId 없음/UserEnforceRequest userId 필수)+parseEnforceRequest archive 분기(입력 userId/role 무시·멤버제재 회귀0) (C) DELETE updateMany(status!=ARCHIVED) 원자적 최초-행위자 보존(재삭제·동시요청 deletedBy 미덮어쓰기)+dispatchEnforcement(action:archive·best-effort) (D) 소켓서버 archive postcondition=Space.status===ARCHIVED·applyEnforcement snapshot→detach→purgeSpaceState(presence+recording+spotlight+proximity 4개 space-키 맵)·archivedSpaces deny cache+join:space TOCTOU 가드 (E) 클라 변경0(리다이렉트=WI-037). 설계 codex consult 1R(deletedBy 최초행위자 보존=최대 누락위험·snapshot-before-detach·discriminated union·TOCTOU deny cache 적출). 듀얼 블라인드 1R 수렴 codex WARNING(환경적 P3만=샌드박스 EPERM·코드결함0)·evaluator 9.81(P0/P1/P2/fixNow=0, P3×2 defer: server/ 테스트 부채·PATCH lean select). 변이검증 3종. 게이트 tsc0/lint0err/vitest 464→478[+14]/build0/esbuild0. impl 3646378. server/·prisma/·src/ 변경 — 승격 시 OCI 소켓 재배포(server/handlers)+prod DB 마이그레이션 승인(Space.deletedBy) 필요. main 미승격. === 큐 잔여 WI-037~040(WI-038/039=LiveKit moderator mute 순신규·P2 / WI-040=귓속말 발견성·P3선택). 저우선 BACKLOG: WI-025(표면0)/WI-028(운영 runbook)."
+  "lastVerifiedCommit": "ed266b6",
+  "note": "[다음: WI-038-feat — 사용자 기능 요청 큐 6/8] WI-038 = LiveKit moderator mute 서버 계약(타인 음성 강제 음소거·순 신규·P2). RoomServiceClient.mutePublishedTrack로 server-side 강제 음소거 + 권한/감사/실패처리. 채팅 음소거(WI-035)와 분리. 후행 WI-039(UI 연결). === 직전: ✅ WI-037-feat(설정 화면 스페이스 삭제 UI) develop PR 생성. 설정 화면에서 OWNER/superAdmin이 스페이스 삭제(soft delete=ARCHIVED)하는 순수 UI. 백엔드 DELETE는 WI-036에서 완성(이 WI 백엔드 무변경·Vercel 전용). (A) 신규 DeleteSpaceSection: 위험 구역 카드+이름 타이핑 확인 모달(role=dialog·ESC·중복제출 방지·진행중 닫기차단)→DELETE→router.replace('/my-spaces'). 멱등 200 성공취급·non-ok 에러+모달유지. canConfirm=spaceName.length>0 && confirmInput===spaceName && !isDeleting. (B) settings/page: findUnique select ownerId 추가+canDelete=isSuperAdmin||ownerId===userId(DELETE 게이트 De Morgan 미러·role 아님·STAFF 미노출). (C) DASHBOARD_COPY.SETTINGS.dangerZone 카피. 설계 codex consult 1R(설정페이지 전용·ownerId 미러·이름타이핑·/my-spaces redirect). 듀얼 블라인드 2R 수렴 codex r1 WARNING(P3x2: fixNow 빈이름가드·focus-trap)→r2 PASS 0 issues·evaluator 9.9(P0/P1/P2/fixNow=0, P3x2 defer). r2: 빈 이름 가드 length>0 추가. 변이검증 5종. 게이트 tsc0/lint0err/vitest 478→501[+23]/build0. impl f023e77/r2 ed266b6. Vercel 전용(server/·prisma/ 무관). main 미승격. 잔여 defer P3x2: focus-trap(전역 a11y 후속)·하드코딩 id(충돌0). === codex consult 놓칠위험(후속 BACKLOG): ①설정 PATCH 권한 불일치(설정 페이지 STAFF 진입가능하나 PATCH는 owner만 403 — 설정 편집 권한 정리 WI) ②대시보드 layout이 archived(status!=ACTIVE) 거부 안 함(멤버행 잔존시 archived 대시보드 계속 보임). === 큐 잔여 WI-038/039(LiveKit moderator mute·P2)/WI-040(귓속말 발견성·P3선택). 저우선 BACKLOG: WI-025(표면0)/WI-028(운영 runbook)."
 }

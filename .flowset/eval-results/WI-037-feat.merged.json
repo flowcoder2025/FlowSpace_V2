@@ -1,0 +1,40 @@
+{
+  "wi": "WI-037-feat",
+  "schemaVersion": 1,
+  "finalCommit": "ed266b6",
+  "rounds": 2,
+  "codex": {
+    "r1": {
+      "verdict": "WARNING",
+      "issues": 2,
+      "note": "P3x2: ①fixNow=true — 빈 이름 스페이스(PATCH가 비-빈 이름 미강제로 데이터 드리프트 가능)에서 빈 입력(\"\")이 spaceName(\"\")과 즉시 일치해 삭제 버튼이 무타이핑 활성. ②fixNow=false — 모달 focus-trap/focus-restore 부재(키보드 사용자가 모달 뒤로 탭 이동 가능)."
+    },
+    "r2": {
+      "verdict": "PASS",
+      "issues": 0,
+      "note": "빈 이름 가드(spaceName.length>0 선행) 해소 확인 → PASS 0 issues."
+    }
+  },
+  "evaluator": {
+    "r1": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.88,
+      "issues": "P0/P1/P2/fixNow=0, P3x4 defer (빈 이름 이론적 엣지[NOT NULL 도메인 불변식·서버 hard gate]·focus-trap·data.error 비-narrowing·성공 후 isDeleting 미리셋[언마운트 무해·중복제출 방지 트레이드오프])"
+    },
+    "final": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.9,
+      "issues": "P0/P1/P2/fixNow=0, P3x2 defer (①모달 focus-trap 부재 — repo 전역 focus-trap 패턴 전무·공용 Dialog 추출 WI 흡수 적절·파괴적 액션은 이름 정확일치 게이트로 별도 보호 ②delete-space-title 하드코딩 id — 단일 인스턴스 렌더·충돌 실표면0). r1 9.88→9.9 상향: r2 length>0 가드가 빈 이름 fixNow 엣지 실제 차단·회귀 테스트 보호 실증."
+    }
+  },
+  "convergence": {
+    "blockingIssues": 0,
+    "fixNow": 0,
+    "deferredP2": 0,
+    "deferredP3": 2,
+    "summary": "듀얼 블라인드 2R 수렴 — codex r1 WARNING(P3x2)→r2 PASS 0 issues / evaluator 최종HEAD WARNING 9.9(P0/P1/P2/fixNow=0). codex가 r1 fixNow=true로 지목한 빈 이름 엣지를 r2에서 즉시 해소(handoff 교훈: fixNow P3 즉시 강화). 양 검증자 독립으로 권한 게이팅 미러 정확성(클라 canDelete = isSuperAdmin || ownerId===userId 가 서버 DELETE 게이트 ownerId!==userId && !isSuperAdmin 의 De Morgan 등가·role 아님·STAFF/드리프트 OWNER 미노출)·서버 hard gate·멱등/에러/중복제출 처리·/my-spaces redirect 정합(GET /api/spaces status=ACTIVE 자연제외)·하드코딩0·server/prisma 무변경(Vercel 전용)을 클린 확인. 잔여 P3x2 전부 defer(focus-trap=전역 a11y 후속 WI, 하드코딩 id=충돌 실표면0)."
+  },
+  "mutationTests": "evaluator 변이검증 5종 전부 검출(복원 후 트리 clean): M1 canConfirm length>0 가드 제거→delete-space 테스트 1 FAIL(r2 빈 이름 가드) / M2 이름 일치(confirmInput===spaceName)→true 강제→4 FAIL / M3 !isDeleting 제거→1 FAIL(중복 제출 방지) / M4 non-ok early-return 제거(에러여도 redirect)→2 FAIL / M5 canDelete를 ownerId 미러 대신 role 기반(ctx.role===OWNER)으로→settings/page 테스트 1 FAIL(데이터 드리프트 오라클이 정밀 판별).",
+  "machineGates": "tsc:0, lint:0err(1 preexisting LiveKit warning·WI무관), vitest:478→501(+23: delete-space-section 17 + settings/page 6), build:0(next build). server/·prisma/ 무변경(diff src/+constants/ 한정) — Vercel 전용, OCI 소켓 재배포·prod DB 마이그레이션 불요.",
+  "issues": []
+}
