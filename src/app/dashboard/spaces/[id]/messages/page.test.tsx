@@ -37,7 +37,7 @@ describe("MessagesPage 에러 처리", () => {
   it("fetch !ok → 에러 메시지 표시(이전엔 catch{}로 무시됨)", async () => {
     render(<MessagesPage />);
     d.resolve({ ok: false, json: async () => ({}) });
-    await screen.findByText("Failed to load messages");
+    await screen.findByText("메시지를 불러오지 못했습니다.");
   });
 
   it("성공 시 에러 미표시", async () => {
@@ -46,6 +46,6 @@ describe("MessagesPage 에러 처리", () => {
     await waitFor(() =>
       expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1)
     );
-    expect(screen.queryByText("Failed to load messages")).toBeNull();
+    expect(screen.queryByText("메시지를 불러오지 못했습니다.")).toBeNull();
   });
 });

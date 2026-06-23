@@ -57,12 +57,12 @@ afterEach(() => {
 describe("MembersPage", () => {
   it("초기 로딩 상태 표시 후 멤버 렌더", async () => {
     render(<MembersPage />);
-    expect(screen.getByText("Loading...")).toBeTruthy();
+    expect(screen.getByText("불러오는 중...")).toBeTruthy();
 
     d.resolve(jsonOk({ members: MEMBERS }));
     await screen.findByText("Alice Kim");
 
-    expect(screen.queryByText("Loading...")).toBeNull();
+    expect(screen.queryByText("불러오는 중...")).toBeNull();
     expect(screen.getByText("Bob Lee")).toBeTruthy();
   });
 
@@ -75,7 +75,7 @@ describe("MembersPage", () => {
   it("fetch 실패 시 에러 표시 + 빈 상태는 억제(실패 ≠ 빈 목록)", async () => {
     render(<MembersPage />);
     d.resolve({ ok: false, json: async () => ({}) });
-    await screen.findByText("Failed to load members");
+    await screen.findByText("멤버를 불러오지 못했습니다.");
     // 로드 실패 시 "멤버가 없습니다." 빈 상태가 함께 뜨면 안 됨
     expect(screen.queryByText("멤버가 없습니다.")).toBeNull();
   });

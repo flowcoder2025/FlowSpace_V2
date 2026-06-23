@@ -1,0 +1,13 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 10.0,
+    "specificity": 9.8,
+    "actionability": 9.9
+  },
+  "weightedTotal": 9.88,
+  "verdict": "PASS",
+  "issues": []
+}

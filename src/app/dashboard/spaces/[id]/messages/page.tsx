@@ -7,6 +7,7 @@ import {
   localDateToStartInstant,
   localDateToEndInstant,
 } from "@/components/dashboard/date-range";
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
 
 interface ChatMsg {
   id: string;
@@ -51,7 +52,7 @@ export default function MessagesPage() {
         if (endInstant) qs.set("endDate", endInstant);
 
         const res = await fetch(`/api/spaces/${spaceId}/admin/messages?${qs}`);
-        if (!res.ok) throw new Error("Failed to load messages");
+        if (!res.ok) throw new Error(DASHBOARD_COPY.MESSAGES.loadError);
         const data = await res.json();
 
         if (nextCursor) {
@@ -64,7 +65,7 @@ export default function MessagesPage() {
         setError(null);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "메시지를 불러오지 못했습니다."
+          err instanceof Error ? err.message : DASHBOARD_COPY.MESSAGES.loadError
         );
       } finally {
         setIsLoading(false);
@@ -79,19 +80,19 @@ export default function MessagesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-ink">Messages</h1>
+      <h1 className="text-2xl font-bold text-ink">{DASHBOARD_COPY.MESSAGES.title}</h1>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
-          aria-label="메시지 타입 필터"
+          aria-label={DASHBOARD_COPY.MESSAGES.typeFilterAriaLabel}
           className="text-sm border border-line rounded px-3 py-1.5"
         >
-          <option value="">All Types</option>
+          <option value="">{DASHBOARD_COPY.MESSAGES.allTypes}</option>
           {MESSAGE_TYPE_OPTIONS.map((t) => (
             <option key={t} value={t}>
-              {t}
+              {DASHBOARD_COPY.messageTypeLabel(t)}
             </option>
           ))}
         </select>
@@ -99,7 +100,7 @@ export default function MessagesPage() {
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
-          aria-label="시작 날짜"
+          aria-label={DASHBOARD_COPY.LOGS.startDateAriaLabel}
           className="text-sm border border-line rounded px-3 py-1.5"
         />
         <span className="text-ink-muted text-sm">~</span>
@@ -107,7 +108,7 @@ export default function MessagesPage() {
           type="date"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
-          aria-label="종료 날짜"
+          aria-label={DASHBOARD_COPY.LOGS.endDateAriaLabel}
           className="text-sm border border-line rounded px-3 py-1.5"
         />
       </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { DASHBOARD_COPY } from "@/constants/dashboard-copy";
+
 interface DataPoint {
   date: string;
   count: number;
@@ -16,7 +18,7 @@ export function UsageChart({ title, data, color = "bg-blue-500" }: UsageChartPro
     return (
       <div className="bg-white rounded-lg border border-line p-5">
         <h3 className="text-sm font-semibold text-ink-soft mb-3">{title}</h3>
-        <p className="text-sm text-ink-light">No data available</p>
+        <p className="text-sm text-ink-light">{DASHBOARD_COPY.CHART.noData}</p>
       </div>
     );
   }

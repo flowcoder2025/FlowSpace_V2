@@ -1,11 +1,14 @@
 # HANDOFF
 
+## 직전 Active — ✅ WI-033-feat (어드민 대시보드 한글화 + copy constants 분리) develop 머지 완료(2026-06-23, PR#__)
+사용자 기능 요청 큐 **1/8 완료**. 어드민 대시보드(18 소스파일) 100% 영문 → 단일 SoT `src/constants/dashboard-copy.ts`(`DASHBOARD_COPY`, 키 영문/값 한글, `as const`)로 분리·한글화. i18n 미도입(단일 한국어 제품). **설계 codex consult 1R**: 단일 파일·scope dashboard 엄격 고정(인-스페이스 player-list 별도 후속)·CSV/에러/aria-label 전부 한글·동적 함수 엔트리. **핵심 위험(codex Q5)=표시 라벨/도메인 값 분리**: `<option value>`·필터키·액션토큰·색상맵 키 전수 enum 코드 유지, `*Label()` 헬퍼로 표시만 매핑(미정의 코드 폴백). CSV는 헤더+표시값 화면과 동일 한글 라벨 SoT 공유, payload JSON 키 미번역. **듀얼 2R 수렴 codex r1/r2 PASS 0 issues·evaluator r1 9.81→r2 9.88**(P0/P1/P2 0). evaluator 유일 P3(accessType만 패턴 이탈·SoT 중복) r2 즉시 해소(accessTypeLabel 단일 SoT·consistency 10.0). 변이검증 2종. 게이트 4/4(tsc0/lint0err/vitest 407→**416**/build0)+`.pass`(empty `e3b0c44`). impl `77f77e6`/r2 `82b39ed`. **Vercel 전용(server/·prisma/ 무관). main 미승격.** 교훈: 표시 라벨↔도메인/API 값 분리(`*Label(code)` 코드 폴백)·CSV↔화면 동일 SoT·헬퍼 패턴 통일=단일 SoT. 상세 fix_plan.md Done.
+
 ## 다음 세션 — 순차 진행 큐 (사용자 지시 2026-06-23)
-**사용자 기능 요청 4건**(①어드민 대시보드 한글 통일 ②스페이스 삭제 ③인-스페이스 멤버관리 강퇴/음소거/귓속말 ④어드민/공통 권한별 구별)을 read-only 멀티에이전트로 실측 + **codex consult로 분해·우선순위 산정 완료**. 사용자 지시: "다음 세션 순차진행 가능하도록 codex 협의 우선순위 산정 후 조치". **다음 세션은 fix_plan.md Queue(2026-06-23 사용자 기능 요청)의 WI-033부터 1개씩 순서대로 처리**(각 WI 착수 시 READY 승격 → 분기 → 기계게이트 → 듀얼검증 → .pass → develop PR).
+**사용자 기능 요청 4건**(①어드민 대시보드 한글 통일[✅WI-033] ②스페이스 삭제 ③인-스페이스 멤버관리 강퇴/음소거/귓속말 ④어드민/공통 권한별 구별)을 read-only 멀티에이전트로 실측 + **codex consult로 분해·우선순위 산정 완료**. **다음 세션은 fix_plan.md Queue의 WI-034부터 1개씩 순서대로 처리**(각 WI 착수 시 READY 승격 → 분기 → 기계게이트 → 듀얼검증 → .pass → develop PR).
 
 **확정 시퀀스** (상세·근거는 fix_plan.md Queue 표):
-1. **WI-033** (feat) 대시보드 한글화 + copy constants 분리 (i18n 미도입·단순 한글화, 범위 dashboard 고정) — 가장 독립·저위험·즉효, **첫 착수 권장**.
-2. **WI-034** (fix) `/space/[id]` page가 myRole 조회→SpaceClient.user.role 전달 (선결 버그·실측 확인: `page.tsx:85` role 미전달).
+1. ✅ **WI-033** (feat) 대시보드 한글화 + copy constants 분리 — **완료**(develop 머지).
+2. **WI-034** (fix) `/space/[id]` page가 myRole 조회→SpaceClient.user.role 전달 (선결 버그·실측 확인: `page.tsx:85` role 미전달) — **다음 착수**.
 3. **WI-035** (feat) 인-스페이스 참가자 패널 멤버관리 UI(채팅음소거/강퇴, role 게이팅) — **dashboard HTTP admin API 재사용**(socket 채팅명령 경로 아님 — `use-socket.ts:584` admin:ban 누락·canActOn/감사 약함).
 4. **WI-036** (fix) 스페이스 archive 하드닝(deletedBy 감사+접속자 추방) — **Space.deletedBy 컬럼=마이그레이션 승인 게이트**.
 5. **WI-037** (feat) 설정 스페이스 삭제 UI(확인 모달+DELETE+이동) — WI-036 후행.
@@ -15,7 +18,7 @@
 
 **실측 정정(가정≠실제·착수 전 필독)**: 스페이스 **DELETE API 이미 존재**(soft delete, `route.ts:143`) — UI+하드닝만 / **강퇴·채팅음소거 백엔드+소켓 enforce+채팅명령 이미 존재**(WI-005) — 발견가능 UI만 / **귓속말 이미 완전 구현**(whisper:send 소켓+DB+파서+UI) / **음성 강제 음소거만 순 신규**(LiveKit moderator) / 권한모델(`canActOn` 역할랭크)은 견고 — UI 게이팅만. 협의 산출물 `scratchpad/consult-feature-decomp.md`. 기존 저우선 BACKLOG(WI-025 offset 상한·표면0 / WI-028 AUTH_SECRET probe·운영 runbook)는 이 시퀀스 뒤.
 
-## 직전 Active — ✅ WI-026-fix (저장 metadata public/internal 분리) develop 머지 완료(2026-06-23, PR#35)
+## 이전 — ✅ WI-026-fix (저장 metadata public/internal 분리) develop 머지 완료(2026-06-23, PR#35)
 **READY 큐 소진 → 사용자 "핸드오프 읽고 코덱스와 협의하여 작업 진행" → 설계 codex consult로 BACKLOG 3건(WI-025/026/028) 우선순위 협의 → WI-026 1순위 선정**(WI-025 실표면0·임의정책 / WI-028 운영 runbook 성격). generate/batch가 생성 성공 시 `GeneratedAssetMetadata` 전체(prompt/workflow/comfyuiJobId)를 metadata Json에 통째 저장하던 것을 공개 런타임 키만 저장하도록 정규화(응답 누출은 WI-019 allowlist로 이미 0 — **저장면 축소 심층방어**, WI-024 "응답+저장 양쪽" 패턴의 저장 측). 신규 `buildStoredAssetMetadata`(PUBLIC_METADATA_KEYS를 저장/응답 단일 SoT 공유) + batchId storage-only 보존 + 순수 코어 분리 백필(prod 게이트). 듀얼 블라인드 **5R 수렴 codex PASS 0 issues·evaluator 9.92**(P0/P1/P2 0, P3×2 defer). **핵심 WI(저장 빌더·라우트·batchId·응답 불변)는 5R 내내 0 findings — 클린**; 모든 이슈는 백필 ops prod 게이트(codex가 libpq 연결문자열 우회 벡터 4R 적대 적출: 전체-URL regex→hostname→host/hostaddr query→반복키 → 매 라운드 fail-safe 차단). 게이트 4/4(tsc0/lint0err/vitest 384→407/build0). impl `6b02fa6`→r5 `02614ce`. **Vercel 전용(server/ 미참조 — OCI/prod-DB 무관). main 미승격(승격은 사용자 승인 게이트).** 남은 BACKLOG: WI-025(parsePageNumber offset 상한·표면0)/WI-028(Vercel↔OCI AUTH_SECRET probe·운영 runbook). 상세는 fix_plan.md Done 참조.
 
 ## 이전 — ✅ develop→main 승격 완료 + 라이브 반영(2026-06-23, PR#34 rebase merge main HEAD `626769e`) 사용자 "develop→main 승격" 선택(AskUserQuestion, codex consult 1순위 권고). **승격 델타 = WI-029/030/031/032(4건)**. **Readiness GO**: codex consult GO + 적대 통합감사 4축(cross-WI/통합건전성/배포런타임/보안회귀) 전 차원 GO·blocker 0. develop⊇main strict superset(클린 rebase·충돌0). **배포 영향**: Vercel 웹/일부 API 라우트만(assets route도 WI-030 query-filter 공용화로 touched) — **server/·prisma/ 무변경 → OCI 소켓 재배포·prod DB 마이그레이션 no-op**, 신규 env 없음. **실행**: rebase 머지(author=`flowcoder25@gmail.com` 보존→Vercel 인가, gh=yonghyeon-dev라 일반 merge면 인가 실패) → **Vercel Production ● Ready**(`flowspace-v2-8twa6brxj`, push 직후). **라이브 검증**: `space.flow-coder.com` 200·`/login` 200·`/api/users/me` 307(인증 게이트). **develop back-sync 완료**(force-with-lease, develop==main==`626769e`·SHA 분기 없음 — codex 놓칠위험 해소). 산출물 `.flowset/promotion-readiness.md`. **롤백**: Vercel 이전배포 promote / main revert. **남은 사용자 게이트(비코드)**: 인증 소켓 e2e smoke(자격증명 필요)·WI-024 백필 --apply prod·WI-005 SOCKET_INTERNAL_*·WI-013 prod EXPLAIN. **READY 큐 비어 있음. BACKLOG: WI-025(표면0)/026(누출0)/028(코드-WI 부적합→runbook).**
