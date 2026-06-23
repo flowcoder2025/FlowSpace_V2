@@ -56,16 +56,23 @@ function normalizeHost(host) {
   return host.trim().toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
 }
 
+/** 후보 host가 로컬인지 — 정확한 로컬 호스트 또는 Unix 도메인 소켓(절대경로). */
+function isLocalHost(host) {
+  // 절대경로(/...)는 Unix 도메인 소켓 = 같은 머신 접속이라 항상 로컬(원격 도달 불가).
+  return LOCAL_HOSTS.has(host) || host.startsWith("/");
+}
+
 /**
  * DATABASE_URL이 로컬 개발 DB가 아닌 원격(prod 포함)을 가리키는지 판정.
  *
  * **실제 접속 대상**을 검사한다 — libpq/Postgres 연결 문자열은 authority host뿐
- * 아니라 `host`/`hostaddr` **query 파라미터**(콤마 다중호스트 허용)로도 접속 대상을
- * 바꾼다(예: `...@localhost/db?host=prod.invalid` → Prisma는 prod.invalid에 접속).
- * 따라서 authority host + host/hostaddr query 후보를 모두 모아, **하나라도 비-로컬
- * 이면 원격**으로 판정한다(fail-safe — 게이트는 과다 활성 쪽으로 기운다).
- * username/password/db명/기타 query에 'localhost'가 섞여도 영향 없다(host 컴포넌트만 봄).
- * 파싱 불가(다중호스트 authority 등)·호스트 정보 전무도 보수적으로 원격 처리한다.
+ * 아니라 `host`/`hostaddr` **query 파라미터**로도 접속 대상을 바꾼다(예:
+ * `...@localhost/db?host=prod.invalid` → Prisma는 prod.invalid에 접속). 반복 키
+ * (`?host=a&host=b`)는 libpq가 마지막 값을 쓰므로 `getAll`로 전부, 콤마 다중호스트도
+ * 분해해 후보로 모은다. 후보 중 **하나라도 비-로컬이면 원격**으로 판정한다(fail-safe).
+ * username/password/db명/기타 query의 'localhost'는 영향 없다(host 컴포넌트만 봄).
+ * Unix 소켓(절대경로 host)은 로컬로 인정한다(로컬 dev UX 보존). 파싱 불가(다중호스트
+ * authority 등)·호스트 정보 전무는 보수적으로 원격 처리한다.
  */
 export function isRemoteDatabase(dbUrl) {
   if (!dbUrl) return false;
@@ -80,11 +87,12 @@ export function isRemoteDatabase(dbUrl) {
   const candidates = [];
   if (url.hostname) candidates.push(url.hostname);
   for (const key of ["host", "hostaddr"]) {
-    const value = url.searchParams.get(key);
-    if (value) candidates.push(...value.split(","));
+    for (const value of url.searchParams.getAll(key)) {
+      if (value) candidates.push(...value.split(","));
+    }
   }
 
   const effective = candidates.map(normalizeHost).filter((h) => h.length > 0);
   if (effective.length === 0) return true; // 호스트 정보 전무 → 보수적 원격
-  return effective.some((h) => !LOCAL_HOSTS.has(h));
+  return effective.some((h) => !isLocalHost(h));
 }
