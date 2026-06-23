@@ -1,0 +1,16 @@
+WI=WI-026-fix
+commit=02614ce
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-026-codex-r5.json
+evaluator=.flowset/eval-results/WI-026.eval.json
+merged=.flowset/eval-results/WI-026-fix.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:407pass,build:0
+codexVerdict=PASS
+evaluatorVerdict=WARNING:9.92
+blockingIssues=0
+deferredP2=0
+deferredP3=2
+rounds=5
+note=듀얼 블라인드 5R 수렴 — codex r1 WARNING→r2/r3/r4 FAIL→r5 PASS 0 issues / evaluator 최종 HEAD WARNING 9.92(P0/P1/P2 0, P3×2 defer). 핵심 WI(buildStoredAssetMetadata 저장 빌더·generate/batch 배선·batchId 보존·응답 shape 불변)는 5R 내내 0 findings 클린. 모든 이슈는 백필 ops 스크립트 prod 게이트(심층방어)에 집중 — codex가 libpq 우회 벡터 4R 적대 적출(전체-URL regex→hostname→host/hostaddr query→반복키)을 매 라운드 fail-safe로 차단. 변이검증: 코어 builder 전체 spread→5 FAIL·batchId 제거→3 FAIL·allowlist drift→8 FAIL·host override 무시→2 FAIL·getAll→get→1 FAIL. sourceFingerprint=empty(소스 전 커밋·작업트리 clean). 설계 codex consult 1R(WI-026 1순위 선정·저장 빌더·batchId 위험 적출). Vercel 전용(server/ 미참조).
+createdAt=2026-06-23T15:10:00Z
