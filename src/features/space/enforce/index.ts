@@ -5,4 +5,11 @@
 // 이 배럴을 거치지 않고 internal/contract 를 상대경로로 직접 COPY/import 한다.
 export { dispatchEnforcement } from "./internal/dispatch";
 export type { EnforceResult } from "./internal/dispatch";
-export type { EnforceRequest, EnforceAction, EnforceRole } from "./internal/contract";
+export type {
+  EnforceRequest,
+  UserEnforceRequest,
+  ArchiveEnforceRequest,
+  EnforceAction,
+  EnforceUserAction,
+  EnforceRole,
+} from "./internal/contract";

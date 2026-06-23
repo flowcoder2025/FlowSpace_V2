@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { canActOn, isSpaceRole } from "@/lib/space-role";
-import { dispatchEnforcement, type EnforceAction } from "@/features/space/enforce";
+import { dispatchEnforcement, type EnforceUserAction } from "@/features/space/enforce";
 import type { SpaceRole, ChatRestriction } from "@prisma/client";
 
 interface RouteParams {
@@ -207,7 +207,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     // changeRole 강등은 권한 회수이므로(인메모리 role 캐시 갱신) 보안상 실시간 반영 필요.
     let realtimeEnforced = false;
     if (target.userId) {
-      const enforceAction: EnforceAction = actionLabel === "changeRole" ? "role" : actionLabel;
+      const enforceAction: EnforceUserAction = actionLabel === "changeRole" ? "role" : actionLabel;
       const r = await dispatchEnforcement({
         spaceId,
         userId: target.userId,

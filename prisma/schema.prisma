@@ -149,6 +149,9 @@ model Space {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+  // archive(soft delete) 행위자 감사용 userId. FK 관계 없는 순수 스칼라(ChatMessage.deletedBy 선례).
+  // 최초 archive 시에만 기록(WI-036 — 재삭제 시 보존). 응답 DTO에 미노출(내부 감사 메타).
+  deletedBy String?
 
   @@index([ownerId])
   @@index([inviteCode])

@@ -6,16 +6,18 @@ import {
 } from "@/__tests__/helpers/api-route";
 
 // vi.mock 프리앰블 — 파일 로컬 호이스팅
-const { mockAuth, mockPrisma } = vi.hoisted(() => ({
+const { mockAuth, mockPrisma, mockDispatch } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockPrisma: {
-    space: { findUnique: vi.fn(), update: vi.fn() },
+    space: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   },
+  mockDispatch: vi.fn(),
 }));
 vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
+vi.mock("@/features/space/enforce", () => ({ dispatchEnforcement: mockDispatch }));
 
-import { PATCH } from "./route";
+import { PATCH, DELETE } from "./route";
 
 const SPACE_ID = "space-1";
 const ctx = { params: Promise.resolve({ id: SPACE_ID }) };
@@ -38,6 +40,9 @@ beforeEach(() => {
   mockAuth.mockReset();
   mockPrisma.space.findUnique.mockReset();
   mockPrisma.space.update.mockReset();
+  mockPrisma.space.updateMany.mockReset();
+  mockDispatch.mockReset();
+  mockDispatch.mockResolvedValue({ enforced: true, affectedSockets: 0 });
 });
 
 describe("PATCH /api/spaces/[id] — 인증·인가 가드", () => {
@@ -130,5 +135,132 @@ describe("PATCH /api/spaces/[id] — 응답 allowlist (WI-014)", () => {
     expect(updateArg.data.accessSecret).toBe("pw");
     // 읽기(select)에는 미포함
     expect(updateArg.select).not.toHaveProperty("accessSecret");
+  });
+});
+
+describe("DELETE /api/spaces/[id] — 인증·인가 가드 (WI-036)", () => {
+  it("미인증이면 401이고 prisma/enforce를 건드리지 않는다", async () => {
+    mockAuth.mockResolvedValue(makeSession(null));
+
+    const res = await DELETE(buildJsonRequest(`/api/spaces/${SPACE_ID}`, "DELETE", {}), ctx);
+
+    expect(res.status).toBe(401);
+    expect(mockPrisma.space.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.space.updateMany).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it("존재하지 않는 공간이면 404", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false }));
+    mockPrisma.space.findUnique.mockResolvedValue(null);
+
+    const res = await DELETE(buildJsonRequest(`/api/spaces/${SPACE_ID}`, "DELETE", {}), ctx);
+
+    expect(res.status).toBe(404);
+    expect(mockPrisma.space.updateMany).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it("오너도 슈퍼어드민도 아니면 403이고 archive/enforce 미진입", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "intruder", isSuperAdmin: false }));
+    mockPrisma.space.findUnique.mockResolvedValue({ id: SPACE_ID, ownerId: "owner-1" });
+
+    const res = await DELETE(buildJsonRequest(`/api/spaces/${SPACE_ID}`, "DELETE", {}), ctx);
+
+    expect(res.status).toBe(403);
+    expect(mockPrisma.space.updateMany).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it("권한 판정용 findUnique는 ownerId만 select(전체행 미조회)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false }));
+    mockPrisma.space.findUnique.mockResolvedValue({ id: SPACE_ID, ownerId: "owner-1" });
+    mockPrisma.space.updateMany.mockResolvedValue({ count: 1 });
+
+    await DELETE(buildJsonRequest(`/api/spaces/${SPACE_ID}`, "DELETE", {}), ctx);
+
+    const findArg = mockPrisma.space.findUnique.mock.calls[0][0] as {
+      select: Record<string, boolean>;
+    };
+    expect(Object.keys(findArg.select).sort()).toEqual(["id", "ownerId"]);
+  });
+});
+
+describe("DELETE /api/spaces/[id] — 최초 행위자 보존 + archive 추방 (WI-036)", () => {
+  it("최초 archive: updateMany가 status!=ARCHIVED 조건 + deletedBy/deletedAt 기록", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false, name: "오너" }));
+    mockPrisma.space.findUnique.mockResolvedValue({ id: SPACE_ID, ownerId: "owner-1" });
+    mockPrisma.space.updateMany.mockResolvedValue({ count: 1 });
+
+    const res = await DELETE(buildJsonRequest(`/api/spaces/${SPACE_ID}`, "DELETE", {}), ctx);
+
+    expect(res.status).toBe(200);
+    const arg = mockPrisma.space.updateMany.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+    };
+    // 조건부 원자 갱신 — 이미 ARCHIVED면 미적용
+    expect(arg.where).toEqual({ id: SPACE_ID, status: { not: "ARCHIVED" } });
+    expect(arg.data.status).toBe("ARCHIVED");
+    expect(arg.data.deletedBy).toBe("owner-1");
+    expect(arg.data.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it("재삭제(이미 ARCHIVED, count=0)도 200이고 기존 행위자 보존(update 미호출)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa", isSuperAdmin: true, name: "슈퍼" }));
+    mockPrisma.space.findUnique.mockResolvedValue({ id: SPACE_ID, ownerId: "owner-1" });
+    mockPrisma.space.updateMany.mockResolvedValue({ count: 0 }); // 이미 archived
+
+    const res = await DELETE(buildJsonRequest(`/api/spaces/${SPACE_ID}`, "DELETE", {}), ctx);
+
+    expect(res.status).toBe(200);
+    // PATCH용 update는 절대 호출되지 않음(deletedBy 덮어쓰기 경로 부재)
+    expect(mockPrisma.space.update).not.toHaveBeenCalled();
+    // 멱등: enforce는 여전히 dispatch(살아있는 소켓 정리)
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("DB 갱신 후 archive enforce를 dispatch(userId 없음·actorName 전달)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false, name: "오너" }));
+    mockPrisma.space.findUnique.mockResolvedValue({ id: SPACE_ID, ownerId: "owner-1" });
+    mockPrisma.space.updateMany.mockResolvedValue({ count: 1 });
+    mockDispatch.mockResolvedValue({ enforced: true, affectedSockets: 2 });
+
+    const res = await DELETE(buildJsonRequest(`/api/spaces/${SPACE_ID}`, "DELETE", {}), ctx);
+
+    expect(mockDispatch).toHaveBeenCalledWith({
+      spaceId: SPACE_ID,
+      action: "archive",
+      actorName: "오너",
+    });
+    const body = await readJson<{ message: string; realtimeEnforced: boolean }>(res);
+    expect(body.realtimeEnforced).toBe(true);
+  });
+
+  it("enforce 전파 실패(enforced=false)여도 archive 자체는 200 성공", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false }));
+    mockPrisma.space.findUnique.mockResolvedValue({ id: SPACE_ID, ownerId: "owner-1" });
+    mockPrisma.space.updateMany.mockResolvedValue({ count: 1 });
+    mockDispatch.mockResolvedValue({ enforced: false, reason: "not_configured" });
+
+    const res = await DELETE(buildJsonRequest(`/api/spaces/${SPACE_ID}`, "DELETE", {}), ctx);
+
+    expect(res.status).toBe(200);
+    const body = await readJson<{ realtimeEnforced: boolean }>(res);
+    expect(body.realtimeEnforced).toBe(false);
+  });
+
+  it("응답에 deletedBy 등 감사 메타가 노출되지 않는다", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false }));
+    mockPrisma.space.findUnique.mockResolvedValue({ id: SPACE_ID, ownerId: "owner-1" });
+    mockPrisma.space.updateMany.mockResolvedValue({ count: 1 });
+
+    const res = await DELETE(buildJsonRequest(`/api/spaces/${SPACE_ID}`, "DELETE", {}), ctx);
+
+    const body = await readJson<Record<string, unknown>>(res);
+    expect(Object.keys(body).sort()).toEqual(["message", "realtimeEnforced"]);
+    for (const leaked of ["deletedBy", "deletedAt", "ownerId", "accessSecret"]) {
+      expect(body).not.toHaveProperty(leaked);
+    }
   });
 });
