@@ -7,17 +7,21 @@ import {
 } from "@/__tests__/helpers/api-route";
 
 // vi.mock 프리앰블 — 파일 로컬 호이스팅
-const { mockAuth, mockPrisma, mockDispatch } = vi.hoisted(() => ({
+const { mockAuth, mockPrisma, mockDispatch, mockRemoveLiveKit } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockPrisma: {
     spaceMember: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
     spaceEventLog: { create: vi.fn() },
   },
   mockDispatch: vi.fn(),
+  mockRemoveLiveKit: vi.fn(),
 }));
 vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 vi.mock("@/features/space/enforce", () => ({ dispatchEnforcement: mockDispatch }));
+vi.mock("@/features/space/livekit-moderation", () => ({
+  removeSpaceParticipant: mockRemoveLiveKit,
+}));
 
 import { GET, PATCH } from "./route";
 
@@ -33,8 +37,26 @@ beforeEach(() => {
   mockPrisma.spaceEventLog.create.mockReset();
   mockDispatch.mockReset();
   mockDispatch.mockResolvedValue({ enforced: false });
+  mockRemoveLiveKit.mockReset();
+  mockRemoveLiveKit.mockResolvedValue({ removed: true, reason: "removed" });
   mockPrisma.spaceEventLog.create.mockResolvedValue({});
 });
+
+/** PATCH 호출 시 호출자(OWNER) + 대상(PARTICIPANT) findUnique 시퀀스 셋업. */
+function setupActorAndTarget(targetOverrides: Record<string, unknown> = {}) {
+  mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false, name: "관리자" }));
+  mockPrisma.spaceMember.findUnique
+    .mockResolvedValueOnce({ role: "OWNER" })
+    .mockResolvedValueOnce({
+      id: "m-target",
+      spaceId: SPACE_ID,
+      role: "PARTICIPANT",
+      userId: "u-target",
+      displayName: "타겟",
+      user: { name: "타겟" },
+      ...targetOverrides,
+    });
+}
 
 describe("GET /api/spaces/[id]/admin/members — 응답 allowlist (WI-014, onRefresh 경로 가드)", () => {
   it("findMany가 restricted*/guestSessionId/spaceId 제외 select로 호출된다", async () => {
@@ -144,5 +166,109 @@ describe("PATCH /api/spaces/[id]/admin/members — 응답 allowlist (WI-014)", (
 
     expect(res.status).toBe(401);
     expect(mockPrisma.spaceMember.update).not.toHaveBeenCalled();
+  });
+});
+
+// WI-045: 강퇴/차단/해제 모델 — kick 멤버 미삭제(재입장 허용) + LiveKit 제거, ban LiveKit 제거,
+// unban DB-only(enforce 미발송).
+describe("PATCH — WI-045 강퇴/차단/해제 (kick·ban·unban)", () => {
+  it("kick: 멤버를 삭제하지 않고 enforce kick + LiveKit removeSpaceParticipant 호출", async () => {
+    setupActorAndTarget();
+
+    const res = await PATCH(
+      buildJsonRequest(`/api/spaces/${SPACE_ID}/admin/members`, "PATCH", {
+        memberId: "m-target",
+        action: "kick",
+      }),
+      ctx
+    );
+
+    expect(res.status).toBe(200);
+    // 핵심: 멤버 행을 삭제하지 않는다(재입장 허용 — room.ts !member 게이트 회피).
+    expect(mockPrisma.spaceMember.delete).not.toHaveBeenCalled();
+    // 소켓 실시간 disconnect(enforce kick) + LiveKit 화상 제거.
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ spaceId: SPACE_ID, userId: "u-target", action: "kick" })
+    );
+    expect(mockRemoveLiveKit).toHaveBeenCalledWith(SPACE_ID, "u-target");
+    const body = await readJson<{ message: string }>(res);
+    expect(body.message).toBe("Member kicked");
+  });
+
+  it("ban: restriction=BANNED 갱신 + enforce ban + LiveKit removeSpaceParticipant 호출", async () => {
+    setupActorAndTarget();
+    mockPrisma.spaceMember.update.mockResolvedValue({
+      id: "m-target",
+      role: "PARTICIPANT",
+      restriction: "BANNED",
+    });
+
+    const res = await PATCH(
+      buildJsonRequest(`/api/spaces/${SPACE_ID}/admin/members`, "PATCH", {
+        memberId: "m-target",
+        action: "ban",
+      }),
+      ctx
+    );
+
+    expect(res.status).toBe(200);
+    const updateArg = mockPrisma.spaceMember.update.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(updateArg.data.restriction).toBe("BANNED");
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "u-target", action: "ban" })
+    );
+    expect(mockRemoveLiveKit).toHaveBeenCalledWith(SPACE_ID, "u-target");
+  });
+
+  it("unban: restriction=NONE 갱신 + enforce 미발송(DB-only) + LiveKit 미호출", async () => {
+    setupActorAndTarget({ restriction: "BANNED" });
+    mockPrisma.spaceMember.update.mockResolvedValue({
+      id: "m-target",
+      role: "PARTICIPANT",
+      restriction: "NONE",
+    });
+
+    const res = await PATCH(
+      buildJsonRequest(`/api/spaces/${SPACE_ID}/admin/members`, "PATCH", {
+        memberId: "m-target",
+        action: "unban",
+      }),
+      ctx
+    );
+
+    expect(res.status).toBe(200);
+    const updateArg = mockPrisma.spaceMember.update.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(updateArg.data.restriction).toBe("NONE");
+    // 차단 유저는 오프라인 → realtime enforce 불요.
+    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockRemoveLiveKit).not.toHaveBeenCalled();
+    const body = await readJson<{ realtimeEnforced: boolean }>(res);
+    expect(body.realtimeEnforced).toBe(false);
+  });
+
+  it("mute: LiveKit removeSpaceParticipant 미호출(채팅 제재는 화상 무관)", async () => {
+    setupActorAndTarget();
+    mockPrisma.spaceMember.update.mockResolvedValue({
+      id: "m-target",
+      role: "PARTICIPANT",
+      restriction: "MUTED",
+    });
+
+    await PATCH(
+      buildJsonRequest(`/api/spaces/${SPACE_ID}/admin/members`, "PATCH", {
+        memberId: "m-target",
+        action: "mute",
+      }),
+      ctx
+    );
+
+    expect(mockRemoveLiveKit).not.toHaveBeenCalled();
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "mute" })
+    );
   });
 });

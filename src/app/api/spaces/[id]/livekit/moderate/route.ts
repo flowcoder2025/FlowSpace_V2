@@ -8,35 +8,12 @@ import {
   parseParticipantIdentity,
   findMicrophoneTrack,
   buildModeratedPermission,
+  resolveLiveKitConfig,
 } from "@/features/space/livekit-moderation";
 import type { SpaceRole } from "@prisma/client";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
-}
-
-const DEV_API_KEY = "devkey";
-const DEV_API_SECRET = "devsecret";
-
-/**
- * LiveKit 서버 자격을 핸들러 시점에 읽는다(모듈 로드 시점 캡처 회피 — 테스트성).
- * 토큰 라우트와 동일 정책: prod 미설정→null(503), dev→devkey 폴백.
- */
-function resolveLiveKitConfig():
-  | { apiKey: string; apiSecret: string; url: string }
-  | null {
-  const url = process.env.LIVEKIT_URL || "http://localhost:7880";
-  let apiKey = process.env.LIVEKIT_API_KEY;
-  let apiSecret = process.env.LIVEKIT_API_SECRET;
-  if (!apiKey || !apiSecret) {
-    if (process.env.NODE_ENV === "development") {
-      apiKey = DEV_API_KEY;
-      apiSecret = DEV_API_SECRET;
-    } else {
-      return null;
-    }
-  }
-  return { apiKey, apiSecret, url };
 }
 
 /**
