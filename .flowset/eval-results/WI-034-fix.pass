@@ -1,0 +1,16 @@
+WI=WI-034-fix
+commit=5379485
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-034-fix.codex-r3.json
+evaluator=.flowset/eval-results/WI-034-fix.eval.json
+merged=.flowset/eval-results/WI-034-fix.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:442pass,build:0
+codexVerdict=PASS
+evaluatorVerdict=WARNING:9.94(P0/P1/P2=0)
+blockingIssues=0
+deferredP2=0
+deferredP3=0
+rounds=3
+note=듀얼 블라인드 3R 수렴 — codex r1 FAIL(P2 BANNED page미검사·P3 bare create race, 둘 fixNow)→r2 FAIL(P2 upsert 충돌분기 BANNED race·fixNow 신규적출)→r3 PASS 0 issues / evaluator r1 WARNING 9.85(P3x2 defer)→r2 PASS 10.0→r3 WARNING 9.94(P3x1 테스트 select 미단언, tsc TS2339 커버·라이브누출0). 인-스페이스 page가 SpaceMember.role 미전달→user.role 세션내내 undefined→canEdit(에디터)·use-chat isAdmin(@mute/@kick 파싱)·ChatPanel 관리UI가 OWNER/STAFF에게도 비활성이던 선결버그(WI-035 인-스페이스 관리UI 선결) 수정. 신규 순수헬퍼 resolveSpaceRoleDecision(space-role.ts)로 role 결정 분리: SpaceMember.role SoT(소켓 join:space room.ts:48·requireSpaceAdmin 정합)·합성OWNER 금지(owner 멤버행 누락시 self-heal create)·superAdmin 인-스페이스 특례없음(비멤버 소켓 NOT_A_MEMBER→클라 발산회피). page.tsx: findUnique(role+restriction)→헬퍼→redirect/upsert(원자적·P2002 race 차단)→SpaceClient user.role 주입. BANNED 멤버는 role보다 먼저 redirect(소켓 정합)+upsert 후 재평가(TOCTOU 마감) — 맵 편집 HTTP 라우트(map/tiles·objects)가 BANNED 미검사라 r1이 BANNED admin에게 role 주면 에디터 우회편집 가능했던 신규회귀 차단. 양검증자 BANNED·race 독립수렴. 변이검증 9종(MUT-A~I). 테스트 +26(space-role 19·page 7). evaluator r3 P3는 page.test arg.select 단언 추가로 해소(test-only). 설계 codex consult 1R(role SoT·합성OWNER 금지·superAdmin 비특례·순수헬퍼 분리·놓칠위험=세션중 role 변경 stale→WI-035 범위). 게이트 4/4(tsc0/lint0err/vitest 416→442[+26]/build0). sourceFingerprint=empty(소스 전 커밋·작업트리 clean). Vercel 전용(server/·prisma/ 무관 — OCI 소켓·prod DB 무관). main 미승격.
+createdAt=2026-06-23T17:24:00Z
