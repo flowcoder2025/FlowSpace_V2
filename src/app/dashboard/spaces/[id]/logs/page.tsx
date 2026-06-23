@@ -9,6 +9,7 @@ import {
 } from "@/components/dashboard/date-range";
 import { ExportCsvButton } from "@/components/dashboard/export-csv-button";
 import { logsToCsv, downloadCsv, csvFilename } from "@/components/dashboard/csv-export";
+import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
 
 // 표시용 이벤트 타입 옵션(서버는 SpaceEventType enum으로 검증 — SSOT). "" = 전체.
 const EVENT_TYPES = [
@@ -27,7 +28,7 @@ const EVENT_TYPES = [
 interface LogEntry {
   id: string;
   eventType: string;
-  payload?: Record<string, unknown> | null;
+  payload?: PublicSpaceEventPayload;
   createdAt: string;
   user?: { name: string | null; email: string } | null;
 }

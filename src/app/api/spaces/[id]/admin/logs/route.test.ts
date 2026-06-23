@@ -147,3 +147,87 @@ describe("GET /api/spaces/[id]/admin/logs — 고급 필터(WI-030)", () => {
     expect(where.createdAt.gte).toBeInstanceOf(Date);
   });
 });
+
+describe("GET /api/spaces/[id]/admin/logs — payload 정규화 + lean DTO (WI-032)", () => {
+  it("응답 payload는 키 allowlist만 — 금지 키(email/inviteCode/accessSecret/prompt) 제거", async () => {
+    mockPrisma.spaceEventLog.findMany.mockResolvedValue([
+      {
+        id: "log-1",
+        spaceId: SPACE_ID,
+        userId: "user-secret-1",
+        guestSessionId: "guest-secret-1",
+        participantId: "part-secret-1",
+        eventType: "ADMIN_ACTION",
+        payload: {
+          action: "kick",
+          targetName: "Bob",
+          email: "bob@example.com",
+          inviteCode: "SECRET-CODE",
+          accessSecret: "sk_live_xxx",
+          prompt: "internal prompt",
+        },
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        user: { name: "Admin", email: "admin@example.com" },
+      },
+    ]);
+    const res = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/logs`), ctx);
+    expect(res.status).toBe(200);
+    const body = await readJson<{
+      logs: Array<Record<string, unknown> & { payload: Record<string, unknown> | null }>;
+    }>(res);
+    const log = body.logs[0];
+    // payload는 allowlist 키만.
+    expect(Object.keys(log.payload ?? {}).sort()).toEqual(["action", "targetName"]);
+    expect(log.payload).not.toHaveProperty("email");
+    expect(log.payload).not.toHaveProperty("inviteCode");
+    expect(log.payload).not.toHaveProperty("accessSecret");
+    expect(log.payload).not.toHaveProperty("prompt");
+  });
+
+  it("응답 행은 lean — 내부 스칼라(spaceId/userId/guestSessionId/participantId) 미노출", async () => {
+    mockPrisma.spaceEventLog.findMany.mockResolvedValue([
+      {
+        id: "log-1",
+        spaceId: SPACE_ID,
+        userId: "user-secret-1",
+        guestSessionId: "guest-secret-1",
+        participantId: "part-secret-1",
+        eventType: "ENTER",
+        payload: { action: "announce", messageId: "m1" },
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        user: { name: "Admin", email: "admin@example.com" },
+      },
+    ]);
+    const res = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/logs`), ctx);
+    const body = await readJson<{ logs: Array<Record<string, unknown>> }>(res);
+    const log = body.logs[0];
+    expect(Object.keys(log).sort()).toEqual([
+      "createdAt",
+      "eventType",
+      "id",
+      "payload",
+      "user",
+    ]);
+    expect(log).not.toHaveProperty("spaceId");
+    expect(log).not.toHaveProperty("userId");
+    expect(log).not.toHaveProperty("guestSessionId");
+    expect(log).not.toHaveProperty("participantId");
+  });
+
+  it("허용 키가 0개면 payload는 null(금지 키만 담긴 행)", async () => {
+    mockPrisma.spaceEventLog.findMany.mockResolvedValue([
+      {
+        id: "log-1",
+        spaceId: SPACE_ID,
+        userId: "u1",
+        eventType: "ADMIN_ACTION",
+        payload: { email: "leak@example.com", inviteCode: "abc" },
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        user: null,
+      },
+    ]);
+    const res = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/logs`), ctx);
+    const body = await readJson<{ logs: Array<{ payload: unknown }> }>(res);
+    expect(body.logs[0].payload).toBeNull();
+  });
+});

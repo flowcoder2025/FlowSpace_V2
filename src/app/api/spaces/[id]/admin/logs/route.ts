@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
 import { normalizeEnumFilter, parseDateRangeFilter } from "@/lib/query-filter";
 import { internalErrorResponse } from "@/lib/api-error";
+import { toPublicSpaceEventLog } from "@/lib/space-event-log-payload";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -70,9 +71,11 @@ export async function GET(request: Request, { params }: RouteParams) {
     });
 
     // 응답 계약 보존: { logs, nextCursor }만 반환(buildCursorPage로 messages와 통일).
+    // payload는 키 allowlist로 정규화하고 행은 lean DTO로 축소한다(WI-032): 이 API가
+    // payload 노출 차단의 단일 chokepoint다(화면/CSV만 필터하면 raw 직접 호출로 우회).
     const { items, nextCursor } = buildCursorPage(logs, limit);
 
-    return NextResponse.json({ logs: items, nextCursor });
+    return NextResponse.json({ logs: items.map(toPublicSpaceEventLog), nextCursor });
   } catch (error) {
     return internalErrorResponse("GET /api/spaces/[id]/admin/logs", error, "Failed to fetch logs");
   }
