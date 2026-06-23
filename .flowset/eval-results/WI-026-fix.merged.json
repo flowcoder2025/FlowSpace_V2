@@ -1,0 +1,29 @@
+{
+  "wi": "WI-026-fix",
+  "title": "저장 metadata public/internal 분리 (저장면 축소 심층 방어)",
+  "finalCommit": "02614ce",
+  "rounds": 5,
+  "codex": {
+    "r1": { "verdict": "WARNING", "issues": 2, "note": "백필 prod 게이트 미구현(주석만)·리터럴 미러링 드리프트 가드 부재(둘 다 ops 스크립트, 코어 WI 0 findings)" },
+    "r2": { "verdict": "FAIL", "issues": 2, "note": "prod 게이트 전체-URL regex 우회(?schema=localhost로 실증)·드리프트 테스트 정규식 fragile" },
+    "r3": { "verdict": "FAIL", "issues": 1, "note": "hostname 파싱 후에도 ?host= query 파라미터 override 우회(prod.invalid 접속 실증)" },
+    "r4": { "verdict": "FAIL", "issues": 1, "note": "host/hostaddr query 반복키(?host=a&host=b)가 get() 첫값만 봐 우회" },
+    "r5": { "verdict": "PASS", "issues": 0, "note": "getAll 반복키 + 콤마 다중호스트 + Unix소켓 로컬 인정으로 우회 클래스 전체 차단 — 잔여 P0/P1/P2 0" },
+    "artifact": ".flowset/eval-results/WI-026-codex-r5.json"
+  },
+  "evaluator": {
+    "verdict": "WARNING",
+    "weightedTotal": 9.92,
+    "scores": { "completeness": 10.0, "consistency": 10.0, "specificity": 9.9, "actionability": 9.7 },
+    "blocking": { "P0": 0, "P1": 0, "P2": 0 },
+    "deferredP3": 2,
+    "mutationTesting": "코어 WI: builder 전체 spread→5 FAIL(prompt/workflow/comfyuiJobId 누출)·batchId 제거→3 FAIL·allowlist drift→8 FAIL. prod 게이트: host override 무시(B)→2 FAIL·getAll→get(C)→1 FAIL. 드리프트: 코어 미러 키 제거(A)→FAIL. 전부 원복 clean.",
+    "artifact": ".flowset/eval-results/WI-026.eval.json"
+  },
+  "convergence": "핵심 WI(buildStoredAssetMetadata·generate/batch·batchId 보존·응답 shape 불변)는 양 검증자가 5R 내내 0 findings — 클린. 모든 이슈는 백필 ops 스크립트의 prod 코드 게이트(심층방어)에 집중. codex가 libpq 연결문자열 우회 벡터를 4R 적대적으로 적출(전체-URL regex→hostname→host/hostaddr query→반복키) → 매 라운드 fail-safe 강화 → r5 PASS. evaluator 최종 HEAD 9.92(r1 9.87 P3 2건 실질 해소→상향). 코어 WI는 r1 변이검증으로 검증됨·이후 무변경.",
+  "gates": { "tsc": 0, "lint": "0err(1 preexisting LiveKit warning)", "vitest": "384→407", "build": 0 },
+  "deferred": [
+    "buildStoredAssetMetadata 이중 캐스트(현 PUBLIC 키 전부 JSON 스칼라라 안전·tsc0, 비-스칼라 공개키 미래 도입 시만 위험)",
+    "prod 게이트 fail-safe 과다활성(사설 LAN IP·0.0.0.0도 원격 판정→확인 env 요구·조용한 mutate 절대 없음) + 빈 DATABASE_URL 게이트 비활성(URL 없이는 Prisma mutate 연결 불가라 위험 경로 부재)"
+  ]
+}
