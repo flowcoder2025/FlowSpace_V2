@@ -222,6 +222,8 @@ export function ParticipantPanel({
                     currentUserId={currentUserId ?? ""}
                     onActionDone={refetch}
                     align="left"
+                    // LiveKit room 참가자 → 음성 강제 음소거 가능(track.participantId = identity).
+                    participantIdentity={track.participantId}
                   />
                 }
               />

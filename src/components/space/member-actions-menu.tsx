@@ -30,6 +30,16 @@ interface MemberActionsMenuProps {
   onActionDone: () => void;
   /** 드롭다운 전개 방향(버튼 위치에 맞춰). 기본 우측 정렬. */
   align?: "left" | "right";
+  /**
+   * 음성 강제 음소거(WI-038/039)용 **LiveKit identity**(`user-{userId}`/`guest-{...}`).
+   * LiveKit room에 연결된 참가자에게만 주어진다(비-미디어 소켓 전용 플레이어는 undefined →
+   * 음성 액션 미노출). userId에서 재구성하지 않는다 — 라우트 계약(LiveKit identity)을
+   * UI에서 복제하지 않기 위함이고, guest-* 확장을 막지 않기 위함이다.
+   *
+   * ⚠️ 메뉴 가시성 게이트(member/actorRole/canActOn)와 **분리된** 액션별 게이트다 —
+   * 음성 액션 추가가 기존 채팅/킥/밴 권한 모델을 흐리지 않는다.
+   */
+  participantIdentity?: string | null;
 }
 
 const COPY = SPACE_COPY.PARTICIPANT_PANEL;
@@ -42,6 +52,7 @@ export function MemberActionsMenu({
   currentUserId,
   onActionDone,
   align = "right",
+  participantIdentity,
 }: MemberActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -97,12 +108,44 @@ export function MemberActionsMenu({
     [member, loading, spaceId, onActionDone, closeMenu]
   );
 
+  // 음성 강제 음소거(WI-038/039) — LiveKit identity로 moderate 라우트 호출.
+  // 멤버 상태(restriction)를 바꾸지 않으므로 onActionDone(refetch) 호출하지 않는다.
+  // 실제 오디오 상태는 LiveKit 이벤트로 자연 갱신된다.
+  const runVoiceAction = useCallback(
+    async (muted: boolean) => {
+      if (!participantIdentity || loading) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/spaces/${spaceId}/livekit/moderate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identity: participantIdentity, muted }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { code?: string };
+          // 서버 영문 error 미노출 — code별 한글 매핑, 미지의 code는 폴백.
+          setError((data.code && COPY.voiceError[data.code]) || COPY.actionFailed);
+          return;
+        }
+        closeMenu();
+      } catch {
+        setError(COPY.networkError);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [participantIdentity, loading, spaceId, closeMenu]
+  );
+
   // 게이팅: 멤버 매핑/권위 role 없으면, 본인이면, 계층상 불가하면 표시 안 함.
   if (!member || !actorRole) return null;
   if (member.userId === currentUserId) return null;
   if (!canActOn(actorRole, member.role)) return null;
 
   const isMuted = member.restriction === "MUTED";
+  // 음성 액션은 LiveKit identity가 있을 때만(LiveKit room 참가자). 메뉴 가시성과 분리된 게이트.
+  const showVoiceActions = !!participantIdentity;
 
   return (
     <div ref={containerRef} className="relative">
@@ -165,6 +208,37 @@ export function MemberActionsMenu({
                   {isMuted ? COPY.actions.unmute : COPY.actions.mute}
                 </button>
               </li>
+              {/* 음성 제어 — LiveKit 강제 음소거(채팅 음소거와 별개 레이어). identity 있을 때만. */}
+              {showVoiceActions && (
+                <>
+                  <li
+                    aria-hidden="true"
+                    className="mt-1 border-t border-cream/10 px-3 pb-0.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted"
+                  >
+                    {COPY.voiceSectionLabel}
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => runVoiceAction(true)}
+                      className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
+                    >
+                      {COPY.voiceActions.mute}
+                    </button>
+                  </li>
+                  <li className="border-b border-cream/10 pb-1">
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => runVoiceAction(false)}
+                      className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
+                    >
+                      {COPY.voiceActions.allow}
+                    </button>
+                  </li>
+                </>
+              )}
               <li>
                 <button
                   type="button"
