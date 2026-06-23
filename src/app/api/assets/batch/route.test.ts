@@ -85,3 +85,77 @@ describe("POST /api/assets/batch — 비동기 실패 경로 정보위생 (WI-02
     expect(loggedRaw).toBe(true);
   });
 });
+
+describe("POST /api/assets/batch — 성공 경로 저장 metadata 정규화 (WI-026)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue(makeSession({ id: "user-1" }));
+    mockPrisma.generatedAsset.create.mockResolvedValue({ id: "asset-1" });
+    mockPrisma.generatedAsset.update.mockResolvedValue({});
+  });
+
+  const FULL_METADATA = {
+    id: "asset-1",
+    type: "character",
+    name: "전사",
+    prompt: "a brave warrior, secret style tokens",
+    workflow: "character-default",
+    width: 512,
+    height: 256,
+    frameWidth: 64,
+    frameHeight: 64,
+    columns: 8,
+    rows: 4,
+    filePath: "/assets/generated/characters/character_전사_v1.png",
+    thumbnailPath: "/assets/generated/thumbnails/thumb_asset-1.png",
+    fileSize: 12345,
+    format: "png",
+    comfyuiJobId: "comfy-job-abc123",
+    seed: 7,
+    generatedAt: "2026-06-23T00:00:00.000Z",
+    processingTime: 9876,
+    status: "completed",
+  };
+
+  it("성공 시 공개 런타임 키 + batchId만 저장한다 (민감 필드 미저장·batchId 보존)", async () => {
+    mockProcess.mockResolvedValue(FULL_METADATA);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(202);
+
+    await vi.waitFor(() =>
+      expect(mockPrisma.generatedAsset.update).toHaveBeenCalled()
+    );
+
+    const arg = mockPrisma.generatedAsset.update.mock.calls[0][0];
+    expect(arg.data.status).toBe("COMPLETED");
+    // 공개 런타임 키 + batchId(저장 전용 운영 키). 민감 필드 없음.
+    expect(Object.keys(arg.data.metadata).sort()).toEqual(
+      [
+        "batchId",
+        "columns",
+        "format",
+        "frameHeight",
+        "frameWidth",
+        "generatedAt",
+        "height",
+        "processingTime",
+        "rows",
+        "seed",
+        "width",
+      ].sort()
+    );
+    // batchId 보존 — GET /api/assets/batch가 metadata.path:["batchId"]로 조회.
+    expect(typeof arg.data.metadata.batchId).toBe("string");
+    expect(arg.data.metadata.batchId).toMatch(/^batch-/);
+    // 민감 필드는 metadata에 미저장.
+    expect(arg.data.metadata.prompt).toBeUndefined();
+    expect(arg.data.metadata.workflow).toBeUndefined();
+    expect(arg.data.metadata.comfyuiJobId).toBeUndefined();
+
+    const stored = JSON.stringify(arg.data.metadata);
+    expect(stored).not.toContain("secret style tokens");
+    expect(stored).not.toContain("character-default");
+    expect(stored).not.toContain("comfy-job-abc123");
+  });
+});

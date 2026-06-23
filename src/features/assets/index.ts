@@ -7,6 +7,7 @@ export { resolveGeneratedAssetPath } from "./internal/safe-path";
 export {
   toPublicGeneratedAsset,
   toPublicAssetListItem,
+  buildStoredAssetMetadata,
   PUBLIC_METADATA_KEYS,
 } from "./internal/public-asset";
 export type {

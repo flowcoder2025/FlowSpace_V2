@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 10.0,
+    "consistency": 10.0,
+    "specificity": 9.9,
+    "actionability": 9.7
+  },
+  "weightedTotal": 9.92,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/features/assets/internal/public-asset.ts:124,131",
+      "description": "buildStoredAssetMetadata가 `metadata as unknown as Record<string, unknown>` 후 `value as Prisma.InputJsonValue`로 이중 캐스트한다. 현 PUBLIC_METADATA_KEYS가 가리키는 GeneratedAssetMetadata 필드는 전부 number/string/optional(JSON-안전 스칼라)이라 캐스트 안전(asset-spec.md GeneratedAssetMetadata 정의·tsc 0 실측 확인). 다만 향후 allowlist에 비-스칼라(객체/배열) 공개키가 추가되면 캐스트가 타입 체커를 우회해 InputJsonValue 위반을 런타임으로 미룬다. 주석으로 안전 근거가 명시돼 있다. r1에서 식별 → r5 시점에도 동일 잔존(코어 WI 무변경).",
+      "recommendation": "현 구현 유지 가능. 향후 비-스칼라 공개키 도입 시 캐스트 대신 명시적 JSON 직렬화 가능성 검증 권고.",
+      "defer": true,
+      "deferRationale": "현 PUBLIC_METADATA_KEYS 전 필드 스칼라라 캐스트 안전 실증(tsc 0·build 0). 비-스칼라 공개키 도입은 가설적 미래 변경이며 그 시점에 다뤄도 충분. 보안·동작 회귀 없음.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "scripts/backfill-stored-asset-metadata.core.mjs:77-78,99-102",
+      "description": "isRemoteDatabase는 fail-safe 설계라 의도적으로 과다 활성 쪽으로 기운다: 사설 LAN IP(192.168.x.x 등)·확장형 IPv6 루프백([0:0:0:0:0:0:0:1])·0.0.0.0를 가리키는 로컬 docker DB도 '원격'으로 판정해 --apply 시 CONFIRM_PROD_BACKFILL=WI-026를 요구한다. 또 `DATABASE_URL` 빈문자열/미설정은 false(게이트 비활성)다. SUSPECTED 과다활성은 실해 없음(확인 환경변수만 요구·절대 조용히 mutate 안 함), 빈값 false도 PrismaClient가 URL 없이는 mutate 연결 불가라 위험 경로 없음. backfill-prod-gate.test.ts가 우회 벡터(query-component localhost·host/hostaddr override·콤마 다중호스트·반복키 getAll·substring·unix socket·파싱불가)는 전수 잠금 — 변이검증 B(query override 무시)·C(getAll→get) 둘 다 테스트가 검출함을 실증.",
+      "recommendation": "현 fail-safe 기조 유지 권고(원격에 대한 거짓음성보다 로컬에 대한 거짓양성이 안전). 빈 DATABASE_URL을 명시적으로 abort하고 싶으면 main 스크립트에 한 줄 가드를 둘 수 있으나 필수 아님.",
+      "defer": true,
+      "deferRationale": "과다활성·빈값 false 모두 데이터 손상 경로가 아니다(확인 환경변수 요구 또는 Prisma 연결 실패로 귀결). 우회 벡터는 전수 테스트+변이검증으로 잠겨 게이트 실효성 입증. dry-run 기본·prod 사용자 게이트로 폭발반경 최소.",
+      "fixNow": false
+    }
+  ]
+}

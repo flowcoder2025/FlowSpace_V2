@@ -1,12 +1,12 @@
 {
   "activeWI": null,
-  "lastWI": "WI-032-fix",
-  "type": null,
-  "status": "PROMOTED_TO_MAIN_LIVE",
+  "lastWI": "WI-026-fix",
+  "type": "fix",
+  "status": "MERGED_TO_DEVELOP",
   "integrationBranch": "develop",
   "branch": "develop",
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "626769e",
-  "note": "✅ develop→main 승격 완료 + 라이브 반영(2026-06-23, PR#34 rebase merge main HEAD 626769e). 승격 델타 = WI-029/030/031/032(4건, 직전 PR#29=WI-017~024 이후). 사용자 'develop→main 승격' 선택(AskUserQuestion). === 승격 readiness GO: codex consult GO(통합 정합·배포영향·rebase 확인) + 적대 통합감사 4축(cross-WI/통합건전성/배포런타임/보안회귀) 전 차원 GO·blocker 0. develop⊇main strict superset(클린 rebase·충돌0). === 배포 영향: Vercel 웹/일부 API 라우트만(assets route도 WI-030 query-filter 공용화로 touched). server/·prisma/·Dockerfile/deploy-*.yml/compose/package 무변경 → OCI 소켓 재배포 no-op·prod DB 마이그레이션 no-op·신규 env 없음. === 실행: rebase 머지(author=flowcoder25@gmail.com 보존→Vercel 인가, gh=yonghyeon-dev라 일반 merge면 인가 실패) → main HEAD 626769e(flowcoder25 authored 검증) → Vercel Production ● Ready(flowspace-v2-8twa6brxj, push 직후 배포·1m). === 라이브 검증: space.flow-coder.com 200·/login 200·/api/users/me 307(인증 게이트 정상). develop back-sync 완료(force-with-lease, develop==main==626769e·SHA 분기 없음 — codex 놓칠위험 해소). === 비차단 concern(승격 무관): toPublicSpaceEventLog createdAt:Date vs 클라 string(런타임 NextResponse.json Date→ISO 정합·코드베이스 관례)·CSV 로드분만(라벨 완화)·admin/messages raw ChatMessage(baseline·WI-030은 필터만 추가)·members CSV email(기존 권한 데이터 재포맷). === 롤백: Vercel 이전배포 promote / main revert PR. === READY 큐 비어 있음. WI-029~032 라이브. BACKLOG: WI-025(표면0)/026(누출0)/028(코드-WI 부적합→runbook). === 남은 사용자 게이트(비코드): 인증 소켓 e2e smoke(로그인→입장→동기화·자격증명 필요)·WI-024 백필 --apply prod·WI-005 SOCKET_INTERNAL_*·WI-013 prod EXPLAIN."
+  "lastVerifiedCommit": "02614ce",
+  "note": "✅ WI-026-fix (저장 metadata public/internal 분리 — 저장면 축소 심층방어) develop 머지 (PR#35). READY 큐 소진 → 사용자 '핸드오프 읽고 코덱스와 협의' → 설계 codex consult로 BACKLOG 3건(WI-025/026/028) 우선순위 협의 → WI-026 1순위 선정(WI-025 실표면0·임의정책 / WI-028 운영 runbook). === 해소: generate/batch 성공 시 GeneratedAssetMetadata 전체(prompt/workflow/comfyuiJobId)를 metadata Json에 통째 저장하던 것을 공개 런타임 키만 저장하도록 정규화. 응답 누출은 WI-019 PUBLIC_METADATA_KEYS allowlist로 이미 0 — 저장 계층 방어(allowlist 드리프트 대비, WI-024 응답+저장 양쪽 패턴의 저장 측). 신규 buildStoredAssetMetadata(PUBLIC_METADATA_KEYS를 저장/응답 단일 SoT 공유 — 저장면=응답면 byte동일=무회귀) + batchId storage-only 보존(batch GET metadata.path 의존) + 순수 코어 분리 백필(prod 게이트). === 듀얼 블라인드 5R 수렴: codex r1 WARNING→r2/r3/r4 FAIL→r5 PASS 0 issues / evaluator 최종 HEAD WARNING 9.92(P0/P1/P2 0, P3×2 defer). 핵심 WI(저장 빌더·라우트·batchId·응답 불변)는 5R 내내 양 검증자 0 findings 클린 — 모든 이슈는 백필 ops prod 게이트(codex가 libpq 우회 벡터 4R 적대 적출: 전체-URL regex→hostname→host/hostaddr query override→반복키 getAll → 매 라운드 fail-safe 강화). 변이검증: builder 전체 spread→5 FAIL·batchId 제거→3 FAIL·allowlist drift→8 FAIL·host override→2 FAIL·getAll→get→1 FAIL. === 게이트 4/4(tsc0/lint0err[선재 LiveKit 경고1·WI무관]/vitest 384→407[+23]/build0) + .pass(fingerprint empty e3b0c44). === Vercel 전용(server/ 미참조 — OCI 소켓·prod DB 무관). === main 미승격(승격은 사용자 승인 게이트). === 남은 BACKLOG: WI-025(parsePageNumber offset 상한·실표면0)/WI-028(Vercel↔OCI AUTH_SECRET synthetic probe·운영 runbook). 남은 사용자 게이트(비코드): WI-024/026 백필 --apply prod(선택)·인증 소켓 e2e smoke·WI-005 SOCKET_INTERNAL_*·WI-013 prod EXPLAIN."
 }
