@@ -1,0 +1,9 @@
+WI=WI-044-fix
+commit=9300b83
+codex=.flowset/eval-results/WI-044-fix.codex.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:563pass(561→563),build:0
+codexVerdict=PASS(0 issues)
+blockingIssues=0
+rounds=1
+note=멤버 관리 메뉴 드롭다운 portal 화 — VideoTile overflow-hidden(둥근모서리) 안 absolute 드롭다운이 타일 높이(aspect-video) 넘는 하위 항목(내보내기/차단)·에러 메시지를 잘라 "메뉴 없음"·"동작 안 함"으로 보이던 라이브 버그(사용자 스크린샷). createPortal(document.body)로 overflow 탈출 + 버튼 rect 기준 fixed 좌표(resize/scroll capture 추종·하단 부족 시 위로 플립·maxHeight+overflow-y-auto) + 외부클릭 buttonRef/dropdownRef 둘 다 체크. 게이팅/액션/확인 로직 무변경. 회귀 테스트 +2(하위 항목 전수 존재·document.body 직속 portal). codex 블라인드 PASS 0 issues(SSR 안전[open 초기 false 단락]·포지셔닝·리스너 누수·회귀·무한루프 전부 클린). 게이트 tsc0/lint0err/vitest 561→563/build0. Vercel 전용(server/·prisma/ 무관). 긴급 라이브 버그라 단일 codex 블라인드로 스트림라인.
