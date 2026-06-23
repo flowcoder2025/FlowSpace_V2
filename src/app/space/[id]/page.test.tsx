@@ -54,7 +54,7 @@ beforeEach(() => {
     avatarConfig: null,
   });
   mockPrisma.spaceMember.findUnique.mockResolvedValue(null);
-  mockPrisma.spaceMember.upsert.mockResolvedValue({ role: "PARTICIPANT" });
+  mockPrisma.spaceMember.upsert.mockResolvedValue({ role: "PARTICIPANT", restriction: "NONE" });
 });
 
 describe("SpacePage role 주입", () => {
@@ -82,7 +82,7 @@ describe("SpacePage role 주입", () => {
 
   it("PUBLIC 비멤버 → upsert로 PARTICIPANT 자동 가입(원자성), bare create 미사용", async () => {
     mockPrisma.spaceMember.findUnique.mockResolvedValue(null);
-    mockPrisma.spaceMember.upsert.mockResolvedValue({ role: "PARTICIPANT" });
+    mockPrisma.spaceMember.upsert.mockResolvedValue({ role: "PARTICIPANT", restriction: "NONE" });
 
     const el = await call();
 
@@ -112,7 +112,7 @@ describe("SpacePage role 주입", () => {
       _count: { members: 1 },
     });
     mockPrisma.spaceMember.findUnique.mockResolvedValue(null);
-    mockPrisma.spaceMember.upsert.mockResolvedValue({ role: "OWNER" });
+    mockPrisma.spaceMember.upsert.mockResolvedValue({ role: "OWNER", restriction: "NONE" });
 
     const el = await call();
 
@@ -129,6 +129,15 @@ describe("SpacePage 접근 거부 (redirect)", () => {
 
     await expect(call()).rejects.toThrow("REDIRECT:/my-spaces");
     expect(mockPrisma.spaceMember.upsert).not.toHaveBeenCalled();
+  });
+
+  it("create 경로에서 upsert가 BANNED 기존 행 반환(race) → role 주입 전 redirect", async () => {
+    // findUnique 직후~upsert 사이 행이 BANNED가 되는 TOCTOU. upsert는 충돌 분기에서
+    // 기존(BANNED) 행을 반환할 수 있으므로 upsert 후에도 BANNED를 재확인해야 한다.
+    mockPrisma.spaceMember.findUnique.mockResolvedValue(null); // 진입 시 행 없음 → create 결정
+    mockPrisma.spaceMember.upsert.mockResolvedValue({ role: "OWNER", restriction: "BANNED" });
+
+    await expect(call()).rejects.toThrow("REDIRECT:/my-spaces");
   });
 
   it("PRIVATE 비멤버 → redirect /my-spaces", async () => {
