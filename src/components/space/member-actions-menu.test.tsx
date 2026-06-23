@@ -274,3 +274,27 @@ describe("MemberActionsMenu — 음성 제어(WI-039)", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 });
+
+// WI-044: 드롭다운 portal — VideoTile overflow-hidden에 잘려 내보내기/차단·에러가
+// 사라지던 버그 회귀 가드. 드롭다운은 document.body 직속(fixed)으로 렌더돼야 한다.
+describe("MemberActionsMenu — portal(overflow 탈출)", () => {
+  it("열린 드롭다운에 모든 하위 항목(내보내기/차단 포함)이 존재한다", () => {
+    renderMenu();
+    fireEvent.click(screen.getByLabelText("Staff Kim 관리"));
+    expect(screen.getByText("채팅 음소거")).toBeTruthy();
+    expect(screen.getByText("내보내기")).toBeTruthy();
+    expect(screen.getByText("차단")).toBeTruthy();
+  });
+
+  it("드롭다운이 document.body 직속(fixed)으로 portal 된다 — 트리거 컨테이너에 중첩되지 않음", () => {
+    renderMenu();
+    const trigger = screen.getByLabelText("Staff Kim 관리");
+    fireEvent.click(trigger);
+    const dropdown = screen.getByText("내보내기").closest('div[style*="fixed"]') as HTMLElement | null;
+    expect(dropdown).not.toBeNull();
+    // portal → document.body 직속(overflow-hidden 조상 밖). 트리거 버튼 조상이 아님.
+    expect(dropdown!.parentElement).toBe(document.body);
+    expect(dropdown!.contains(trigger)).toBe(false);
+    expect(trigger.parentElement?.contains(dropdown)).toBe(false);
+  });
+});

@@ -9,8 +9,14 @@
  * 클라 게이팅은 best-effort UX다.
  *
  * ⚠️ PATCH 대상은 **오직 `member.memberId`(=SpaceMember.id)**. userId를 쓰지 않는다.
+ *
+ * ⚠️ 드롭다운은 React portal(document.body)로 렌더한다 — 트리거 버튼이 `overflow-hidden`
+ * 한 VideoTile(좌상단 actionsSlot) 안에 있어 absolute 드롭다운이 타일 높이에 잘려
+ * 아래쪽 항목(내보내기/차단)·에러 메시지가 사라지던 버그(WI-044)를 막는다. fixed 좌표는
+ * 버튼 rect 기준으로 계산하고, 아래 공간이 부족하면 위로 펼친다.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { canActOn } from "@/lib/space-role";
 import { SPACE_COPY } from "@/constants/space-copy";
 import type { SpaceRole } from "@prisma/client";
@@ -28,7 +34,7 @@ interface MemberActionsMenuProps {
   currentUserId: string;
   /** 액션 성공 시 호출(멤버 스냅샷 재조회). */
   onActionDone: () => void;
-  /** 드롭다운 전개 방향(버튼 위치에 맞춰). 기본 우측 정렬. */
+  /** 드롭다운 가로 정렬(버튼 위치에 맞춰). 기본 우측 정렬. */
   align?: "left" | "right";
   /**
    * 음성 강제 음소거(WI-038/039)용 **LiveKit identity**(`user-{userId}`/`guest-{...}`).
@@ -44,6 +50,35 @@ interface MemberActionsMenuProps {
 
 const COPY = SPACE_COPY.PARTICIPANT_PANEL;
 
+const MENU_WIDTH = 176; // w-44
+const VIEWPORT_MARGIN = 8;
+
+/** 드롭다운 fixed 위치(버튼 rect 기준). 아래 공간 부족 시 위로 펼침. */
+interface MenuCoords {
+  left: number;
+  top?: number;
+  bottom?: number;
+  maxHeight: number;
+}
+
+function computeCoords(rect: DOMRect, align: "left" | "right"): MenuCoords {
+  const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_MARGIN;
+  const spaceAbove = rect.top - VIEWPORT_MARGIN;
+  const openUp = spaceBelow < 200 && spaceAbove > spaceBelow;
+
+  // 가로: align에 따라 버튼 좌/우 모서리에 맞추되 화면 밖으로 나가지 않게 clamp.
+  const rawLeft = align === "left" ? rect.left : rect.right - MENU_WIDTH;
+  const left = Math.max(
+    VIEWPORT_MARGIN,
+    Math.min(rawLeft, window.innerWidth - MENU_WIDTH - VIEWPORT_MARGIN)
+  );
+
+  if (openUp) {
+    return { left, bottom: window.innerHeight - rect.top + 4, maxHeight: spaceAbove };
+  }
+  return { left, top: rect.bottom + 4, maxHeight: spaceBelow };
+}
+
 export function MemberActionsMenu({
   spaceId,
   target,
@@ -58,7 +93,9 @@ export function MemberActionsMenu({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<"kick" | "ban" | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<MenuCoords | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = useCallback(() => {
     setOpen(false);
@@ -66,13 +103,27 @@ export function MemberActionsMenu({
     setError(null);
   }, []);
 
-  // 메뉴 밖 클릭 시 닫기
+  // 드롭다운 열림 시 버튼 rect 기준 fixed 좌표 계산(portal이라 overflow 무관).
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) return;
+    const update = () =>
+      setCoords(computeCoords(buttonRef.current!.getBoundingClientRect(), align));
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true); // capture: 스크롤 조상 포함
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, align]);
+
+  // 메뉴 밖 클릭 시 닫기(portal 드롭다운은 buttonRef 밖이라 별도 체크).
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        closeMenu();
-      }
+      const t = e.target as Node;
+      if (buttonRef.current?.contains(t) || dropdownRef.current?.contains(t)) return;
+      closeMenu();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -148,8 +199,9 @@ export function MemberActionsMenu({
   const showVoiceActions = !!participantIdentity;
 
   return (
-    <div ref={containerRef} className="relative">
+    <>
       <button
+        ref={buttonRef}
         type="button"
         aria-label={COPY.manageAriaLabel(target.nickname)}
         onClick={(e) => {
@@ -165,109 +217,121 @@ export function MemberActionsMenu({
         </svg>
       </button>
 
-      {open && (
-        <div
-          className={`absolute ${align === "left" ? "left-0" : "right-0"} z-50 mt-1 w-44 overflow-hidden rounded-md border border-cream/15 bg-ink/95 text-sm text-cream shadow-lg backdrop-blur-md`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {pendingConfirm ? (
-            <div className="p-2">
-              <p className="mb-2 text-xs leading-snug text-ink-light">
-                {pendingConfirm === "kick"
-                  ? COPY.confirm.kick(target.nickname)
-                  : COPY.confirm.ban(target.nickname)}
-              </p>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => runAction(pendingConfirm)}
-                  className="flex-1 rounded bg-red-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
-                >
-                  {COPY.confirm.confirmLabel}
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => setPendingConfirm(null)}
-                  className="flex-1 rounded bg-cream/10 px-2 py-1 text-xs text-cream transition-colors hover:bg-cream/20 disabled:opacity-50"
-                >
-                  {COPY.confirm.cancelLabel}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <ul className="py-1">
-              <li>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => runAction(isMuted ? "unmute" : "mute")}
-                  className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
-                >
-                  {isMuted ? COPY.actions.unmute : COPY.actions.mute}
-                </button>
-              </li>
-              {/* 음성 제어 — LiveKit 강제 음소거(채팅 음소거와 별개 레이어). identity 있을 때만. */}
-              {showVoiceActions && (
-                <>
-                  <li
-                    aria-hidden="true"
-                    className="mt-1 border-t border-cream/10 px-3 pb-0.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted"
+      {open &&
+        coords &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: "fixed",
+              left: coords.left,
+              top: coords.top,
+              bottom: coords.bottom,
+              width: MENU_WIDTH,
+              maxHeight: coords.maxHeight,
+            }}
+            className="z-[100] overflow-y-auto rounded-md border border-cream/15 bg-ink/95 text-sm text-cream shadow-lg backdrop-blur-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {pendingConfirm ? (
+              <div className="p-2">
+                <p className="mb-2 text-xs leading-snug text-ink-light">
+                  {pendingConfirm === "kick"
+                    ? COPY.confirm.kick(target.nickname)
+                    : COPY.confirm.ban(target.nickname)}
+                </p>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => runAction(pendingConfirm)}
+                    className="flex-1 rounded bg-red-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
                   >
-                    {COPY.voiceSectionLabel}
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => runVoiceAction(true)}
-                      className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
+                    {COPY.confirm.confirmLabel}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => setPendingConfirm(null)}
+                    className="flex-1 rounded bg-cream/10 px-2 py-1 text-xs text-cream transition-colors hover:bg-cream/20 disabled:opacity-50"
+                  >
+                    {COPY.confirm.cancelLabel}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <ul className="py-1">
+                <li>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => runAction(isMuted ? "unmute" : "mute")}
+                    className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
+                  >
+                    {isMuted ? COPY.actions.unmute : COPY.actions.mute}
+                  </button>
+                </li>
+                {/* 음성 제어 — LiveKit 강제 음소거(채팅 음소거와 별개 레이어). identity 있을 때만. */}
+                {showVoiceActions && (
+                  <>
+                    <li
+                      aria-hidden="true"
+                      className="mt-1 border-t border-cream/10 px-3 pb-0.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted"
                     >
-                      {COPY.voiceActions.mute}
-                    </button>
-                  </li>
-                  <li className="border-b border-cream/10 pb-1">
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => runVoiceAction(false)}
-                      className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
-                    >
-                      {COPY.voiceActions.allow}
-                    </button>
-                  </li>
-                </>
-              )}
-              <li>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => setPendingConfirm("kick")}
-                  className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
-                >
-                  {COPY.actions.kick}
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => setPendingConfirm("ban")}
-                  className="block w-full px-3 py-1.5 text-left text-red-400 transition-colors hover:bg-cream/10 disabled:opacity-50"
-                >
-                  {COPY.actions.ban}
-                </button>
-              </li>
-            </ul>
-          )}
-          {error && (
-            <p className="border-t border-cream/10 px-3 py-1.5 text-xs text-red-400">
-              {error}
-            </p>
-          )}
-        </div>
-      )}
-    </div>
+                      {COPY.voiceSectionLabel}
+                    </li>
+                    <li>
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => runVoiceAction(true)}
+                        className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
+                      >
+                        {COPY.voiceActions.mute}
+                      </button>
+                    </li>
+                    <li className="border-b border-cream/10 pb-1">
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => runVoiceAction(false)}
+                        className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
+                      >
+                        {COPY.voiceActions.allow}
+                      </button>
+                    </li>
+                  </>
+                )}
+                <li>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => setPendingConfirm("kick")}
+                    className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
+                  >
+                    {COPY.actions.kick}
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => setPendingConfirm("ban")}
+                    className="block w-full px-3 py-1.5 text-left text-red-400 transition-colors hover:bg-cream/10 disabled:opacity-50"
+                  >
+                    {COPY.actions.ban}
+                  </button>
+                </li>
+              </ul>
+            )}
+            {error && (
+              <p className="border-t border-cream/10 px-3 py-1.5 text-xs text-red-400">
+                {error}
+              </p>
+            )}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
