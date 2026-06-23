@@ -89,6 +89,21 @@ describe("POST /api/livekit/token — BANNED 차단(WI-045)", () => {
     expect(body.code).not.toBe("BANNED");
   });
 
+  it("BANNED 멤버는 owner(space 매치)여도 차단 — 소켓 게이트와 일관(owner 예외 없음)", async () => {
+    // 데이터 드리프트로 BANNED 가 된 owner 라도 소켓(room.ts)과 동일하게 화상도 차단해야 일관.
+    const POST = await loadPOST();
+    mockAuth.mockResolvedValue({ user: { id: "u-own", name: "오너" } });
+    mockPrisma.spaceMember.findFirst.mockResolvedValue({ id: "m-own", restriction: "BANNED" });
+    mockPrisma.space.findFirst.mockResolvedValue({ id: "s1" }); // owner 매치(space truthy)
+
+    const res = await POST(
+      tokenRequest({ ...VALID_BODY, participantId: "user-u-own", participantName: "오너" }) as never
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("BANNED");
+  });
+
   it("토큰 라우트 select 에 restriction 포함(게이트 판단용)", async () => {
     const POST = await loadPOST();
     mockAuth.mockResolvedValue({ user: { id: "u-ban", name: "밴유저" } });
