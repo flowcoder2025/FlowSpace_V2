@@ -1,0 +1,3561 @@
+OpenAI Codex v0.142.0
+--------
+workdir: C:\Team-jane\FlowSpace
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019ef2c3-b883-7301-8271-d4f87acaa353
+--------
+user
+# 승격 협의 (consult) — develop→main 승격 GO 판정
+
+너는 FlowSpace(Next.js 15 메타버스, Vercel 웹 + OCI 소켓) 코드를 read-only로 보는 릴리스 검토자다.
+산문으로 답하라. 마지막에 "내가(요청자가) 놓칠 위험 1가지"를 반드시 포함하라.
+
+## 상황
+- 사용자가 develop→main 승격을 승인했다(프로덕션 라이브 반영).
+- 승격 델타 = **WI-029/030/031/032 (4건)**. develop `77e690a` ⊋ main `ba3a82f`(직전 승격 PR#29 = WI-017~024).
+  - WI-029-fix: 어드민 대시보드 품질 마감(Logs/Messages 에러처리·Members 로딩/검색/필터)
+  - WI-030-feat: 대시보드 고급 필터(메시지/로그 날짜·타입, 공용 query-filter)
+  - WI-031-feat: 대시보드 CSV 내보내기(멤버/로그/analytics, 순수 csv.ts)
+  - WI-032-fix: 어드민 로그 payload 응답 allowlist + lean DTO
+- 4건 전부 develop에서 **듀얼 블라인드 검증 통과**(codex PASS·evaluator 9.85, 각 .pass 산출). 기계게이트 develop HEAD green(tsc0/lint0err/vitest384/build0).
+
+## 배포 영향 실측 (확정)
+- `git diff main..develop --name-only`: 변경은 전부 `src/`(dashboard 컴포넌트·admin API 라우트·lib) + `.flowset/`(산출물) + `vitest.config.ts`.
+- **server/ 무변경 → OCI 소켓 재배포 불필요**(소켓 코드 동일).
+- **prisma/ 무변경 → prod DB 마이그레이션 no-op**.
+- 배포설정(Dockerfile/deploy-*.yml/compose)·의존성(package.json/lock) 무변경.
+- 즉 승격 = **Vercel 웹 배포만**(자동).
+
+## 승격 방식(직전 선례 PR#18/PR#29)
+- **rebase 머지 필수**: gh 인증계정=yonghyeon-dev ≠ Vercel 인가계정=flowcoder25. 일반 merge면 merge commit author=gh계정→Vercel team-members 인가 실패. rebase면 main HEAD가 비-merge 커밋(flowcoder25 작성)이라 author 보존→Vercel 통과.
+- 머지 후 main↔develop는 rebase로 SHA 분기 → develop back-sync(force-push) 필요.
+
+## 질문
+1. 이 승격을 **GO** 할 수 있는가? 승격 차단(blocker) 결함이 있는가? (4건이 dashboard/API에 집중돼 cross-WI 상호작용 — WI-029/030/031/032가 공유 파일[csv-export·query-filter·pagination·event-log-table·logs route]을 순차 변경했는데 통합 시 정합한가?)
+2. Vercel-web-only 승격(OCI/DB no-op) 판단이 맞는가? 내가 놓친 배포 영향(env 신규 요구·런타임 차이)이 있는가?
+3. rebase 머지 방식이 맞는가?
+4. 내가 놓칠 위험 1가지.
+
+기계게이트·듀얼검증은 통과 가정. 통합/배포/릴리스 관점에 집중.
+
+codex
+릴리스 관점으로만 확인하겠습니다. 먼저 실제 브랜치/델타와 변경 파일을 대조하고, 공유 파일들에서 통합 후 런타임 계약이 깨지는 지점이 있는지 좁혀 보겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git rev-parse main develop HEAD' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git status --short --branch' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git log --oneline --decorate --max-count=20 --graph --all' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --name-only main..develop' in C:\Team-jane\FlowSpace
+ succeeded in 229ms:
+9cde274ef0d15d0d1066362dfd39be33aa72ddd7
+77e690ad8a9ca53592638804c78dd00d8e24a53f
+77e690ad8a9ca53592638804c78dd00d8e24a53f
+
+ succeeded in 241ms:
+## develop...origin/develop
+?? .flowset/eval-results/PROMOTION2-consult-out.txt
+?? .flowset/eval-results/PROMOTION2-consult-prompt.md
+
+ succeeded in 242ms:
+.flowset/HANDOFF.md
+.flowset/current.json
+.flowset/eval-results/CUTOVER-consult.err.txt
+.flowset/eval-results/NEXT-WORK-consult-prompt.md
+.flowset/eval-results/NEXT-WORK-consult-r1.err.txt
+.flowset/eval-results/NEXT-WORK-consult-r1.out.txt
+.flowset/eval-results/NEXT-consult-prompt.md
+.flowset/eval-results/NEXT2-consult-r1-prompt.md
+.flowset/eval-results/WI-017-fix.codex.json
+.flowset/eval-results/WI-017-fix.eval.json
+.flowset/eval-results/WI-017-fix.pass
+.flowset/eval-results/WI-018-codex-schema.json
+.flowset/eval-results/WI-018-feat.codex-prompt.md
+.flowset/eval-results/WI-018-feat.codex.json
+.flowset/eval-results/WI-018-feat.codex.stream.log
+.flowset/eval-results/WI-018-feat.eval.json
+.flowset/eval-results/WI-018-feat.merged.json
+.flowset/eval-results/WI-018-feat.pass
+.flowset/eval-results/WI-019-codex-prompt.md
+.flowset/eval-results/WI-019-codex-schema.json
+.flowset/eval-results/WI-019-consult-prompt.md
+.flowset/eval-results/WI-019-consult-r1.err.txt
+.flowset/eval-results/WI-019-consult-r1.out.txt
+.flowset/eval-results/WI-019-fix.codex.err.txt
+.flowset/eval-results/WI-019-fix.codex.json
+.flowset/eval-results/WI-019-fix.codex.stream.log
+.flowset/eval-results/WI-019-fix.eval.json
+.flowset/eval-results/WI-019-fix.merged.json
+.flowset/eval-results/WI-019-fix.pass
+.flowset/eval-results/WI-019-pr-body.md
+.flowset/eval-results/WI-021-codex-prompt.md
+.flowset/eval-results/WI-021-codex-schema.json
+.flowset/eval-results/WI-021-consult-prompt.md
+.flowset/eval-results/WI-021-consult-r1.err.txt
+.flowset/eval-results/WI-021-consult-r1.out.txt
+.flowset/eval-results/WI-021-fix.codex.err.txt
+.flowset/eval-results/WI-021-fix.codex.json
+.flowset/eval-results/WI-021-fix.codex.stream.log
+.flowset/eval-results/WI-021-fix.eval.json
+.flowset/eval-results/WI-021-fix.merged.json
+.flowset/eval-results/WI-021-fix.pass
+.flowset/eval-results/WI-021-pr-body.md
+.flowset/eval-results/WI-022-codex-prompt.md
+.flowset/eval-results/WI-022-codex-schema.json
+.flowset/eval-results/WI-022-consult-prompt.md
+.flowset/eval-results/WI-022-consult-r1.out.txt
+.flowset/eval-results/WI-022-fix.codex.err.txt
+.flowset/eval-results/WI-022-fix.codex.json
+.flowset/eval-results/WI-022-fix.codex.r2.err.txt
+.flowset/eval-results/WI-022-fix.codex.r2.json
+.flowset/eval-results/WI-022-fix.codex.r2.stream.log
+.flowset/eval-results/WI-022-fix.codex.r3.err.txt
+.flowset/eval-results/WI-022-fix.codex.r3.json
+.flowset/eval-results/WI-022-fix.codex.r3.stream.log
+.flowset/eval-results/WI-022-fix.codex.stream.log
+.flowset/eval-results/WI-022-fix.eval.json
+.flowset/eval-results/WI-022-fix.merged.json
+.flowset/eval-results/WI-022-fix.pass
+.flowset/eval-results/WI-022-pr-body.md
+.flowset/eval-results/WI-023-codex-schema.json
+.flowset/eval-results/WI-023-fix.codex-prompt.md
+.flowset/eval-results/WI-023-fix.codex.json
+.flowset/eval-results/WI-023-fix.codex.stream.log
+.flowset/eval-results/WI-023-fix.eval.json
+.flowset/eval-results/WI-023-fix.merged.json
+.flowset/eval-results/WI-023-fix.pass
+.flowset/eval-results/WI-024-codex-schema.json
+.flowset/eval-results/WI-024-consult-prompt.md
+.flowset/eval-results/WI-024-consult-r1.out.txt
+.flowset/eval-results/WI-024-fix.codex-prompt.md
+.flowset/eval-results/WI-024-fix.codex.json
+.flowset/eval-results/WI-024-fix.codex.stream.log
+.flowset/eval-results/WI-024-fix.eval.json
+.flowset/eval-results/WI-024-fix.merged.json
+.flowset/eval-results/WI-024-fix.pass
+.flowset/eval-results/WI-029-fix.codex.json
+.flowset/eval-results/WI-029-fix.eval.json
+.flowset/eval-results/WI-029-fix.pass
+.flowset/eval-results/WI-030-feat.codex.json
+.flowset/eval-results/WI-030-feat.eval.json
+.flowset/eval-results/WI-030-feat.pass
+.flowset/eval-results/WI-031-codex-schema.json
+.flowset/eval-results/WI-031-consult-r1-prompt.md
+.flowset/eval-results/WI-031-consult-r1.log
+.flowset/eval-results/WI-031-consult-r2-prompt.md
+.flowset/eval-results/WI-031-consult-r2.log
+.flowset/eval-results/WI-031-feat.merged.json
+.flowset/eval-results/WI-031-feat.pass
+.flowset/eval-results/WI-031-verify-prompt.md
+.flowset/eval-results/WI-031-verify-r2-prompt.md
+.flowset/eval-results/WI-031-verify-r3-prompt.md
+.flowset/eval-results/WI-031.codex.json
+.flowset/eval-results/WI-031.codex.r2.json
+.flowset/eval-results/WI-031.codex.r2.stream.log
+.flowset/eval-results/WI-031.codex.r3.json
+.flowset/eval-results/WI-031.codex.r3.stream.log
+.flowset/eval-results/WI-031.codex.stream.log
+.flowset/eval-results/WI-031.eval.json
+.flowset/eval-results/WI-032-codex-schema.json
+.flowset/eval-results/WI-032-fix.eval.json
+.flowset/eval-results/WI-032-fix.merged.json
+.flowset/eval-results/WI-032-fix.pass
+.flowset/eval-results/WI-032-verify-prompt.md
+.flowset/eval-results/WI-032-verify-r2-prompt.md
+.flowset/eval-results/WI-032.codex-r2.err
+.flowset/eval-results/WI-032.codex-r2.json
+.flowset/eval-results/WI-032.codex.err
+.flowset/eval-results/WI-032.codex.json
+.flowset/fix_plan.md
+.github/workflows/deploy-socket.yml
+Dockerfile.socket
+scripts/backfill-failed-asset-error.mjs
+server/index.ts
+src/app/api/assets/[id]/route.test.ts
+src/app/api/assets/[id]/route.ts
+src/app/api/assets/batch/route.test.ts
+src/app/api/assets/batch/route.ts
+src/app/api/assets/generate/route.test.ts
+src/app/api/assets/generate/route.ts
+src/app/api/assets/route.test.ts
+src/app/api/assets/route.ts
+src/app/api/auth/register/route.ts
+src/app/api/guest/route.ts
+src/app/api/spaces/[id]/admin/analytics/route.ts
+src/app/api/spaces/[id]/admin/announce/route.ts
+src/app/api/spaces/[id]/admin/logs/route.test.ts
+src/app/api/spaces/[id]/admin/logs/route.ts
+src/app/api/spaces/[id]/admin/media/[grantId]/route.ts
+src/app/api/spaces/[id]/admin/media/route.ts
+src/app/api/spaces/[id]/admin/members/route.ts
+src/app/api/spaces/[id]/admin/messages/[messageId]/route.ts
+src/app/api/spaces/[id]/admin/messages/route.test.ts
+src/app/api/spaces/[id]/admin/messages/route.ts
+src/app/api/spaces/[id]/admin/stats/route.test.ts
+src/app/api/spaces/[id]/admin/stats/route.ts
+src/app/api/spaces/[id]/map/objects/[objectId]/link/route.ts
+src/app/api/spaces/[id]/map/objects/[objectId]/route.ts
+src/app/api/spaces/[id]/map/objects/route.ts
+src/app/api/spaces/[id]/map/route.ts
+src/app/api/spaces/[id]/map/tiles/route.ts
+src/app/api/spaces/[id]/members/route.ts
+src/app/api/spaces/[id]/messages/route.ts
+src/app/api/spaces/[id]/route.ts
+src/app/api/spaces/join/[inviteCode]/route.ts
+src/app/api/spaces/route.test.ts
+src/app/api/spaces/route.ts
+src/app/api/workflows/route.ts
+src/app/dashboard/spaces/[id]/analytics/page.tsx
+src/app/dashboard/spaces/[id]/logs/page.test.tsx
+src/app/dashboard/spaces/[id]/logs/page.tsx
+src/app/dashboard/spaces/[id]/members/page.test.tsx
+src/app/dashboard/spaces/[id]/members/page.tsx
+src/app/dashboard/spaces/[id]/messages/page.test.tsx
+src/app/dashboard/spaces/[id]/messages/page.tsx
+src/app/dashboard/spaces/[id]/page.tsx
+src/components/dashboard/csv-export.test.ts
+src/components/dashboard/csv-export.ts
+src/components/dashboard/date-range.test.ts
+src/components/dashboard/date-range.ts
+src/components/dashboard/event-log-table.tsx
+src/components/dashboard/export-csv-button.tsx
+src/components/dashboard/member-filter.test.ts
+src/components/dashboard/member-filter.ts
+src/components/dashboard/member-table.tsx
+src/features/assets/index.ts
+src/features/assets/internal/constants.ts
+src/features/assets/internal/public-asset.test.ts
+src/features/assets/internal/public-asset.ts
+src/features/space/socket/internal/socket-client.test.ts
+src/features/space/socket/internal/socket-client.ts
+src/features/space/socket/internal/use-socket.test.ts
+src/features/space/socket/internal/use-socket.ts
+src/lib/api-error.test.ts
+src/lib/api-error.ts
+src/lib/csv.test.ts
+src/lib/csv.ts
+src/lib/pagination.test.ts
+src/lib/pagination.ts
+src/lib/query-filter.test.ts
+src/lib/query-filter.ts
+src/lib/socket-startup.test.ts
+src/lib/socket-startup.ts
+src/lib/space-event-log-payload.test.ts
+src/lib/space-event-log-payload.ts
+vitest.config.ts
+
+ succeeded in 259ms:
+* 77e690a (HEAD -> develop, origin/develop) docs: WI-032-fix develop 머지 완료 원장 (PR#33 bf4a3ea)
+*   bf4a3ea Merge pull request #33 from flowcoder2025/fix/WI-032-fix-log-payload-allowlist
+|\  
+| * f9c7919 (origin/fix/WI-032-fix-log-payload-allowlist) WI-032-fix 듀얼검증 산출물 + .pass + 원장 (codex r2 PASS · evaluator 9.85)
+| * b6e3811 WI-032-fix r2 codex P2 해소 — admin/stats recentActivity 동일 정규화
+| * b3dd931 WI-032-fix 어드민 로그 payload 응답 allowlist 정형화 + lean DTO
+|/  
+* e8c8f0d @ docs: WI-031-feat develop 머지 완료 원장 (PR#32 6bdee98)
+*   6bdee98 Merge pull request #32 from flowcoder2025/feature/WI-031-feat-dashboard-csv-export
+|\  
+| * ea7b6d7 (origin/feature/WI-031-feat-dashboard-csv-export) @ WI-031-feat 듀얼검증 산출물 + .pass + merged (codex r3 PASS · evaluator 9.85)
+| * 056ce56 @ WI-031-feat r3 codex r2 P2 해소 (선두 LF 인젝션 중화)
+| * d106a4b @ WI-031-feat r2 codex 검증 P2 해소 (이름 폴백 + 다운로드 finally)
+| * 788ea0e @ WI-031-feat 어드민 대시보드 CSV 내보내기 (멤버/로그/analytics)
+|/  
+* 23bf8ab docs: WI-030-feat develop 머지 완료 원장 (PR#31 a41e2a8)
+*   a41e2a8 Merge pull request #31 from flowcoder2025/feature/WI-030-feat-dashboard-advanced-filters
+|\  
+| * 298d0ae (origin/feature/WI-030-feat-dashboard-advanced-filters) WI-030-feat 듀얼검증 산출물 + .pass + 원장 (codex PASS 3R · evaluator 9.85)
+| * c7176f9 WI-030-feat r3 parseInstant 달력 검증 (codex r2 P3 fixNow — 서버 롤오버 거부)
+| * f2135ef WI-030-feat r2 날짜 입력 엄격화 (codex P3×2 — ISO instant 계약 + 롤오버 거부)
+| * a4b3dd0 WI-030-feat 대시보드 고급 필터 — 메시지/로그 날짜·타입
+|/  
+* c22bd89 docs: WI-029-fix develop 머지 완료 원장 (PR#30 1bdf225) + WI-030/031 후속
+*   1bdf225 Merge pull request #30 from flowcoder2025/fix/WI-029-fix-dashboard-quality-hardening
+|\  
+| * 834feb2 (origin/fix/WI-029-fix-dashboard-quality-hardening) WI-029-fix 듀얼검증 산출물 + .pass + 원장 (codex PASS · evaluator 9.85)
+
+codex
+로컬 `main` 포인터가 사용자 설명의 `ba3a82f`가 아니라 `9cde274`를 가리키고 있어서, 단순 `main..develop` 비교는 이전 승격분까지 섞여 보입니다. 그래서 지금부터는 설명에 적힌 기준 SHA(`ba3a82f..77e690a`)와 로컬 브랜치 상태를 분리해서 보겠습니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git cat-file -t ba3a82f; git cat-file -t 77e690a; git merge-base ba3a82f 77e690a; git merge-base --is-ancestor ba3a82f 77e690a; Write-Output "ancestor_exit=$LASTEXITCODE"' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --name-only ba3a82f..77e690a' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git log --oneline --first-parent ba3a82f..77e690a' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --stat ba3a82f..77e690a' in C:\Team-jane\FlowSpace
+ succeeded in 218ms:
+.flowset/HANDOFF.md
+.flowset/current.json
+.flowset/eval-results/NEXT2-consult-r1-prompt.md
+.flowset/eval-results/WI-029-fix.codex.json
+.flowset/eval-results/WI-029-fix.eval.json
+.flowset/eval-results/WI-029-fix.pass
+.flowset/eval-results/WI-030-feat.codex.json
+.flowset/eval-results/WI-030-feat.eval.json
+.flowset/eval-results/WI-030-feat.pass
+.flowset/eval-results/WI-031-codex-schema.json
+.flowset/eval-results/WI-031-consult-r1-prompt.md
+.flowset/eval-results/WI-031-consult-r1.log
+.flowset/eval-results/WI-031-consult-r2-prompt.md
+.flowset/eval-results/WI-031-consult-r2.log
+.flowset/eval-results/WI-031-feat.merged.json
+.flowset/eval-results/WI-031-feat.pass
+.flowset/eval-results/WI-031-verify-prompt.md
+.flowset/eval-results/WI-031-verify-r2-prompt.md
+.flowset/eval-results/WI-031-verify-r3-prompt.md
+.flowset/eval-results/WI-031.codex.json
+.flowset/eval-results/WI-031.codex.r2.json
+.flowset/eval-results/WI-031.codex.r2.stream.log
+.flowset/eval-results/WI-031.codex.r3.json
+.flowset/eval-results/WI-031.codex.r3.stream.log
+.flowset/eval-results/WI-031.codex.stream.log
+.flowset/eval-results/WI-031.eval.json
+.flowset/eval-results/WI-032-codex-schema.json
+.flowset/eval-results/WI-032-fix.eval.json
+.flowset/eval-results/WI-032-fix.merged.json
+.flowset/eval-results/WI-032-fix.pass
+.flowset/eval-results/WI-032-verify-prompt.md
+.flowset/eval-results/WI-032-verify-r2-prompt.md
+.flowset/eval-results/WI-032.codex-r2.err
+.flowset/eval-results/WI-032.codex-r2.json
+.flowset/eval-results/WI-032.codex.err
+.flowset/eval-results/WI-032.codex.json
+.flowset/fix_plan.md
+src/app/api/assets/route.ts
+src/app/api/spaces/[id]/admin/logs/route.test.ts
+src/app/api/spaces/[id]/admin/logs/route.ts
+src/app/api/spaces/[id]/admin/messages/route.test.ts
+src/app/api/spaces/[id]/admin/messages/route.ts
+src/app/api/spaces/[id]/admin/stats/route.test.ts
+src/app/api/spaces/[id]/admin/stats/route.ts
+src/app/dashboard/spaces/[id]/analytics/page.tsx
+src/app/dashboard/spaces/[id]/logs/page.test.tsx
+src/app/dashboard/spaces/[id]/logs/page.tsx
+src/app/dashboard/spaces/[id]/members/page.test.tsx
+src/app/dashboard/spaces/[id]/members/page.tsx
+src/app/dashboard/spaces/[id]/messages/page.test.tsx
+src/app/dashboard/spaces/[id]/messages/page.tsx
+src/app/dashboard/spaces/[id]/page.tsx
+src/components/dashboard/csv-export.test.ts
+src/components/dashboard/csv-export.ts
+src/components/dashboard/date-range.test.ts
+src/components/dashboard/date-range.ts
+src/components/dashboard/event-log-table.tsx
+src/components/dashboard/export-csv-button.tsx
+src/components/dashboard/member-filter.test.ts
+src/components/dashboard/member-filter.ts
+src/components/dashboard/member-table.tsx
+src/lib/csv.test.ts
+src/lib/csv.ts
+src/lib/query-filter.test.ts
+src/lib/query-filter.ts
+src/lib/space-event-log-payload.test.ts
+src/lib/space-event-log-payload.ts
+vitest.config.ts
+
+ succeeded in 211ms:
+77e690a docs: WI-032-fix develop 머지 완료 원장 (PR#33 bf4a3ea)
+bf4a3ea Merge pull request #33 from flowcoder2025/fix/WI-032-fix-log-payload-allowlist
+e8c8f0d @ docs: WI-031-feat develop 머지 완료 원장 (PR#32 6bdee98)
+6bdee98 Merge pull request #32 from flowcoder2025/feature/WI-031-feat-dashboard-csv-export
+23bf8ab docs: WI-030-feat develop 머지 완료 원장 (PR#31 a41e2a8)
+a41e2a8 Merge pull request #31 from flowcoder2025/feature/WI-030-feat-dashboard-advanced-filters
+c22bd89 docs: WI-029-fix develop 머지 완료 원장 (PR#30 1bdf225) + WI-030/031 후속
+1bdf225 Merge pull request #30 from flowcoder2025/fix/WI-029-fix-dashboard-quality-hardening
+76cf44b docs: develop→main 승격 완료 원장 (PR#29 ba3a82f) — WI-017~024 라이브
+
+ succeeded in 223ms:
+ .flowset/HANDOFF.md                                |  13 +-
+ .flowset/current.json                              |  10 +-
+ .flowset/eval-results/NEXT2-consult-r1-prompt.md   |  45 +++
+ .flowset/eval-results/WI-029-fix.codex.json        |   1 +
+ .flowset/eval-results/WI-029-fix.eval.json         |  41 +++
+ .flowset/eval-results/WI-029-fix.pass              |  12 +
+ .flowset/eval-results/WI-030-feat.codex.json       |   1 +
+ .flowset/eval-results/WI-030-feat.eval.json        |  41 +++
+ .flowset/eval-results/WI-030-feat.pass             |  13 +
+ .flowset/eval-results/WI-031-codex-schema.json     |  29 ++
+ .flowset/eval-results/WI-031-consult-r1-prompt.md  |  43 +++
+ .flowset/eval-results/WI-031-consult-r1.log        |  89 +++++
+ .flowset/eval-results/WI-031-consult-r2-prompt.md  |  28 ++
+ .flowset/eval-results/WI-031-consult-r2.log        |  74 ++++
+ .flowset/eval-results/WI-031-feat.merged.json      |  57 +++
+ .flowset/eval-results/WI-031-feat.pass             |  16 +
+ .flowset/eval-results/WI-031-verify-prompt.md      |  31 ++
+ .flowset/eval-results/WI-031-verify-r2-prompt.md   |  22 ++
+ .flowset/eval-results/WI-031-verify-r3-prompt.md   |  18 +
+ .flowset/eval-results/WI-031.codex.json            |   1 +
+ .flowset/eval-results/WI-031.codex.r2.json         |   1 +
+ .flowset/eval-results/WI-031.codex.r2.stream.log   | 383 +++++++++++++++++++++
+ .flowset/eval-results/WI-031.codex.r3.json         |   1 +
+ .flowset/eval-results/WI-031.codex.r3.stream.log   | 129 +++++++
+ .flowset/eval-results/WI-031.codex.stream.log      | 138 ++++++++
+ .flowset/eval-results/WI-031.eval.json             |  32 ++
+ .flowset/eval-results/WI-032-codex-schema.json     |  29 ++
+ .flowset/eval-results/WI-032-fix.eval.json         |  41 +++
+ .flowset/eval-results/WI-032-fix.merged.json       |  27 ++
+ .flowset/eval-results/WI-032-fix.pass              |  16 +
+ .flowset/eval-results/WI-032-verify-prompt.md      |  32 ++
+ .flowset/eval-results/WI-032-verify-r2-prompt.md   |  19 +
+ .flowset/eval-results/WI-032.codex-r2.err          |  62 ++++
+ .flowset/eval-results/WI-032.codex-r2.json         |   1 +
+ .flowset/eval-results/WI-032.codex.err             |  29 ++
+ .flowset/eval-results/WI-032.codex.json            |   1 +
+ .flowset/fix_plan.md                               |  13 +-
+ src/app/api/assets/route.ts                        |  22 +-
+ src/app/api/spaces/[id]/admin/logs/route.test.ts   | 233 +++++++++++++
+ src/app/api/spaces/[id]/admin/logs/route.ts        |  43 ++-
+ .../api/spaces/[id]/admin/messages/route.test.ts   |  81 +++++
+ src/app/api/spaces/[id]/admin/messages/route.ts    |  29 +-
+ src/app/api/spaces/[id]/admin/stats/route.test.ts  | 106 ++++++
+ src/app/api/spaces/[id]/admin/stats/route.ts       |   5 +-
+ src/app/dashboard/spaces/[id]/analytics/page.tsx   |  33 +-
+ src/app/dashboard/spaces/[id]/logs/page.test.tsx   |  51 +++
+ src/app/dashboard/spaces/[id]/logs/page.tsx        |  90 ++++-
+ .../dashboard/spaces/[id]/members/page.test.tsx    | 121 +++++++
+ src/app/dashboard/spaces/[id]/members/page.tsx     | 110 +++++-
+ .../dashboard/spaces/[id]/messages/page.test.tsx   |  51 +++
+ src/app/dashboard/spaces/[id]/messages/page.tsx    |  66 +++-
+ src/app/dashboard/spaces/[id]/page.tsx             |   6 +-
+ src/components/dashboard/csv-export.test.ts        | 208 +++++++++++
+ src/components/dashboard/csv-export.ts             | 132 +++++++
+ src/components/dashboard/date-range.test.ts        |  49 +++
+ src/components/dashboard/date-range.ts             |  40 +++
+ src/components/dashboard/event-log-table.tsx       |   5 +-
+ src/components/dashboard/export-csv-button.tsx     |  29 ++
+ src/components/dashboard/member-filter.test.ts     | 124 +++++++
+ src/components/dashboard/member-filter.ts          |  30 ++
+ src/components/dashboard/member-table.tsx          |   5 +-
+ src/lib/csv.test.ts                                |  84 +++++
+ src/lib/csv.ts                                     |  54 +++
+ src/lib/query-filter.test.ts                       |  96 ++++++
+ src/lib/query-filter.ts                            | 100 ++++++
+ src/lib/space-event-log-payload.test.ts            | 153 ++++++++
+ src/lib/space-event-log-payload.ts                 | 114 ++++++
+ vitest.config.ts                                   |   4 +
+ 68 files changed, 3725 insertions(+), 88 deletions(-)
+
+ succeeded in 371ms:
+commit
+commit
+ba3a82f4b82f0b889d7c4d14f06228ee9dbe658c
+ancestor_exit=0
+
+codex
+기준 SHA로 보면 `ba3a82f`가 `77e690a`의 조상이고, 델타는 설명대로 대시보드/API/라이브러리와 검증 산출물 위주입니다. 다음은 신규 env 요구나 런타임 타깃 변화, 그리고 query/filter/export/payload가 서로 맞물리는 부분을 확인합니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff ba3a82f..77e690a -- src/app/api/spaces/[id]/admin/logs/route.ts src/app/api/spaces/[id]/admin/messages/route.ts src/app/api/spaces/[id]/admin/stats/route.ts src/lib/query-filter.ts src/lib/csv.ts src/lib/space-event-log-payload.ts' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff ba3a82f..77e690a -- src/components/dashboard/csv-export.ts src/components/dashboard/export-csv-button.tsx src/components/dashboard/event-log-table.tsx src/app/dashboard/spaces/[id]/logs/page.tsx src/app/dashboard/spaces/[id]/messages/page.tsx' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "git diff ba3a82f..77e690a -G \"process\\.env|NEXT_PUBLIC_|runtime|dynamic|revalidate|fetch\\(\" -- src package.json next.config.* vercel.json Dockerfile* .github workflows" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff ba3a82f..77e690a -- package.json package-lock.json pnpm-lock.yaml yarn.lock prisma server Dockerfile.socket .github/workflows/deploy-socket.yml docker-compose.yml compose.yml vercel.json next.config.ts next.config.js' in C:\Team-jane\FlowSpace
+ succeeded in 208ms:
+diff --git a/src/app/dashboard/spaces/[id]/logs/page.tsx b/src/app/dashboard/spaces/[id]/logs/page.tsx
+index 8f808ee..4aae6e5 100644
+--- a/src/app/dashboard/spaces/[id]/logs/page.tsx
++++ b/src/app/dashboard/spaces/[id]/logs/page.tsx
+@@ -3,13 +3,32 @@
+ import { useEffect, useState, useCallback } from "react";
+ import { useParams } from "next/navigation";
+ import { EventLogTable } from "@/components/dashboard/event-log-table";
++import {
++  localDateToStartInstant,
++  localDateToEndInstant,
++} from "@/components/dashboard/date-range";
++import { ExportCsvButton } from "@/components/dashboard/export-csv-button";
++import { logsToCsv, downloadCsv, csvFilename } from "@/components/dashboard/csv-export";
++import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
+ 
+-const EVENT_TYPES = ["", "ENTER", "EXIT", "CHAT", "INTERACTION", "ADMIN_ACTION"] as const;
++// 표시용 이벤트 타입 옵션(서버는 SpaceEventType enum으로 검증 — SSOT). "" = 전체.
++const EVENT_TYPES = [
++  "",
++  "ENTER",
++  "EXIT",
++  "INTERACTION",
++  "CHAT",
++  "ADMIN_ACTION",
++  "VIDEO_START",
++  "VIDEO_END",
++  "SCREEN_SHARE_START",
++  "SCREEN_SHARE_END",
++] as const;
+ 
+ interface LogEntry {
+   id: string;
+   eventType: string;
+-  payload?: Record<string, unknown> | null;
++  payload?: PublicSpaceEventPayload;
+   createdAt: string;
+   user?: { name: string | null; email: string } | null;
+ }
+@@ -19,9 +38,12 @@ export default function LogsPage() {
+   const spaceId = params.id;
+   const [logs, setLogs] = useState<LogEntry[]>([]);
+   const [filter, setFilter] = useState("");
++  const [startDate, setStartDate] = useState("");
++  const [endDate, setEndDate] = useState("");
+   const [cursor, setCursor] = useState<string | null>(null);
+   const [hasMore, setHasMore] = useState(false);
+   const [isLoading, setIsLoading] = useState(false);
++  const [error, setError] = useState<string | null>(null);
+ 
+   const loadLogs = useCallback(
+     async (nextCursor?: string | null) => {
+@@ -30,6 +52,10 @@ export default function LogsPage() {
+         const qs = new URLSearchParams();
+         if (filter) qs.set("eventType", filter);
+         if (nextCursor) qs.set("cursor", nextCursor);
++        const startInstant = localDateToStartInstant(startDate);
++        const endInstant = localDateToEndInstant(endDate);
++        if (startInstant) qs.set("startDate", startInstant);
++        if (endInstant) qs.set("endDate", endInstant);
+ 
+         const res = await fetch(`/api/spaces/${spaceId}/admin/logs?${qs}`);
+         if (!res.ok) throw new Error("Failed to load logs");
+@@ -42,13 +68,14 @@ export default function LogsPage() {
+         }
+         setCursor(data.nextCursor);
+         setHasMore(!!data.nextCursor);
+-      } catch {
+-        // ignore
++        setError(null);
++      } catch (err) {
++        setError(err instanceof Error ? err.message : "로그를 불러오지 못했습니다.");
+       } finally {
+         setIsLoading(false);
+       }
+     },
+-    [spaceId, filter]
++    [spaceId, filter, startDate, endDate]
+   );
+ 
+   useEffect(() => {
+@@ -57,22 +84,49 @@ export default function LogsPage() {
+ 
+   return (
+     <div className="space-y-6">
+-      <div className="flex items-center justify-between">
++      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+         <h1 className="text-2xl font-bold text-ink">Event Logs</h1>
+-        <select
+-          value={filter}
+-          onChange={(e) => setFilter(e.target.value)}
+-          className="text-sm border border-line rounded px-3 py-1.5"
+-        >
+-          <option value="">All Events</option>
+-          {EVENT_TYPES.filter(Boolean).map((t) => (
+-            <option key={t} value={t}>
+-              {t}
+-            </option>
+-          ))}
+-        </select>
++        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
++          <select
++            value={filter}
++            onChange={(e) => setFilter(e.target.value)}
++            aria-label="이벤트 타입 필터"
++            className="text-sm border border-line rounded px-3 py-1.5"
++          >
++            <option value="">All Events</option>
++            {EVENT_TYPES.filter(Boolean).map((t) => (
++              <option key={t} value={t}>
++                {t}
++              </option>
++            ))}
++          </select>
++          <input
++            type="date"
++            value={startDate}
++            onChange={(e) => setStartDate(e.target.value)}
++            aria-label="시작 날짜"
++            className="text-sm border border-line rounded px-3 py-1.5"
++          />
++          <span className="text-ink-muted text-sm">~</span>
++          <input
++            type="date"
++            value={endDate}
++            onChange={(e) => setEndDate(e.target.value)}
++            aria-label="종료 날짜"
++            className="text-sm border border-line rounded px-3 py-1.5"
++          />
++          <ExportCsvButton
++            disabled={logs.length === 0}
++            label={`CSV 내보내기 (로드된 ${logs.length}건)`}
++            onExport={() =>
++              downloadCsv(csvFilename("logs", spaceId, new Date()), logsToCsv(logs))
++            }
++          />
++        </div>
+       </div>
+ 
++      {error && <div className="text-red-600 text-sm">{error}</div>}
++
+       <div className="bg-white rounded-lg border border-line p-5">
+         <EventLogTable
+           logs={logs}
+diff --git a/src/app/dashboard/spaces/[id]/messages/page.tsx b/src/app/dashboard/spaces/[id]/messages/page.tsx
+index 8830049..6473090 100644
+--- a/src/app/dashboard/spaces/[id]/messages/page.tsx
++++ b/src/app/dashboard/spaces/[id]/messages/page.tsx
+@@ -3,6 +3,10 @@
+ import { useEffect, useState, useCallback } from "react";
+ import { useParams } from "next/navigation";
+ import { MessageModeration } from "@/components/dashboard/message-moderation";
++import {
++  localDateToStartInstant,
++  localDateToEndInstant,
++} from "@/components/dashboard/date-range";
+ 
+ interface ChatMsg {
+   id: string;
+@@ -13,6 +17,15 @@ interface ChatMsg {
+   createdAt: string;
+ }
+ 
++// 표시용 타입 옵션(서버는 MessageType enum으로 검증 — SSOT). "" = 전체.
++const MESSAGE_TYPE_OPTIONS = [
++  "MESSAGE",
++  "WHISPER",
++  "PARTY",
++  "SYSTEM",
++  "ANNOUNCEMENT",
++] as const;
++
+ export default function MessagesPage() {
+   const params = useParams<{ id: string }>();
+   const spaceId = params.id;
+@@ -20,6 +33,10 @@ export default function MessagesPage() {
+   const [cursor, setCursor] = useState<string | null>(null);
+   const [hasMore, setHasMore] = useState(false);
+   const [isLoading, setIsLoading] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++  const [typeFilter, setTypeFilter] = useState("");
++  const [startDate, setStartDate] = useState("");
++  const [endDate, setEndDate] = useState("");
+ 
+   const loadMessages = useCallback(
+     async (nextCursor?: string | null) => {
+@@ -27,9 +44,14 @@ export default function MessagesPage() {
+       try {
+         const qs = new URLSearchParams();
+         if (nextCursor) qs.set("cursor", nextCursor);
++        if (typeFilter) qs.set("type", typeFilter);
++        const startInstant = localDateToStartInstant(startDate);
++        const endInstant = localDateToEndInstant(endDate);
++        if (startInstant) qs.set("startDate", startInstant);
++        if (endInstant) qs.set("endDate", endInstant);
+ 
+         const res = await fetch(`/api/spaces/${spaceId}/admin/messages?${qs}`);
+-        if (!res.ok) throw new Error("Failed");
++        if (!res.ok) throw new Error("Failed to load messages");
+         const data = await res.json();
+ 
+         if (nextCursor) {
+@@ -39,13 +61,16 @@ export default function MessagesPage() {
+         }
+         setCursor(data.nextCursor);
+         setHasMore(!!data.nextCursor);
+-      } catch {
+-        // ignore
++        setError(null);
++      } catch (err) {
++        setError(
++          err instanceof Error ? err.message : "메시지를 불러오지 못했습니다."
++        );
+       } finally {
+         setIsLoading(false);
+       }
+     },
+-    [spaceId]
++    [spaceId, typeFilter, startDate, endDate]
+   );
+ 
+   useEffect(() => {
+@@ -55,6 +80,39 @@ export default function MessagesPage() {
+   return (
+     <div className="space-y-6">
+       <h1 className="text-2xl font-bold text-ink">Messages</h1>
++
++      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
++        <select
++          value={typeFilter}
++          onChange={(e) => setTypeFilter(e.target.value)}
++          aria-label="메시지 타입 필터"
++          className="text-sm border border-line rounded px-3 py-1.5"
++        >
++          <option value="">All Types</option>
++          {MESSAGE_TYPE_OPTIONS.map((t) => (
++            <option key={t} value={t}>
++              {t}
++            </option>
++          ))}
++        </select>
++        <input
++          type="date"
++          value={startDate}
++          onChange={(e) => setStartDate(e.target.value)}
++          aria-label="시작 날짜"
++          className="text-sm border border-line rounded px-3 py-1.5"
++        />
++        <span className="text-ink-muted text-sm">~</span>
++        <input
++          type="date"
++          value={endDate}
++          onChange={(e) => setEndDate(e.target.value)}
++          aria-label="종료 날짜"
++          className="text-sm border border-line rounded px-3 py-1.5"
++        />
++      </div>
++
++      {error && <div className="text-red-600 text-sm">{error}</div>}
+       <div className="bg-white rounded-lg border border-line p-5">
+         <MessageModeration
+           spaceId={spaceId}
+diff --git a/src/components/dashboard/csv-export.ts b/src/components/dashboard/csv-export.ts
+new file mode 100644
+index 0000000..baca37f
+--- /dev/null
++++ b/src/components/dashboard/csv-export.ts
+@@ -0,0 +1,132 @@
++"use client";
++
++/**
++ * 어드민 대시보드 CSV 내보내기 — 도메인 매퍼(순수) + 브라우저 다운로드(DOM) (WI-031).
++ *
++ * 순수 직렬화/이스케이프/인젝션 중화는 `@/lib/csv`가 담당하고, 여기서는 화면별 컬럼
++ * 정책(멤버/로그/analytics)과 다운로드 트리거만 둔다. 매퍼는 DOM 무의존이라 단독 테스트
++ * 가능하며, `downloadCsv`만 브라우저 API를 사용한다(useScreenRecorder 다운로드 패턴 동일).
++ *
++ * 로그 내보내기는 클라가 cursor로 **로드한 분량만** 대상(원장: 클라 측 생성) — 호출부가
++ * 버튼 라벨에 건수를 노출해 "로드된 범위"임을 드러낸다.
++ */
++
++import { toCsv, CSV_BOM } from "@/lib/csv";
++import type { Member } from "@/components/dashboard/member-table";
++import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
++
++/**
++ * 로그 CSV 입력(로그 페이지 state와 구조 호환 — 내보내기에 필요한 필드만).
++ * payload는 API가 이미 allowlist로 정규화한 공개 payload다(WI-032) — 여기선 직렬화만.
++ */
++export interface LogExportEntry {
++  eventType: string;
++  payload?: PublicSpaceEventPayload;
++  createdAt: string;
++  user?: { name: string | null; email: string } | null;
++}
++
++/** analytics CSV 입력(analytics 페이지 state와 구조 호환). */
++export interface AnalyticsExportData {
++  dailyMessages: { date: string; count: number }[];
++  dailyVisitors: { date: string; count: number }[];
++}
++
++const MEMBER_HEADERS = [
++  "Name",
++  "Email",
++  "Role",
++  "Restriction",
++  "Guest",
++  "Joined",
++] as const;
++const LOG_HEADERS = ["Time", "Event Type", "User", "Details"] as const;
++const ANALYTICS_HEADERS = ["Date", "Messages", "Visitors"] as const;
++
++/** payload 직렬화 실패 시 표기(JSON.stringify가 던지는 경우 — 순환참조 등). */
++const UNSERIALIZABLE_PAYLOAD = "[unserializable]";
++
++/**
++ * 멤버 목록을 CSV로 직렬화한다. 이름은 MemberTable/filterMembers와 **동일한 표시
++ * 우선순위**(truthy `||` 체인)로 해석한다 — `??`(nullish)를 쓰면 빈 문자열 이름이
++ * 폴백되지 않아 화면과 CSV가 어긋난다(codex 적출). 최종 폴백은 화면 표기와 동일한 "Unknown".
++ */
++export function membersToCsv(members: ReadonlyArray<Member>): string {
++  const rows = members.map((m) => [
++    m.user?.name || m.guestSession?.nickname || m.displayName || "Unknown",
++    m.user?.email ?? "",
++    m.role,
++    m.restriction,
++    m.guestSession ? "Yes" : "No",
++    m.createdAt,
++  ]);
++  return toCsv(MEMBER_HEADERS, rows);
++}
++
++/** 로드된 이벤트 로그를 CSV로 직렬화한다(화면 정렬 순서 유지). */
++export function logsToCsv(logs: ReadonlyArray<LogExportEntry>): string {
++  const rows = logs.map((log) => [
++    log.createdAt,
++    log.eventType,
++    log.user?.name || log.user?.email || "",
++    stringifyPayload(log.payload),
++  ]);
++  return toCsv(LOG_HEADERS, rows);
++}
++
++function stringifyPayload(payload?: PublicSpaceEventPayload): string {
++  if (payload == null) return "";
++  try {
++    return JSON.stringify(payload);
++  } catch {
++    return UNSERIALIZABLE_PAYLOAD;
++  }
++}
++
++/**
++ * 일별 메시지/방문자 두 시계열을 날짜 union으로 머지해 CSV로 직렬화한다.
++ * 한쪽에만 있는 날짜의 결측 값은 0, 날짜는 오름차순(YYYY-MM-DD 사전식=시간순).
++ */
++export function analyticsToCsv(data: AnalyticsExportData): string {
++  const messagesByDate = new Map(
++    data.dailyMessages.map((d) => [d.date, d.count])
++  );
++  const visitorsByDate = new Map(
++    data.dailyVisitors.map((d) => [d.date, d.count])
++  );
++  const dates = [
++    ...new Set([...messagesByDate.keys(), ...visitorsByDate.keys()]),
++  ].sort();
++  const rows = dates.map((date) => [
++    date,
++    String(messagesByDate.get(date) ?? 0),
++    String(visitorsByDate.get(date) ?? 0),
++  ]);
++  return toCsv(ANALYTICS_HEADERS, rows);
++}
++
++/** `flowspace-<kind>-<spaceId>-<YYYY-MM-DD>.csv` 다운로드 파일명을 만든다. */
++export function csvFilename(kind: string, spaceId: string, date: Date): string {
++  const ymd = date.toISOString().slice(0, 10);
++  return `flowspace-${kind}-${spaceId}-${ymd}.csv`;
++}
++
++/**
++ * CSV 문자열을 BOM과 함께 다운로드한다(브라우저 전용). useScreenRecorder의 앵커 클릭
++ * 패턴과 동일 — createObjectURL → a[download] → click → revoke.
++ */
++export function downloadCsv(filename: string, csv: string): void {
++  const blob = new Blob([CSV_BOM + csv], { type: "text/csv;charset=utf-8" });
++  const url = URL.createObjectURL(blob);
++  const a = document.createElement("a");
++  a.href = url;
++  a.download = filename;
++  document.body.appendChild(a);
++  try {
++    a.click();
++  } finally {
++    // click/제거가 던져도 앵커 분리 + objectURL 해제를 보장(누수 방지).
++    a.remove();
++    URL.revokeObjectURL(url);
++  }
++}
+diff --git a/src/components/dashboard/event-log-table.tsx b/src/components/dashboard/event-log-table.tsx
+index 83ef235..a29f81b 100644
+--- a/src/components/dashboard/event-log-table.tsx
++++ b/src/components/dashboard/event-log-table.tsx
+@@ -1,9 +1,12 @@
+ "use client";
+ 
++import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
++
+ interface EventLog {
+   id: string;
+   eventType: string;
+-  payload?: Record<string, unknown> | null;
++  // API가 allowlist로 정규화한 공개 payload(WI-032) — 화면은 그대로 직렬화 표시.
++  payload?: PublicSpaceEventPayload;
+   createdAt: string;
+   user?: { name: string | null; email: string } | null;
+ }
+diff --git a/src/components/dashboard/export-csv-button.tsx b/src/components/dashboard/export-csv-button.tsx
+new file mode 100644
+index 0000000..39cc039
+--- /dev/null
++++ b/src/components/dashboard/export-csv-button.tsx
+@@ -0,0 +1,29 @@
++"use client";
++
++/**
++ * 대시보드 CSV 내보내기 버튼 (WI-031). 멤버/로그/analytics 페이지에서 공용 — 동일
++ * 스타일·동작을 한 곳에 둔다. 라벨은 페이지별로 다르다(로그는 로드된 건수 노출).
++ */
++interface ExportCsvButtonProps {
++  onExport: () => void;
++  disabled?: boolean;
++  label?: string;
++}
++
++export function ExportCsvButton({
++  onExport,
++  disabled,
++  label = "CSV 내보내기",
++}: ExportCsvButtonProps) {
++  return (
++    <button
++      type="button"
++      onClick={onExport}
++      disabled={disabled}
++      aria-label="CSV 내보내기"
++      className="text-sm border border-line rounded px-3 py-1.5 text-ink hover:text-brand-deep disabled:opacity-50 disabled:cursor-not-allowed"
++    >
++      {label}
++    </button>
++  );
++}
+
+ succeeded in 209ms:
+diff --git a/src/app/api/spaces/[id]/admin/logs/route.ts b/src/app/api/spaces/[id]/admin/logs/route.ts
+index 122bf18..753022a 100644
+--- a/src/app/api/spaces/[id]/admin/logs/route.ts
++++ b/src/app/api/spaces/[id]/admin/logs/route.ts
+@@ -1,12 +1,20 @@
+ import { NextResponse } from "next/server";
++import type { Prisma } from "@prisma/client";
++import { SpaceEventType } from "@prisma/client";
+ import { auth } from "@/lib/auth";
+ import { prisma } from "@/lib/prisma";
++import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
++import { normalizeEnumFilter, parseDateRangeFilter } from "@/lib/query-filter";
+ import { internalErrorResponse } from "@/lib/api-error";
++import { toPublicSpaceEventLog } from "@/lib/space-event-log-payload";
+ 
+ interface RouteParams {
+   params: Promise<{ id: string }>;
+ }
+ 
++/** 이벤트 타입 필터 allowlist (Prisma 런타임 enum) */
++const EVENT_TYPE_VALUES = new Set<string>(Object.values(SpaceEventType));
++
+ export async function GET(request: Request, { params }: RouteParams) {
+   try {
+     const session = await auth();
+@@ -29,11 +37,28 @@ export async function GET(request: Request, { params }: RouteParams) {
+ 
+     const { searchParams } = new URL(request.url);
+     const cursor = searchParams.get("cursor");
+-    const eventType = searchParams.get("eventType");
+-    const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
++    const limit = parsePageLimit(searchParams.get("limit"));
++
++    // 고급 필터(WI-030): eventType enum(기존 미검증→전수 검증 보강) + 날짜 범위.
++    // 잘못된 값은 400(무시 시 의도보다 넓은 결과 노출). where가 cursor보다 우선 적용.
++    const eventType = normalizeEnumFilter(
++      searchParams.getAll("eventType"),
++      EVENT_TYPE_VALUES
++    );
++    const dateRange = parseDateRangeFilter(
++      searchParams.get("startDate"),
++      searchParams.get("endDate")
++    );
++    if (eventType === null || dateRange === "invalid") {
++      return NextResponse.json(
++        { error: "Invalid filter", code: "INVALID_FILTER" },
++        { status: 400 }
++      );
++    }
+ 
+-    const where: Record<string, unknown> = { spaceId };
+-    if (eventType) where.eventType = eventType;
++    const where: Prisma.SpaceEventLogWhereInput = { spaceId };
++    if (eventType) where.eventType = eventType as SpaceEventType;
++    if (dateRange) where.createdAt = dateRange;
+ 
+     const logs = await prisma.spaceEventLog.findMany({
+       where,
+@@ -45,11 +70,13 @@ export async function GET(request: Request, { params }: RouteParams) {
+       },
+     });
+ 
+-    const hasMore = logs.length > limit;
+-    const items = hasMore ? logs.slice(0, limit) : logs;
+-    const nextCursor = hasMore ? items[items.length - 1].id : null;
++    // 응답 계약 보존: { logs, nextCursor }만 반환(buildCursorPage로 messages와 통일).
++    // payload는 키 allowlist로 정규화하고 행은 lean DTO로 축소한다(WI-032). 차단은 응답
++    // DTO 계층에서 한다(화면/CSV만 필터하면 raw 직접 호출로 우회) — SpaceEventLog 행을
++    // 반환하는 모든 API(여기 + admin/stats recentActivity)에 동일 정규화를 적용한다.
++    const { items, nextCursor } = buildCursorPage(logs, limit);
+ 
+-    return NextResponse.json({ logs: items, nextCursor });
++    return NextResponse.json({ logs: items.map(toPublicSpaceEventLog), nextCursor });
+   } catch (error) {
+     return internalErrorResponse("GET /api/spaces/[id]/admin/logs", error, "Failed to fetch logs");
+   }
+diff --git a/src/app/api/spaces/[id]/admin/messages/route.ts b/src/app/api/spaces/[id]/admin/messages/route.ts
+index 9c62640..a5ca477 100644
+--- a/src/app/api/spaces/[id]/admin/messages/route.ts
++++ b/src/app/api/spaces/[id]/admin/messages/route.ts
+@@ -1,13 +1,19 @@
+ import { NextResponse } from "next/server";
++import type { Prisma } from "@prisma/client";
++import { MessageType } from "@prisma/client";
+ import { auth } from "@/lib/auth";
+ import { prisma } from "@/lib/prisma";
+ import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
++import { normalizeEnumFilter, parseDateRangeFilter } from "@/lib/query-filter";
+ import { internalErrorResponse } from "@/lib/api-error";
+ 
+ interface RouteParams {
+   params: Promise<{ id: string }>;
+ }
+ 
++/** 메시지 타입 필터 allowlist (Prisma 런타임 enum) */
++const MESSAGE_TYPE_VALUES = new Set<string>(Object.values(MessageType));
++
+ export async function GET(request: Request, { params }: RouteParams) {
+   try {
+     const session = await auth();
+@@ -32,8 +38,29 @@ export async function GET(request: Request, { params }: RouteParams) {
+     const cursor = searchParams.get("cursor");
+     const limit = parsePageLimit(searchParams.get("limit"));
+ 
++    // 고급 필터(WI-030): 타입 enum + 날짜 범위. 잘못된 값은 400(무시 시 의도보다
++    // 넓은 결과 노출). where가 cursor보다 항상 적용돼 권한 밖 row 노출 불가(WI-010).
++    const type = normalizeEnumFilter(
++      searchParams.getAll("type"),
++      MESSAGE_TYPE_VALUES
++    );
++    const dateRange = parseDateRangeFilter(
++      searchParams.get("startDate"),
++      searchParams.get("endDate")
++    );
++    if (type === null || dateRange === "invalid") {
++      return NextResponse.json(
++        { error: "Invalid filter", code: "INVALID_FILTER" },
++        { status: 400 }
++      );
++    }
++
++    const where: Prisma.ChatMessageWhereInput = { spaceId };
++    if (type) where.type = type as MessageType;
++    if (dateRange) where.createdAt = dateRange;
++
+     const messages = await prisma.chatMessage.findMany({
+-      where: { spaceId },
++      where,
+       orderBy: { createdAt: "desc" },
+       take: limit + 1,
+       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+diff --git a/src/app/api/spaces/[id]/admin/stats/route.ts b/src/app/api/spaces/[id]/admin/stats/route.ts
+index b9b2f89..ce28270 100644
+--- a/src/app/api/spaces/[id]/admin/stats/route.ts
++++ b/src/app/api/spaces/[id]/admin/stats/route.ts
+@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
+ import { auth } from "@/lib/auth";
+ import { internalErrorResponse } from "@/lib/api-error";
+ import { prisma } from "@/lib/prisma";
++import { toPublicSpaceEventLog } from "@/lib/space-event-log-payload";
+ 
+ interface RouteParams {
+   params: Promise<{ id: string }>;
+@@ -48,11 +49,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
+       }),
+     ]);
+ 
++    // recentActivity도 SpaceEventLog raw 행 — admin/logs와 동일하게 payload allowlist +
++    // lean DTO로 정규화한다(WI-032: payload 노출 차단의 chokepoint를 이 병렬 경로에도 적용).
+     return NextResponse.json({
+       memberCount,
+       messageCount,
+       todayMessageCount,
+-      recentActivity,
++      recentActivity: recentActivity.map(toPublicSpaceEventLog),
+     });
+   } catch (error) {
+     return internalErrorResponse("GET /api/spaces/[id]/admin/stats", error, "Failed to fetch stats");
+diff --git a/src/lib/csv.ts b/src/lib/csv.ts
+new file mode 100644
+index 0000000..d8a3808
+--- /dev/null
++++ b/src/lib/csv.ts
+@@ -0,0 +1,54 @@
++/**
++ * CSV 직렬화 공용 헬퍼 (순수 함수 — DOM/React/도메인 무의존, WI-031 CSV 내보내기).
++ *
++ * - RFC 4180 이스케이프: 구분자(`,`)/따옴표(`"`)/개행(CR·LF) 포함 셀은 큰따옴표로
++ *   감싸고 내부 `"`는 이중화. 레코드 구분자는 CRLF.
++ * - CSV/수식 인젝션 중화: 셀이 위험 문자(`= + - @` 또는 탭/CR/LF)로 시작하면 작은따옴표
++ *   prefix로 텍스트 강제(OWASP CSV Injection — Excel/Sheets가 셀을 수식으로 실행하는
++ *   것 차단). 모든 셀에 일률 적용(신뢰 가능한 숫자/날짜/enum 컬럼은 선두 위험 문자가
++ *   없어 무영향, 사용자 제어 텍스트만 실제로 중화됨).
++ * - BOM은 직렬화 결과에 포함하지 않는다(순수 텍스트 유지) — 다운로드 계층이 `CSV_BOM`을
++ *   앞에 붙여 Excel 한글 인코딩 깨짐을 막는다.
++ */
++
++/** Excel이 UTF-8 CSV를 올바른 인코딩으로 열도록 하는 BOM (다운로드 시 앞에 붙임). */
++export const CSV_BOM = "﻿";
++
++/** RFC 4180 레코드 구분자 (CRLF). */
++const CSV_LINE_BREAK = "\r\n";
++
++/**
++ * 셀 선두에 오면 수식으로 해석될 수 있는 문자 (OWASP CSV Injection).
++ * 공백류(탭/CR/LF)를 포함하는 이유: 일부 스프레드시트가 선두 공백을 무시한 뒤 그
++ * 다음 문자를 수식으로 해석하므로, `\t`/`\r`과 동일하게 `\n`도 중화 대상에 둔다.
++ */
++const FORMULA_INJECTION_PREFIXES = new Set(["=", "+", "-", "@", "\t", "\r", "\n"]);
++
++/** 따옴표 감싸기가 필요한 문자 (구분자·따옴표·개행). */
++const NEEDS_QUOTING_RE = /[",\r\n]/;
++
++function escapeCell(value: string): string {
++  let cell = value;
++  // 1) 수식 인젝션 중화 — 선두 위험 문자면 작은따옴표 prefix(텍스트 강제).
++  if (cell.length > 0 && FORMULA_INJECTION_PREFIXES.has(cell[0])) {
++    cell = `'${cell}`;
++  }
++  // 2) RFC 4180 — 구분자/따옴표/개행 포함 시 큰따옴표로 감싸고 내부 따옴표 이중화.
++  if (NEEDS_QUOTING_RE.test(cell)) {
++    cell = `"${cell.replace(/"/g, '""')}"`;
++  }
++  return cell;
++}
++
++/**
++ * 헤더 + 행들을 RFC 4180 CSV 문자열로 직렬화한다(BOM 미포함, CRLF 구분).
++ * 모든 셀은 이스케이프·인젝션 중화된다. 행이 없으면 헤더 줄만 반환.
++ */
++export function toCsv(
++  headers: readonly string[],
++  rows: readonly (readonly string[])[]
++): string {
++  return [headers, ...rows]
++    .map((row) => row.map(escapeCell).join(","))
++    .join(CSV_LINE_BREAK);
++}
+diff --git a/src/lib/query-filter.ts b/src/lib/query-filter.ts
+new file mode 100644
+index 0000000..a8be25f
+--- /dev/null
++++ b/src/lib/query-filter.ts
+@@ -0,0 +1,100 @@
++/**
++ * 쿼리스트링 필터 정규화·검증 공용 헬퍼 (순수 함수 — Prisma/React 무의존).
++ *
++ * - `normalizeEnumFilter`: enum 필터(trim+대문자) 전수 검증 (WI-022에서 assets
++ *   라우트에 도입, WI-030에서 공용 추출 — messages/logs 라우트도 재사용).
++ * - `parseDateRangeFilter`: startDate/endDate(ISO datetime instant)를 Prisma
++ *   createdAt 범위로 파싱.
++ */
++
++/**
++ * 쿼리 enum 필터를 정규화(trim+대문자)·검증한다.
++ * 중복 파라미터(`?type=a&type=b`)의 검증 우회를 막기 위해 `getAll()`로 받은
++ * **모든 값**을 검사한다 (`get()`은 첫 값만 봐 invalid 2번째 값이 숨는다).
++ * - 빈 배열/공백-only만 → undefined (필터 미적용; trim 후 비면 "미지정"과 동일)
++ * - 하나라도 allowlist 불일치 → null (호출부가 400 INVALID_FILTER로 처리)
++ * - 전부 유효 → 첫 값(Prisma scalar equality)으로 필터
++ */
++export function normalizeEnumFilter(
++  values: string[],
++  allowed: Set<string>
++): string | undefined | null {
++  const normalized = values
++    .map((v) => v.trim().toUpperCase())
++    .filter((v) => v.length > 0);
++  if (normalized.length === 0) return undefined;
++  if (normalized.some((v) => !allowed.has(v))) return null;
++  return normalized[0];
++}
++
++/** Prisma DateTime 범위 필터 (createdAt: { gte, lt }) */
++export interface DateRangeFilter {
++  gte?: Date;
++  lt?: Date;
++}
++
++/**
++ * `startDate`/`endDate` 쿼리(ISO datetime instant)를 Prisma createdAt 범위로 파싱한다.
++ *
++ * - start는 inclusive(`gte`), end는 **exclusive upper bound**(`lt`) — 클라이언트가
++ *   "종료일 포함"을 익일 00:00 instant로 보내는 계약(date-only를 서버에서 파싱하면
++ *   UTC로 해석돼 클라 로컬 날짜와 어긋나는 타임존 함정 회피, codex 설계).
++ * - 미지정/공백 → 해당 경계 미적용. 둘 다 미지정 → undefined(필터 미적용).
++ * - 파싱 불가(Invalid Date) 또는 start >= end → "invalid"(호출부가 400 처리).
++ */
++export function parseDateRangeFilter(
++  startRaw: string | null,
++  endRaw: string | null
++): DateRangeFilter | undefined | "invalid" {
++  const start = parseInstant(startRaw);
++  const end = parseInstant(endRaw);
++  if (start === "invalid" || end === "invalid") return "invalid";
++  if (start === undefined && end === undefined) return undefined;
++  if (
++    start !== undefined &&
++    end !== undefined &&
++    start.getTime() >= end.getTime()
++  ) {
++    return "invalid";
++  }
++  const range: DateRangeFilter = {};
++  if (start !== undefined) range.gte = start;
++  if (end !== undefined) range.lt = end;
++  return range;
++}
++
++/**
++ * ISO 8601 datetime **instant**(날짜+시간+TZ 지정자 Z 또는 ±HH:MM)만 허용한다.
++ * date-only(`2026-06-23`)나 offsetless(`...T00:00:00`)는 서버에서 UTC/로컬로 모호하게
++ * 해석되므로 계약에서 거부(클라이언트는 `.toISOString()`으로 항상 instant 전송).
++ * 캡처 그룹: 1=year 2=month 3=day 4=hour 5=min 6=sec(opt) — 달력/시간 범위를 직접
++ * 검증해 JS Date의 조용한 보정(`02-31`→3월)을 차단한다(offset instant는 UTC 비교로
++ * 검증 불가 → 작성된 컴포넌트를 직접 검사).
++ */
++const ISO_INSTANT_RE =
++  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
++
++function parseInstant(raw: string | null): Date | undefined | "invalid" {
++  if (raw === null) return undefined;
++  const trimmed = raw.trim();
++  if (trimmed.length === 0) return undefined;
++
++  const m = ISO_INSTANT_RE.exec(trimmed);
++  if (!m) return "invalid";
++
++  const year = Number(m[1]);
++  const month = Number(m[2]);
++  const day = Number(m[3]);
++  const hour = Number(m[4]);
++  const minute = Number(m[5]);
++  const second = m[6] !== undefined ? Number(m[6]) : 0;
++  // 달력/시간 범위 검증(JS Date 롤오버 보정 차단)
++  if (month < 1 || month > 12) return "invalid";
++  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
++  if (day < 1 || day > daysInMonth) return "invalid";
++  if (hour > 23 || minute > 59 || second > 59) return "invalid";
++
++  const d = new Date(trimmed);
++  if (Number.isNaN(d.getTime())) return "invalid";
++  return d;
++}
+diff --git a/src/lib/space-event-log-payload.ts b/src/lib/space-event-log-payload.ts
+new file mode 100644
+index 0000000..7713ce5
+--- /dev/null
++++ b/src/lib/space-event-log-payload.ts
+@@ -0,0 +1,114 @@
++import type { Prisma } from "@prisma/client";
++
++/**
++ * 어드민 이벤트 로그(SpaceEventLog) 공개 응답 정규화 (WI-032)
++ *
++ * `GET /api/spaces/[id]/admin/logs`는 raw `SpaceEventLog` 행을 그대로 반환했고,
++ * 그 행의 `payload`(Json)는 화면(`event-log-table`)·CSV(`csv-export`)에서 키 필터
++ * 없이 `JSON.stringify`로 직렬화된다. 현재 payload write site 5곳은 전부 operational
++ * 메타데이터(action/대상ID/표시명/미디어 종류)만 담지만, 향후 새 event type이 payload에
++ * email·inviteCode·accessSecret·prompt 같은 값을 넣으면 API → 화면 → CSV 세 경로로
++ * 동시에 raw 노출된다(WI-014/019/021/024에서 반복 확인한 "DB Json이 응답으로 자동 이동"
++ * 패턴과 동형).
++ *
++ * 차단 지점은 **API 응답 DTO**다 — 화면/CSV만 필터하면 raw JSON을 직접 호출하는 admin
++ * 클라이언트가 우회한다(codex consult 지적). 따라서 이 모듈이 payload를 키 allowlist로
++ * 정규화하고, 로그 행 자체도 소비처가 쓰는 필드만 남기는 lean DTO로 축소한다
++ * (deny-by-default — WI-019/021 패턴). 화면/CSV는 이미 정규화된 payload를 받으므로
++ * 별도 sanitize를 두지 않고(이중 책임 회피, codex), 같은 공개 타입만 공유한다.
++ *
++ * 순수 함수 + 타입만 노출하며 Prisma 런타임을 import하지 않아(`import type`만) 클라이언트
++ * 컴포넌트에서도 타입을 안전하게 공유할 수 있다.
++ */
++
++/**
++ * 공개 payload 키 allowlist — 현존 5개 write site에서 실측한 8키만 통과시킨다.
++ *
++ * - livekit/webhook(track_(un)published): trackType, trackSource, participantName
++ * - admin/announce: action, messageId
++ * - admin/members(kick): action, targetName
++ * - admin/members(제재): action, targetMemberId, targetName
++ * - admin/messages(deleteMessage): action, messageId, senderName
++ *
++ * allowlist(deny-by-default)이므로 향후 신규 키는 명시 등재 전까지 응답에서 제거된다.
++ */
++export const PUBLIC_SPACE_EVENT_PAYLOAD_KEYS = [
++  "action",
++  "messageId",
++  "targetMemberId",
++  "targetName",
++  "senderName",
++  "trackType",
++  "trackSource",
++  "participantName",
++] as const;
++
++/** 공개 payload 표현(JSON-safe). 비객체/빈 객체는 `null`로 축소한다. */
++export type PublicSpaceEventPayload = Record<string, unknown> | null;
++
++/**
++ * 저장된 payload(Json)를 공개 키 allowlist로 축소한다.
++ * null/undefined/비객체/배열 → null. 객체면 allowlist 키만 골라 새 객체로.
++ * allowlist 키가 하나도 없으면 → null(화면의 "-", CSV 빈 Details 계약 보존).
++ */
++export function toPublicSpaceEventPayload(
++  payload: Prisma.JsonValue | null | undefined
++): PublicSpaceEventPayload {
++  if (
++    payload === null ||
++    payload === undefined ||
++    typeof payload !== "object" ||
++    Array.isArray(payload)
++  ) {
++    return null;
++  }
++
++  const src = payload as Record<string, unknown>;
++  const out: Record<string, unknown> = {};
++  for (const key of PUBLIC_SPACE_EVENT_PAYLOAD_KEYS) {
++    const value = src[key];
++    if (value !== undefined) {
++      out[key] = value;
++    }
++  }
++  return Object.keys(out).length > 0 ? out : null;
++}
++
++/** 어드민 로그 공개 응답 DTO (WI-032). 소비처(table/page/csv)가 쓰는 필드만. */
++export interface PublicSpaceEventLog {
++  id: string;
++  eventType: string;
++  payload: PublicSpaceEventPayload;
++  createdAt: Date;
++  user: { name: string | null; email: string } | null;
++}
++
++/**
++ * 헬퍼 입력 — route의 `findMany` 행을 구조적으로 수용한다(여분 스칼라 필드는 무시).
++ * `eventType`은 `SpaceEventType`(enum ⊆ string)을 string으로 받는다.
++ */
++export interface SpaceEventLogForPublic {
++  id: string;
++  eventType: string;
++  payload: Prisma.JsonValue | null;
++  createdAt: Date;
++  user: { name: string | null; email: string } | null;
++}
++
++/**
++ * raw SpaceEventLog 행 → 공개 응답 DTO.
++ * payload는 allowlist로 정규화하고, 응답엔 소비처가 쓰는 필드만 포함한다
++ * (deny-by-default: spaceId·userId·guestSessionId·participantId 등 내부 스칼라 제외).
++ * select가 우발적으로 넓어지거나 모델에 컬럼이 추가돼도 응답 키 집합은 고정된다.
++ */
++export function toPublicSpaceEventLog(
++  log: SpaceEventLogForPublic
++): PublicSpaceEventLog {
++  return {
++    id: log.id,
++    eventType: log.eventType,
++    payload: toPublicSpaceEventPayload(log.payload),
++    createdAt: log.createdAt,
++    user: log.user ? { name: log.user.name, email: log.user.email } : null,
++  };
++}
+
+ succeeded in 192ms:
+ succeeded in 198ms:
+diff --git a/src/app/dashboard/spaces/[id]/members/page.tsx b/src/app/dashboard/spaces/[id]/members/page.tsx
+index 578553e..05c1963 100644
+--- a/src/app/dashboard/spaces/[id]/members/page.tsx
++++ b/src/app/dashboard/spaces/[id]/members/page.tsx
+@@ -1,39 +1,121 @@
+ "use client";
+ 
+-import { useEffect, useState, useCallback } from "react";
++import { useEffect, useState, useCallback, useMemo } from "react";
+ import { useParams } from "next/navigation";
+-import { MemberTable } from "@/components/dashboard/member-table";
++import {
++  MemberTable,
++  type Member,
++  type MemberRoleFilter,
++} from "@/components/dashboard/member-table";
++import { filterMembers } from "@/components/dashboard/member-filter";
++import { ExportCsvButton } from "@/components/dashboard/export-csv-button";
++import { membersToCsv, downloadCsv, csvFilename } from "@/components/dashboard/csv-export";
++
++const ROLE_FILTERS: { value: MemberRoleFilter; label: string }[] = [
++  { value: "ALL", label: "All Roles" },
++  { value: "OWNER", label: "Owner" },
++  { value: "STAFF", label: "Staff" },
++  { value: "PARTICIPANT", label: "Participant" },
++];
+ 
+ export default function MembersPage() {
+   const params = useParams<{ id: string }>();
+   const spaceId = params.id;
+-  const [members, setMembers] = useState<[]>([]);
++  const [members, setMembers] = useState<Member[]>([]);
+   const [error, setError] = useState<string | null>(null);
++  const [isLoading, setIsLoading] = useState(true);
++  const [query, setQuery] = useState("");
++  const [roleFilter, setRoleFilter] = useState<MemberRoleFilter>("ALL");
+ 
+-  const loadMembers = useCallback(() => {
+-    fetch(`/api/spaces/${spaceId}/admin/members`)
+-      .then((res) => {
+-        if (!res.ok) throw new Error("Failed to load members");
+-        return res.json();
+-      })
+-      .then((data) => setMembers(data.members))
+-      .catch((err) => setError(err.message));
++  const loadMembers = useCallback(async () => {
++    setIsLoading(true);
++    try {
++      const res = await fetch(`/api/spaces/${spaceId}/admin/members`);
++      if (!res.ok) throw new Error("Failed to load members");
++      const data = await res.json();
++      setMembers(data.members);
++      setError(null);
++    } catch (err) {
++      setError(
++        err instanceof Error ? err.message : "멤버를 불러오지 못했습니다."
++      );
++    } finally {
++      setIsLoading(false);
++    }
+   }, [spaceId]);
+ 
+   useEffect(() => {
+     loadMembers();
+   }, [loadMembers]);
+ 
+-  if (error) return <div className="text-red-600 text-sm">{error}</div>;
++  const visibleMembers = useMemo(
++    () => filterMembers(members, query, roleFilter),
++    [members, query, roleFilter]
++  );
+ 
+   return (
+     <div className="space-y-6">
+       <div className="flex items-center justify-between">
+         <h1 className="text-2xl font-bold text-ink">Members</h1>
+-        <span className="text-sm text-ink-muted">{members.length} members</span>
++        <div className="flex items-center gap-3">
++          <span className="text-sm text-ink-muted">
++            {visibleMembers.length}
++            {visibleMembers.length !== members.length ? ` / ${members.length}` : ""} members
++          </span>
++          <ExportCsvButton
++            disabled={visibleMembers.length === 0}
++            onExport={() =>
++              downloadCsv(
++                csvFilename("members", spaceId, new Date()),
++                membersToCsv(visibleMembers)
++              )
++            }
++          />
++        </div>
++      </div>
++
++      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
++        <input
++          type="search"
++          value={query}
++          onChange={(e) => setQuery(e.target.value)}
++          placeholder="이름 또는 이메일 검색..."
++          aria-label="멤버 검색"
++          className="flex-1 text-sm border border-line rounded px-3 py-1.5"
++        />
++        <select
++          value={roleFilter}
++          onChange={(e) => setRoleFilter(e.target.value as MemberRoleFilter)}
++          aria-label="역할 필터"
++          className="text-sm border border-line rounded px-3 py-1.5"
++        >
++          {ROLE_FILTERS.map((r) => (
++            <option key={r.value} value={r.value}>
++              {r.label}
++            </option>
++          ))}
++        </select>
+       </div>
++
++      {error && <div className="text-red-600 text-sm">{error}</div>}
++
+       <div className="bg-white rounded-lg border border-line p-5">
+-        <MemberTable spaceId={spaceId} members={members} onRefresh={loadMembers} />
++        {isLoading ? (
++          <div className="text-ink-muted text-sm py-4">Loading...</div>
++        ) : members.length === 0 ? (
++          // 로드 실패 시엔 빈 상태 대신 위의 error 메시지만 노출(실패 ≠ 빈 목록)
++          error ? null : (
++            <div className="text-ink-muted text-sm py-4">멤버가 없습니다.</div>
++          )
++        ) : visibleMembers.length === 0 ? (
++          <div className="text-ink-muted text-sm py-4">검색 결과가 없습니다.</div>
++        ) : (
++          <MemberTable
++            spaceId={spaceId}
++            members={visibleMembers}
++            onRefresh={loadMembers}
++          />
++        )}
+       </div>
+     </div>
+   );
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\app\\api\\spaces\\[id]\\admin\\logs\\route.ts" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\app\\api\\spaces\\[id]\\admin\\messages\\route.ts" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\lib\\pagination.ts" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\app\\api\\assets\\route.ts" in C:\Team-jane\FlowSpace
+ succeeded in 274ms:
+/**
+ * ?˜ì´ì§€?¤ì´??ì¿¼ë¦¬ ?Œì‹± + ë³€??ê³µìš© ?¬í¼ (?œìˆ˜ ?¨ìˆ˜ ??Prisma/React ë¬´ì˜ì¡?.
+ *
+ * - `parsePageLimit`/`parsePageNumber`: ì¿¼ë¦¬?¤íŠ¸ë§?limit/pageë¥??ˆì „???•ìˆ˜ë¡??•ê·œ??
+ * - `buildCursorPage`: cursor ?˜ì´ì§€?¤ì´?˜ì˜ `take: limit + 1` ?¨í„´
+ *   (`src/app/api/spaces/[id]/messages/route.ts` ê´€ë¡€)??ìº¡ìŠ????limitë³´ë‹¤ 1ê±??? *   ê°€?¸ì˜¨ ?‰ì„ ?˜ë¼ `hasMore`/`nextCursor`ë¥??„ì¶œ?œë‹¤.
+ *
+ * offset ?˜ì´ì§€?¤ì´??`skip`/`take`) ?¼ìš°?¸ëŠ” `parsePageNumber`+`parsePageLimit`ë§?
+ * cursor ?˜ì´ì§€?¤ì´???¼ìš°?¸ëŠ” `parsePageLimit`+`buildCursorPage`ë¥??¬ìš©?œë‹¤.
+ */
+
+/** limit ë¯¸ì????´ìƒì¹???ê¸°ë³¸ ?˜ì´ì§€ ?¬ê¸° */
+export const DEFAULT_PAGE_LIMIT = 50;
+/** ?´ë¼?´ì–¸?¸ê? ?”ì²­ ê°€?¥í•œ ìµœë? ?˜ì´ì§€ ?¬ê¸° (?„ì—­ ëª©ë¡ ??£¼ ë°©ì?) */
+export const MAX_PAGE_LIMIT = 100;
+
+/**
+ * ì¿¼ë¦¬?¤íŠ¸ë§?`limit` ê°’ì„ ?ˆì „???•ìˆ˜ ?˜ì´ì§€ ?¬ê¸°ë¡??•ê·œ?”í•œ??
+ * - null/ë¹ˆê°’/ë¹„ì •??0 ?´í•˜ ??`defaultLimit`
+ * - MAX_PAGE_LIMIT ì´ˆê³¼ ??MAX_PAGE_LIMITë¡??ˆìƒ(cap)
+ *
+ * @param defaultLimit limit ë¯¸ì????´ìƒì¹???ê¸°ë³¸ê°??¼ìš°?¸ë³„ ê¸°ë³¸ ?˜ì´ì§€ ?¬ê¸°ë¥? *   ë³´ì¡´?˜ê¸° ?„í•œ ? íƒ ?¸ìž, ë¯¸ì?????DEFAULT_PAGE_LIMIT).
+ */
+export function parsePageLimit(
+  raw: string | null,
+  defaultLimit: number = DEFAULT_PAGE_LIMIT
+): number {
+  const n = parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n) || n <= 0) return defaultLimit;
+  return Math.min(n, MAX_PAGE_LIMIT);
+}
+
+/**
+ * ì¿¼ë¦¬?¤íŠ¸ë§?`page`(1-base offset ?˜ì´ì§€ ë²ˆí˜¸)ë¥??ˆì „???‘ì˜ ?•ìˆ˜ë¡??•ê·œ?”í•œ??
+ * - null/ë¹ˆê°’/ë¹„ì •??1 ë¯¸ë§Œ ??1
+ * - ?í•œ ?†ìŒ (offset ?˜ì´ì§€ ë²”ìœ„???°ì´???¬ê¸°???˜ì¡´)
+ *
+ * offset ?¼ìš°?¸ì—??`skip: (page - 1) * limit` ê³„ì‚° ??pageê°€ NaN/0/?Œìˆ˜ë©? * ?Œìˆ˜ skip???˜ì–´ Prismaê°€ throw(??00)?˜ë˜ ê²ƒì„ ë°©ì??œë‹¤.
+ */
+export function parsePageNumber(raw: string | null): number {
+  const n = parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return n;
+}
+
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/**
+ * `take: limit + 1`ë¡?ì¡°íšŒ????ë°°ì—´???˜ì´ì§€ë¡?ë³€?˜í•œ??
+ * ?‰ì´ limitë³´ë‹¤ ë§Žìœ¼ë©?ë§ˆì?ë§??¬ë¶„) 1ê±´ì„ ?˜ë¼?´ê³  ê·?ì§ì „ ?‰ì˜ idë¥? * ?¤ìŒ cursorë¡??¬ìš©?œë‹¤.
+ *
+ * @param rows  limit + 1 ë§Œí¼ ì¡°íšŒ?????•ë ¬ ?„ë£Œ ?íƒœ, ê°??‰ì? ê³ ìœ  `id` ë³´ìœ )
+ * @param limit ?˜ì´ì§€ ?¬ê¸°
+ */
+export function buildCursorPage<T extends { id: string }>(
+  rows: T[],
+  limit: number
+): CursorPage<T> {
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+  return { items, nextCursor, hasMore };
+}
+
+
+ succeeded in 274ms:
+import { NextRequest, NextResponse } from "next/server";
+import { AssetType, AssetStatus } from "@prisma/client";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { parsePageLimit, parsePageNumber } from "@/lib/pagination";
+import { normalizeEnumFilter } from "@/lib/query-filter";
+import { internalErrorResponse } from "@/lib/api-error";
+import { toPublicAssetListItem } from "@/features/assets";
+
+/** limit ë¯¸ì?????ê¸°ë³¸ ?˜ì´ì§€ ?¬ê¸° (WI-022 ?´ì „ ?™ìž‘ ë³´ì¡´). */
+const ASSETS_DEFAULT_LIMIT = 20;
+/**
+ * ?„í„° enum allowlist ??Prisma ?°í???enum?ì„œ ?„ì¶œ(?˜ë“œì½”ë”© ë°°ì—´ ?Œí”¼, enum
+ * ì¶”ê? ???ë™ ?™ê¸°??. ê°’ì? ëª¨ë‘ ?€ë¬¸ìž???…ë ¥???•ê·œ??trim+?€ë¬¸ìž)????ê²€ì¦í•œ??
+ * (`normalizeEnumFilter`??WI-030?ì„œ `@/lib/query-filter`ë¡?ê³µìš© ì¶”ì¶œ)
+ */
+const ASSET_TYPE_VALUES = new Set<string>(Object.values(AssetType));
+const ASSET_STATUS_VALUES = new Set<string>(Object.values(AssetStatus));
+
+/** GET /api/assets - ?ì…‹ ëª©ë¡ (?„í„°ë§? */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const shared = searchParams.get("shared");
+
+    // ?…ë ¥ ê²€ì¦?WI-022): type/statusë¥?AssetType/AssetStatus allowlistë¡?ê²€ì¦?
+    // ?˜ëª»??enum?€ ì¡°ìš©??ë¬´ì‹œ(?„ì²´ ëª©ë¡ ?‘ë‹µ)?˜ì? ?Šê³  400?¼ë¡œ ê±°ì ˆ(WI-009 ?•í•©).
+    // getAllë¡?ì¤‘ë³µ ?Œë¼ë¯¸í„°ê¹Œì? ?„ìˆ˜ ê²€ì¦?ì¤‘ë³µê°?ê²€ì¦??°íšŒ ì°¨ë‹¨, codex r2).
+    const type = normalizeEnumFilter(
+      searchParams.getAll("type"),
+      ASSET_TYPE_VALUES
+    );
+    const status = normalizeEnumFilter(
+      searchParams.getAll("status"),
+      ASSET_STATUS_VALUES
+    );
+    if (type === null || status === null) {
+      return NextResponse.json(
+        { error: "Invalid asset filter", code: "INVALID_FILTER" },
+        { status: 400 }
+      );
+    }
+
+    // page/limit ?•ê·œ??WI-022): NaN/0/?Œìˆ˜ ???Œìˆ˜ skip(500) ë°©ì?, limit ?í•œ 100.
+    const page = parsePageNumber(searchParams.get("page"));
+    const limit = parsePageLimit(searchParams.get("limit"), ASSETS_DEFAULT_LIMIT);
+
+    const where: Record<string, unknown> = {};
+
+    if (shared === "true") {
+      // ê³µìš© ?ì…‹ ì¡°íšŒ (?„ë°”?€ ? íƒ ??
+      where.isShared = true;
+    } else {
+      // ë³¸ì¸ ?ì…‹ë§?ì¡°íšŒ (IDOR ë°©ì?)
+      where.userId = session.user.id;
+    }
+
+    if (type) {
+      where.type = type;
+    }
+    if (status) {
+      where.status = status;
+    }
+
+    // ?‘ë‹µ allowlist (WI-021): ëª©ë¡?€ lean DTOë§?ë°˜í™˜?œë‹¤.
+    // shared=true ë¶„ê¸°??owner ê²Œì´???†ì´ ?€??ê³µìœ  ?ì‚°??ë°˜í™˜?˜ë?ë¡??˜ë„??ê³µìœ )
+    // prompt/workflow/comfyuiJobId(ë¯¼ê°)Â·metadataÂ·user??select?˜ì? ?Šê³ ,
+    // toPublicAssetListItemë¡??‘ë‹µ ??ì§‘í•©??ê³ ì •?œë‹¤(?¬ì¸µ ë°©ì–´).
+    const [assets, total] = await Promise.all([
+      prisma.generatedAsset.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          type: true,
+          name: true,
+          status: true,
+          filePath: true,
+          thumbnailPath: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.generatedAsset.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      assets: assets.map(toPublicAssetListItem),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    return internalErrorResponse("GET /api/assets", error, "Failed to fetch assets");
+  }
+}
+
+
+2026-06-23T04:36:44.070393Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.3 seconds
+Output:
+Get-Content : 지정한 경로 src\app\api\spaces\[id]\admin\logs\route.ts에 개체가 없거나 -Include 또는 -Exclude 매개 변수
+로 필터링되었습니다.
+위치 줄:2 문자:1
++ Get-Content -Raw src\app\api\spaces\[id]\admin\logs\route.ts
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+ exited 1 in 308ms:
+Get-Content : 지정한 경로 src\app\api\spaces\[id]\admin\logs\route.ts에 개체가 없거나 -Include 또는 -Exclude 매개 변수
+로 필터링되었습니다.
+위치 줄:2 문자:1
++ Get-Content -Raw src\app\api\spaces\[id]\admin\logs\route.ts
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+2026-06-23T04:36:44.081819Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.3 seconds
+Output:
+Get-Content : 지정한 경로 src\app\api\spaces\[id]\admin\messages\route.ts에 개체가 없거나 -Include 또는 -Exclude 매개 
+변수로 필터링되었습니다.
+위치 줄:2 문자:1
++ Get-Content -Raw src\app\api\spaces\[id]\admin\messages\route.ts
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+ exited 1 in 319ms:
+Get-Content : 지정한 경로 src\app\api\spaces\[id]\admin\messages\route.ts에 개체가 없거나 -Include 또는 -Exclude 매개 
+변수로 필터링되었습니다.
+위치 줄:2 문자:1
++ Get-Content -Raw src\app\api\spaces\[id]\admin\messages\route.ts
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (System.String[]:String[]) [Get-Content], Exception
+    + FullyQualifiedErrorId : ItemNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw -LiteralPath 'src\\app\\api\\spaces\\[id]\\admin\\logs\\route.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw -LiteralPath 'src\\app\\api\\spaces\\[id]\\admin\\stats\\route.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw -LiteralPath 'src\\app\\api\\spaces\\[id]\\admin\\messages\\route.ts'" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\components\\dashboard\\date-range.ts" in C:\Team-jane\FlowSpace
+ succeeded in 219ms:
+import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import { SpaceEventType } from "@prisma/client";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
+import { normalizeEnumFilter, parseDateRangeFilter } from "@/lib/query-filter";
+import { internalErrorResponse } from "@/lib/api-error";
+import { toPublicSpaceEventLog } from "@/lib/space-event-log-payload";
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+/** ?´ë²¤???€???„í„° allowlist (Prisma ?°í???enum) */
+const EVENT_TYPE_VALUES = new Set<string>(Object.values(SpaceEventType));
+
+export async function GET(request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: spaceId } = await params;
+
+    const self = await prisma.spaceMember.findUnique({
+      where: { spaceId_userId: { spaceId, userId: session.user.id } },
+      select: { role: true },
+    });
+    if (!self && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (self && self.role !== "OWNER" && self.role !== "STAFF" && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const cursor = searchParams.get("cursor");
+    const limit = parsePageLimit(searchParams.get("limit"));
+
+    // ê³ ê¸‰ ?„í„°(WI-030): eventType enum(ê¸°ì¡´ ë¯¸ê?ì¦â†’?„ìˆ˜ ê²€ì¦?ë³´ê°•) + ? ì§œ ë²”ìœ„.
+    // ?˜ëª»??ê°’ì? 400(ë¬´ì‹œ ???˜ë„ë³´ë‹¤ ?“ì? ê²°ê³¼ ?¸ì¶œ). whereê°€ cursorë³´ë‹¤ ?°ì„  ?ìš©.
+    const eventType = normalizeEnumFilter(
+      searchParams.getAll("eventType"),
+      EVENT_TYPE_VALUES
+    );
+    const dateRange = parseDateRangeFilter(
+      searchParams.get("startDate"),
+      searchParams.get("endDate")
+    );
+    if (eventType === null || dateRange === "invalid") {
+      return NextResponse.json(
+        { error: "Invalid filter", code: "INVALID_FILTER" },
+        { status: 400 }
+      );
+    }
+
+    const where: Prisma.SpaceEventLogWhereInput = { spaceId };
+    if (eventType) where.eventType = eventType as SpaceEventType;
+    if (dateRange) where.createdAt = dateRange;
+
+    const logs = await prisma.spaceEventLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      include: {
+        user: { select: { name: true, email: true } },
+      },
+    });
+
+    // ?‘ë‹µ ê³„ì•½ ë³´ì¡´: { logs, nextCursor }ë§?ë°˜í™˜(buildCursorPageë¡?messages?€ ?µì¼).
+    // payload????allowlistë¡??•ê·œ?”í•˜ê³??‰ì? lean DTOë¡?ì¶•ì†Œ?œë‹¤(WI-032). ì°¨ë‹¨?€ ?‘ë‹µ
+    // DTO ê³„ì¸µ?ì„œ ?œë‹¤(?”ë©´/CSVë§??„í„°?˜ë©´ raw ì§ì ‘ ?¸ì¶œë¡??°íšŒ) ??SpaceEventLog ?‰ì„
+    // ë°˜í™˜?˜ëŠ” ëª¨ë“  API(?¬ê¸° + admin/stats recentActivity)???™ì¼ ?•ê·œ?”ë? ?ìš©?œë‹¤.
+    const { items, nextCursor } = buildCursorPage(logs, limit);
+
+    return NextResponse.json({ logs: items.map(toPublicSpaceEventLog), nextCursor });
+  } catch (error) {
+    return internalErrorResponse("GET /api/spaces/[id]/admin/logs", error, "Failed to fetch logs");
+  }
+}
+
+
+ succeeded in 231ms:
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
+import { prisma } from "@/lib/prisma";
+import { toPublicSpaceEventLog } from "@/lib/space-event-log-payload";
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+export async function GET(_request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: spaceId } = await params;
+
+    // ê¶Œí•œ ?•ì¸
+    const member = await prisma.spaceMember.findUnique({
+      where: { spaceId_userId: { spaceId, userId: session.user.id } },
+      select: { role: true },
+    });
+
+    if (!member && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (member && member.role !== "OWNER" && member.role !== "STAFF" && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [memberCount, messageCount, todayMessageCount, recentActivity] = await Promise.all([
+      prisma.spaceMember.count({ where: { spaceId } }),
+      prisma.chatMessage.count({ where: { spaceId } }),
+      prisma.chatMessage.count({
+        where: { spaceId, createdAt: { gte: today } },
+      }),
+      prisma.spaceEventLog.findMany({
+        where: { spaceId },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: {
+          user: { select: { name: true, email: true } },
+        },
+      }),
+    ]);
+
+    // recentActivity??SpaceEventLog raw ????admin/logs?€ ?™ì¼?˜ê²Œ payload allowlist +
+    // lean DTOë¡??•ê·œ?”í•œ??WI-032: payload ?¸ì¶œ ì°¨ë‹¨??chokepointë¥???ë³‘ë ¬ ê²½ë¡œ?ë„ ?ìš©).
+    return NextResponse.json({
+      memberCount,
+      messageCount,
+      todayMessageCount,
+      recentActivity: recentActivity.map(toPublicSpaceEventLog),
+    });
+  } catch (error) {
+    return internalErrorResponse("GET /api/spaces/[id]/admin/stats", error, "Failed to fetch stats");
+  }
+}
+
+
+ succeeded in 231ms:
+import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import { MessageType } from "@prisma/client";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
+import { normalizeEnumFilter, parseDateRangeFilter } from "@/lib/query-filter";
+import { internalErrorResponse } from "@/lib/api-error";
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+/** 氅旍嫓歆€ ?€???勴劙 allowlist (Prisma ?绊???enum) */
+const MESSAGE_TYPE_VALUES = new Set<string>(Object.values(MessageType));
+
+export async function GET(request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: spaceId } = await params;
+
+    const self = await prisma.spaceMember.findUnique({
+      where: { spaceId_userId: { spaceId, userId: session.user.id } },
+      select: { role: true },
+    });
+    if (!self && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (self && self.role !== "OWNER" && self.role !== "STAFF" && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const cursor = searchParams.get("cursor");
+    const limit = parsePageLimit(searchParams.get("limit"));
+
+    // 瓿犼笁 ?勴劙(WI-030): ?€??enum + ?犾 氩旍渼. ?橂??臧掛? 400(氍挫嫓 ???橂弰氤措嫟
+    // ?撿? 瓴瓣臣 ?胳稖). where臧€ cursor氤措嫟 ??儊 ?侅毄??甓岉暅 氚?row ?胳稖 攵堦?(WI-010).
+    const type = normalizeEnumFilter(
+      searchParams.getAll("type"),
+      MESSAGE_TYPE_VALUES
+    );
+    const dateRange = parseDateRangeFilter(
+      searchParams.get("startDate"),
+      searchParams.get("endDate")
+    );
+    if (type === null || dateRange === "invalid") {
+      return NextResponse.json(
+        { error: "Invalid filter", code: "INVALID_FILTER" },
+        { status: 400 }
+      );
+    }
+
+    const where: Prisma.ChatMessageWhereInput = { spaceId };
+    if (type) where.type = type as MessageType;
+    if (dateRange) where.createdAt = dateRange;
+
+    const messages = await prisma.chatMessage.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+
+    // ?戨嫷 瓿勳暯 氤挫〈: admin ?检毎?鸽姅 { messages, nextCursor }毵?氚橅櫂(hasMore 氙鸽吀於? WI-012-2 S5/D5).
+    const { items, nextCursor } = buildCursorPage(messages, limit);
+
+    return NextResponse.json({ messages: items, nextCursor });
+  } catch (error) {
+    return internalErrorResponse("GET /api/spaces/[id]/admin/messages", error, "Failed to fetch messages");
+  }
+}
+
+
+ succeeded in 213ms:
+/**
+ * `<input type="date">`??ë¡œì»¬ ? ì§œ(YYYY-MM-DD)ë¥?admin API??ISO datetime instantë¡? * ë³€?˜í•œ??(WI-030 ê³ ê¸‰ ?„í„°).
+ *
+ * ?œë²„??instantë¥?ë°›ì•„ `createdAt: { gte, lt }`ë¡??„í„°?œë‹¤ ??date-onlyë¥??œë²„?ì„œ
+ * ?Œì‹±?˜ë©´ UTCë¡??´ì„???´ë¼ ë¡œì»¬ ? ì§œ?€ ?´ê¸‹?˜ë?ë¡??€?„ì¡´ ?¨ì •), ?´ë¼ê°€ ë¡œì»¬ ?ì •
+ * ê¸°ì? instantë¡?ë³€?˜í•´ ë³´ë‚¸??codex ?¤ê³„).
+ */
+
+/** ë¡œì»¬ ? ì§œ??00:00(?œìž‘, inclusive)??ISO instantë¡? ë¹??˜ëª»??ê°???null. */
+export function localDateToStartInstant(dateStr: string): string | null {
+  const d = parseLocalDate(dateStr);
+  return d ? d.toISOString() : null;
+}
+
+/**
+ * ë¡œì»¬ ? ì§œ **?µì¼** 00:00(ì¢…ë£Œ, exclusive upper bound)??ISO instantë¡?
+ * ? íƒ??? ì§œë¥??¬í•¨?˜ê¸° ?„í•´ ?µì¼ ?ì • ë¯¸ë§Œ(`lt`)?¼ë¡œ ë³´ë‚¸?? ë¹??˜ëª»??ê°???null.
+ */
+export function localDateToEndInstant(dateStr: string): string | null {
+  const d = parseLocalDate(dateStr);
+  if (!d) return null;
+  d.setDate(d.getDate() + 1);
+  return d.toISOString();
+}
+
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseLocalDate(dateStr: string): Date | null {
+  if (!DATE_ONLY_RE.test(dateStr)) return null;
+  // `T00:00:00`(?€?„ì¡´ ë¯¸í‘œê¸? ???°í???ë¡œì»¬ ?€?„ì¡´ ?ì •?¼ë¡œ ?´ì„
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  // ?¬ë ¥ ë¡¤ì˜¤ë²?ê±°ë?(?? 2026-02-31 ??3??: ?Œì‹± ê²°ê³¼ê°€ ?…ë ¥ê³??¼ì¹˜?´ì•¼ ? íš¨
+  const [y, m, day] = dateStr.split("-").map(Number);
+  if (d.getFullYear() !== y || d.getMonth() + 1 !== m || d.getDate() !== day) {
+    return null;
+  }
+  return d;
+}
+
+
+codex
+현재까지 공유 모듈 연결은 방향이 맞습니다. 서버 필터는 `getAll()` 기반 전수 검증이고, 날짜는 클라이언트가 로컬 날짜를 ISO instant로 보내며 서버가 instant만 받는 계약이라 Next/Vercel 런타임 차이를 만들 가능성은 낮아 보입니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw package.json' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg "SpaceEventType|enum SpaceEventType|enum MessageType|model SpaceEventLog|model ChatMessage" prisma src -n' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg \"process\\.env|NEXT_PUBLIC_|export const runtime|export const dynamic|preferredRegion|revalidate\" src vitest.config.ts next.config.* vercel.json package.json -n" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff ba3a82f..77e690a --check' in C:\Team-jane\FlowSpace
+ succeeded in 562ms:
+{
+  "name": "flowspace",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "socket:dev": "cross-env NODE_ENV=development tsx server/index.ts",
+    "livekit:dev": "node scripts/livekit-dev.js",
+    "dev:all": "concurrently \"npm run dev\" \"npm run socket:dev\" \"npm run livekit:dev\"",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.0.0",
+    "@livekit/components-react": "2.9.17",
+    "@prisma/client": "^6.0.0",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "dompurify": "3.3.1",
+    "dotenv": "^17.3.1",
+    "jose": "^6.1.3",
+    "livekit-client": "2.16.0",
+    "livekit-server-sdk": "^2.15.0",
+    "lucide-react": "^0.561.0",
+    "next": "^15.5.9",
+    "next-auth": "^5.0.0-beta.25",
+    "phaser": "^3.90.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.34.5",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "tailwind-merge": "^2.5.0",
+    "tsx": "^4.0.0",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.15",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/dompurify": "3.0.5",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.0.8",
+    "jsdom": "^28.1.0",
+    "playwright": "^1.58.2",
+    "prisma": "^6.0.0",
+    "tailwindcss": "^4.0.15",
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
+  }
+}
+
+
+2026-06-23T04:36:58.296491Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.6 seconds
+Output:
+src\components\layout\navbar.tsx:230:    if (process.env.NODE_ENV !== "development") return;
+src\lib\auth.config.ts:15:    ...(process.env.GOOGLE_CLIENT_ID
+src\lib\auth.config.ts:18:            clientId: process.env.GOOGLE_CLIENT_ID,
+src\lib\auth.config.ts:19:            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+src\lib\auth-secret.ts:19:  const secret = process.env.AUTH_SECRET;
+src\lib\comfyui\config.ts:6:  const baseUrl = process.env.COMFYUI_URL || DEFAULT_COMFYUI_URL;
+src\lib\comfyui\config.ts:20:  const comfyuiMode = process.env.COMFYUI_MODE;
+src\lib\comfyui\config.ts:26:  if (process.env.COMFYUI_MOCK_MODE === "true") {
+src\lib\prisma.ts:9:if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+src\lib\socket-startup.ts:39:  const isProduction = process.env.NODE_ENV === "production";
+src\lib\socket-startup.ts:55:  if (isProduction && !process.env.SOCKET_INTERNAL_SECRET) {
+src\features\space\socket\internal\socket-client.ts:135:  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+src\features\space\socket\internal\socket-client.ts:136:    return process.env.NEXT_PUBLIC_SOCKET_URL;
+src\features\space\socket\internal\socket-client.ts:139:  const port = process.env.NEXT_PUBLIC_SOCKET_PORT || "3001";
+src\app\api\livekit\webhook\route.ts:9:const IS_DEV = process.env.NODE_ENV === "development";
+src\app\api\livekit\webhook\route.ts:10:const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "";
+src\app\api\livekit\webhook\route.ts:11:const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "";
+src\app\api\livekit\token\route.ts:9:const IS_DEV = process.env.NODE_ENV === "development";
+src\app\api\livekit\token\route.ts:10:const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
+src\app\api\livekit\token\route.ts:11:const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
+src\app\api\livekit\token\route.ts:12:const LIVEKIT_URL = process.env.LIVEKIT_URL || "http://localhost:7880";
+src\features\assets\internal\processor.ts:537:    if (process.env.CHIBI_DEBUG) {
+src\features\assets\internal\processor.ts:564:  if (process.env.CHIBI_DEBUG) {
+src\features\space\livekit\internal\livekit-constants.ts:8:  process.env.NEXT_PUBLIC_LIVEKIT_URL || "ws://localhost:7880";
+src\features\space\livekit\internal\livekit-constants.ts:11:export const IS_DEV = process.env.NODE_ENV === "development";
+src\features\space\livekit\internal\livekit-constants.ts:15:  process.env.NEXT_PUBLIC_SKIP_LIVEKIT_IN_DEV === "true";
+src\features\space\enforce\internal\dispatch.ts:33:  const baseUrl = process.env.SOCKET_INTERNAL_URL;
+src\features\space\enforce\internal\dispatch.ts:34:  const secret = process.env.SOCKET_INTERNAL_SECRET;
+src\features\space\enforce\internal\dispatch.ts:37:    if (process.env.NODE_ENV === "production") {
+rg: next.config.*: 파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다. (os error 123)
+
+ succeeded in 562ms:
+prisma\schema.prisma:199:model SpaceEventLog {
+prisma\schema.prisma:204:  eventType      SpaceEventType
+prisma\schema.prisma:223:enum SpaceEventType {
+prisma\schema.prisma:256:enum MessageType {
+prisma\schema.prisma:333:model ChatMessage {
+prisma\migrations\0_init\migration.sql:14:CREATE TYPE "SpaceEventType" AS ENUM ('ENTER', 'EXIT', 'INTERACTION', 'CHAT', 'ADMIN_ACTION', 'VIDEO_START', 'VIDEO_END', 'SCREEN_SHARE_START', 'SCREEN_SHARE_END');
+prisma\migrations\0_init\migration.sql:143:    "eventType" "SpaceEventType" NOT NULL,
+src\lib\space-event-log-payload.ts:88: * `eventType`은 `SpaceEventType`(enum ⊆ string)을 string으로 받는다.
+src\app\dashboard\spaces\[id]\logs\page.tsx:14:// 표시용 이벤트 타입 옵션(서버는 SpaceEventType enum으로 검증 — SSOT). "" = 전체.
+src\app\api\livekit\webhook\route.ts:4:import type { SpaceEventType, Prisma } from "@prisma/client";
+src\app\api\livekit\webhook\route.ts:56:): SpaceEventType | null {
+src\app\api\livekit\webhook\route.ts:204:  eventType: SpaceEventType;
+src\app\api\spaces\[id]\admin\logs\route.ts:3:import { SpaceEventType } from "@prisma/client";
+src\app\api\spaces\[id]\admin\logs\route.ts:16:const EVENT_TYPE_VALUES = new Set<string>(Object.values(SpaceEventType));
+src\app\api\spaces\[id]\admin\logs\route.ts:60:    if (eventType) where.eventType = eventType as SpaceEventType;
+
+ exited 1 in 562ms:
+src\components\layout\navbar.tsx:230:    if (process.env.NODE_ENV !== "development") return;
+src\lib\auth.config.ts:15:    ...(process.env.GOOGLE_CLIENT_ID
+src\lib\auth.config.ts:18:            clientId: process.env.GOOGLE_CLIENT_ID,
+src\lib\auth.config.ts:19:            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+src\lib\auth-secret.ts:19:  const secret = process.env.AUTH_SECRET;
+src\lib\comfyui\config.ts:6:  const baseUrl = process.env.COMFYUI_URL || DEFAULT_COMFYUI_URL;
+src\lib\comfyui\config.ts:20:  const comfyuiMode = process.env.COMFYUI_MODE;
+src\lib\comfyui\config.ts:26:  if (process.env.COMFYUI_MOCK_MODE === "true") {
+src\lib\prisma.ts:9:if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+src\lib\socket-startup.ts:39:  const isProduction = process.env.NODE_ENV === "production";
+src\lib\socket-startup.ts:55:  if (isProduction && !process.env.SOCKET_INTERNAL_SECRET) {
+src\features\space\socket\internal\socket-client.ts:135:  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+src\features\space\socket\internal\socket-client.ts:136:    return process.env.NEXT_PUBLIC_SOCKET_URL;
+src\features\space\socket\internal\socket-client.ts:139:  const port = process.env.NEXT_PUBLIC_SOCKET_PORT || "3001";
+src\app\api\livekit\webhook\route.ts:9:const IS_DEV = process.env.NODE_ENV === "development";
+src\app\api\livekit\webhook\route.ts:10:const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "";
+src\app\api\livekit\webhook\route.ts:11:const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "";
+src\app\api\livekit\token\route.ts:9:const IS_DEV = process.env.NODE_ENV === "development";
+src\app\api\livekit\token\route.ts:10:const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
+src\app\api\livekit\token\route.ts:11:const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
+src\app\api\livekit\token\route.ts:12:const LIVEKIT_URL = process.env.LIVEKIT_URL || "http://localhost:7880";
+src\features\assets\internal\processor.ts:537:    if (process.env.CHIBI_DEBUG) {
+src\features\assets\internal\processor.ts:564:  if (process.env.CHIBI_DEBUG) {
+src\features\space\livekit\internal\livekit-constants.ts:8:  process.env.NEXT_PUBLIC_LIVEKIT_URL || "ws://localhost:7880";
+src\features\space\livekit\internal\livekit-constants.ts:11:export const IS_DEV = process.env.NODE_ENV === "development";
+src\features\space\livekit\internal\livekit-constants.ts:15:  process.env.NEXT_PUBLIC_SKIP_LIVEKIT_IN_DEV === "true";
+src\features\space\enforce\internal\dispatch.ts:33:  const baseUrl = process.env.SOCKET_INTERNAL_URL;
+src\features\space\enforce\internal\dispatch.ts:34:  const secret = process.env.SOCKET_INTERNAL_SECRET;
+src\features\space\enforce\internal\dispatch.ts:37:    if (process.env.NODE_ENV === "production") {
+rg: next.config.*: 파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다. (os error 123)
+
+2026-06-23T04:36:58.306492Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.6 seconds
+Output:
+.flowset/eval-results/WI-031.codex.r3.stream.log:99: trailing whitespace.
++ 
+.flowset/eval-results/WI-031.codex.stream.log:131: trailing whitespace.
++ 
+.flowset/eval-results/WI-032.codex-r2.err:8: trailing whitespace.
++    + CategoryInfo          : ObjectNotFound: (src/components/dashboard/csv-export.tsx:String) [Get-Content], ItemNotF 
+.flowset/eval-results/WI-032.codex-r2.err:11: trailing whitespace.
++ 
+.flowset/eval-results/WI-032.codex-r2.err:22: trailing whitespace.
++ 
+.flowset/eval-results/WI-032.codex-r2.err:59: new blank line at EOF.
+.flowset/eval-results/WI-032.codex.err:26: new blank line at EOF.
+
+ exited 1 in 572ms:
+.flowset/eval-results/WI-031.codex.r3.stream.log:99: trailing whitespace.
++ 
+.flowset/eval-results/WI-031.codex.stream.log:131: trailing whitespace.
++ 
+.flowset/eval-results/WI-032.codex-r2.err:8: trailing whitespace.
++    + CategoryInfo          : ObjectNotFound: (src/components/dashboard/csv-export.tsx:String) [Get-Content], ItemNotF 
+.flowset/eval-results/WI-032.codex-r2.err:11: trailing whitespace.
++ 
+.flowset/eval-results/WI-032.codex-r2.err:22: trailing whitespace.
++ 
+.flowset/eval-results/WI-032.codex-r2.err:59: new blank line at EOF.
+.flowset/eval-results/WI-032.codex.err:26: new blank line at EOF.
+
+codex
+배포 영향 쪽에서 새 `process.env` 사용이나 설정 파일 변경은 아직 보이지 않습니다. 한 가지 사소한 사실은 `.flowset/eval-results` 산출물에 공백 경고가 있지만, 프로덕션 런타임이나 Vercel 빌드 산출에는 영향 없는 문서성 파일입니다.
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "git diff ba3a82f..77e690a -G \"process\\.env|NEXT_PUBLIC_|export const runtime|export const dynamic|preferredRegion|revalidate\" --name-only -- src vitest.config.ts package.json" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw prisma\\schema.prisma | Select-String -Pattern 'enum SpaceEventType|enum MessageType|model SpaceEventLog|model ChatMessage' -Context 0,20" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff ba3a82f..77e690a -- src/app/dashboard/spaces/[id]/analytics/page.tsx src/app/dashboard/spaces/[id]/page.tsx src/components/dashboard/member-filter.ts src/components/dashboard/member-table.tsx' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff ba3a82f..77e690a -- vitest.config.ts' in C:\Team-jane\FlowSpace
+ succeeded in 209ms:
+ succeeded in 310ms:
+
+> // FlowSpace - Prisma Schema
+// flow_metaverse 旮半皹 + ComfyUI Asset Pipeline ?曥灔
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// 1. User (NextAuth)
+// ============================================
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+
+  isSuperAdmin Boolean @default(false)
+
+  avatarConfig Json?
+
+  // Relations
+  accounts         Account[]
+  sessions         Session[]
+  spaces           Space[]
+  spaceEventLogs   SpaceEventLog[]
+  spaceMemberships SpaceMember[]
+  generatedAssets  GeneratedAsset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// 2. Account (NextAuth OAuth)
+// ============================================
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// ============================================
+// 3. Session (NextAuth)
+// ============================================
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================
+// 4. VerificationToken (NextAuth)
+// ============================================
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// 5. Template (毵??滍攲毽?
+// ============================================
+model Template {
+  id          String      @id @default(cuid())
+  key         TemplateKey @unique
+  name        String
+  description String?
+  version     String      @default("1.0.0")
+  assetsPath  String
+  previewUrl  String?
+  isActive    Boolean     @default(true)
+
+  spaces Space[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TemplateKey {
+  OFFICE
+  CLASSROOM
+  LOUNGE
+}
+
+// ============================================
+// 6. Space (臧€??瓿店皠)
+// ============================================
+model Space {
+  id          String  @id @default(cuid())
+  name        String
+  description String? @db.Text
+  ownerId     String
+  templateId  String
+
+  accessType   SpaceAccessType @default(PUBLIC)
+  accessSecret String?
+  inviteCode   String          @unique @default(cuid())
+
+  logoUrl        String?
+  primaryColor   String?
+  loadingMessage String?
+
+  status   SpaceStatus @default(ACTIVE)
+  maxUsers Int         @default(50)
+
+  mapData Json?
+
+  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  template Template @relation(fields: [templateId], references: [id])
+
+  eventLogs       SpaceEventLog[]
+  guestSessions   GuestSession[]
+  members         SpaceMember[]
+  chatMessages    ChatMessage[]
+  mapObjects      MapObject[]
+  partyZones      PartyZone[]
+  spotlightGrants SpotlightGrant[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([ownerId])
+  @@index([inviteCode])
+  // GET /api/spaces ??炜茧Μ(WI-013): where status=ACTIVE + orderBy [updatedAt desc, id desc] + cursor.
+  // 氤淀暕 ?鸽嵄???犽憪 旎熂??status??旮办〈 ?澕 @@index([status])毳??€觳?欷戨车 ?滉卑).
+  @@index([status, updatedAt(sort: Desc), id(sort: Desc)])
+}
+
+enum SpaceAccessType {
+  PUBLIC
+  PRIVATE
+  PASSWORD
+}
+
+enum SpaceStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+// ============================================
+// 7. GuestSession (瓴岇姢???胳厴)
+// ============================================
+model GuestSession {
+  id       String @id @default(cuid())
+  spaceId  String
+  nickname String
+  avatar   String @default("default")
+
+  sessionToken String   @unique @default(cuid())
+  expiresAt    DateTime
+
+  space            Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  eventLogs        SpaceEventLog[]
+  spaceMemberships SpaceMember[]
+
+  createdAt DateTime @default(now())
+
+  @@index([spaceId])
+  @@index([sessionToken])
+  @@index([spaceId, createdAt])
+  @@index([spaceId, nickname])
+}
+
+// ============================================
+// 8. SpaceEventLog (?措菠??搿滉犯)
+// ============================================
+model SpaceEventLog {
+  id             String         @id @default(cuid())
+  spaceId        String
+  userId         String?
+  guestSessionId String?
+  eventType      SpaceEventType
+  payload        Json?
+
+  participantId String?
+
+  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  guestSession GuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([spaceId])
+  @@index([userId])
+  @@index([guestSessionId])
+  @@index([eventType])
+  @@index([createdAt(sort: Desc)])
+  @@index([spaceId, eventType, createdAt])
+}
+
+enum SpaceEventType {
+  ENTER
+  EXIT
+  INTERACTION
+  CHAT
+  ADMIN_ACTION
+  VIDEO_START
+  VIDEO_END
+  SCREEN_SHARE_START
+  SCREEN_SHARE_END
+}
+
+// ============================================
+// 9. SpaceMember (瓿店皠 氅る矂??
+// ============================================
+
+enum SpaceRole {
+  OWNER
+  STAFF
+  PARTICIPANT
+}
+
+enum ChatRestriction {
+  NONE
+  MUTED
+  BANNED
+}
+
+enum SenderType {
+  USER
+  GUEST
+}
+
+enum MessageType {
+  MESSAGE
+  WHISPER
+  PARTY
+  SYSTEM
+  ANNOUNCEMENT
+}
+
+model SpaceMember {
+  id             String  @id @default(cuid())
+  spaceId        String
+  userId         String?
+  guestSessionId String?
+
+  displayName      String?
+  role             SpaceRole       @default(PARTICIPANT)
+  restriction      ChatRestriction @default(NONE)
+  restrictedUntil  DateTime?
+  restrictedBy     String?
+  restrictedReason String?
+
+  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestSession GuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([spaceId, userId])
+  @@unique([spaceId, guestSessionId])
+  @@index([spaceId, role])
+  @@index([userId])
+  @@index([guestSessionId])
+}
+
+// ============================================
+// 10. MapObject (毵??る笇?濏姼)
+// ============================================
+model MapObject {
+  id      String  @id @default(cuid())
+  spaceId String
+  assetId String?
+
+  objectType String
+  label      String?
+
+  positionX Float
+  positionY Float
+  rotation  Int   @default(0)
+  width     Int   @default(1)
+  height    Int   @default(1)
+
+  isActive Boolean @default(true)
+
+  linkedObjectId String?    @unique
+  linkedObject   MapObject? @relation("ObjectPair", fields: [linkedObjectId], references: [id], onDelete: SetNull)
+  linkedBy       MapObject? @relation("ObjectPair")
+
+  customData Json?
+
+  placedBy     String
+  placedByType SenderType @default(USER)
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId])
+  @@index([assetId])
+  @@index([linkedObjectId])
+  @@index([spaceId, isActive])
+}
+
+// ============================================
+// 11. ChatMessage (毂勴寘 氅旍嫓歆€)
+// ============================================
+model ChatMessage {
+  id         String     @id @default(cuid())
+  spaceId    String
+  senderId   String?
+  senderType SenderType
+  senderName String
+
+  content  String      @db.Text
+  type     MessageType @default(MESSAGE)
+  targetId String?
+
+  isDeleted Boolean   @default(false)
+  deletedBy String?
+  deletedAt DateTime?
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([spaceId, createdAt])
+  @@index([senderId])
+  @@index([type])
+}
+
+// ============================================
+// 12. PartyZone (?岉嫲 臁?
+// ============================================
+model PartyZone {
+  id      String @id @default(cuid())
+  spaceId String
+  name    String
+
+  boundsX1 Int
+  boundsY1 Int
+  boundsX2 Int
+  boundsY2 Int
+
+  createdBy     String
+  createdByType SenderType @default(USER)
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId])
+}
+
+// ============================================
+// 13. GeneratedAsset (AI ?濎劚 ?愳厠) - ?犼窚
+// ============================================
+model GeneratedAsset {
+  id     String @id @default(cuid())
+  userId String
+
+  type   AssetType
+  name   String
+  prompt String    @db.Text
+
+  workflow String
+  status   AssetStatus @default(PENDING)
+
+  metadata Json?
+
+  filePath      String?
+  thumbnailPath String?
+  fileSize      Int?
+
+  comfyuiJobId String?
+  isShared     Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isShared, status, type])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+enum AssetType {
+  CHARACTER
+  TILESET
+  OBJECT
+  MAP
+}
+
+enum AssetStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// 14. AssetWorkflow (?岉伂?岆???滍攲毽? - ?犼窚
+// ============================================
+model AssetWorkflow {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+
+  template  Json
+  version   String    @default("1.0.0")
+  assetType AssetType
+  isActive  Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assetType])
+  @@index([isActive])
+}
+
+// ============================================
+// 15. SpotlightGrant (?ろ彫?鸽澕?错姼 甓岉暅)
+// ============================================
+model SpotlightGrant {
+  id             String  @id @default(cuid())
+  spaceId        String
+  userId         String?
+  guestSessionId String?
+
+  grantedBy String
+  expiresAt DateTime?
+  isActive  Boolean   @default(false)
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId])
+  @@index([spaceId, userId])
+  @@index([spaceId, guestSessionId])
+  @@index([isActive])
+}
+
+
+
+
+ succeeded in 327ms:
+diff --git a/src/app/dashboard/spaces/[id]/analytics/page.tsx b/src/app/dashboard/spaces/[id]/analytics/page.tsx
+index 2c83d18..d9b0fdc 100644
+--- a/src/app/dashboard/spaces/[id]/analytics/page.tsx
++++ b/src/app/dashboard/spaces/[id]/analytics/page.tsx
+@@ -3,6 +3,8 @@
+ import { useEffect, useState } from "react";
+ import { useParams } from "next/navigation";
+ import { UsageChart } from "@/components/dashboard/usage-chart";
++import { ExportCsvButton } from "@/components/dashboard/export-csv-button";
++import { analyticsToCsv, downloadCsv, csvFilename } from "@/components/dashboard/csv-export";
+ 
+ interface DataPoint {
+   date: string;
+@@ -38,16 +40,27 @@ export default function AnalyticsPage() {
+     <div className="space-y-6">
+       <div className="flex items-center justify-between">
+         <h1 className="text-2xl font-bold text-ink">Analytics</h1>
+-        <select
+-          value={days}
+-          onChange={(e) => setDays(Number(e.target.value))}
+-          className="text-sm border border-line rounded px-3 py-1.5"
+-        >
+-          <option value={7}>Last 7 days</option>
+-          <option value={14}>Last 14 days</option>
+-          <option value={30}>Last 30 days</option>
+-          <option value={90}>Last 90 days</option>
+-        </select>
++        <div className="flex items-center gap-3">
++          <select
++            value={days}
++            onChange={(e) => setDays(Number(e.target.value))}
++            className="text-sm border border-line rounded px-3 py-1.5"
++          >
++            <option value={7}>Last 7 days</option>
++            <option value={14}>Last 14 days</option>
++            <option value={30}>Last 30 days</option>
++            <option value={90}>Last 90 days</option>
++          </select>
++          <ExportCsvButton
++            disabled={data.dailyMessages.length === 0 && data.dailyVisitors.length === 0}
++            onExport={() =>
++              downloadCsv(
++                csvFilename("analytics", spaceId, new Date()),
++                analyticsToCsv(data)
++              )
++            }
++          />
++        </div>
+       </div>
+ 
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+diff --git a/src/app/dashboard/spaces/[id]/page.tsx b/src/app/dashboard/spaces/[id]/page.tsx
+index 001a361..8026317 100644
+--- a/src/app/dashboard/spaces/[id]/page.tsx
++++ b/src/app/dashboard/spaces/[id]/page.tsx
+@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
+ import { useParams } from "next/navigation";
+ import { StatCard } from "@/components/dashboard/stat-card";
+ import { AnnounceForm } from "@/components/dashboard/announce-form";
++import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
+ 
+ interface Stats {
+   memberCount: number;
+@@ -13,8 +14,9 @@ interface Stats {
+     id: string;
+     eventType: string;
+     createdAt: string;
+-    user?: { name: string | null; email: string };
+-    payload?: Record<string, unknown>;
++    user?: { name: string | null; email: string } | null;
++    // API가 allowlist로 정규화한 공개 payload(WI-032). 오버뷰는 미렌더.
++    payload?: PublicSpaceEventPayload;
+   }>;
+ }
+ 
+diff --git a/src/components/dashboard/member-filter.ts b/src/components/dashboard/member-filter.ts
+new file mode 100644
+index 0000000..589f7fd
+--- /dev/null
++++ b/src/components/dashboard/member-filter.ts
+@@ -0,0 +1,30 @@
++import type { Member, MemberRoleFilter } from "./member-table";
++
++/**
++ * 멤버 목록을 검색어(이름/이메일)와 역할 필터로 거른다 (순수 함수 — 클라 측 필터).
++ *
++ * - 검색어는 trim 후 소문자 비교. 빈 검색어 → 이름/이메일 조건 미적용.
++ * - 이름은 member-table의 표시명 우선순위와 동일하게
++ *   `user.name → guestSession.nickname → displayName` 순으로 비교 대상에 포함.
++ * - 역할 필터 "ALL" → 역할 조건 미적용.
++ */
++export function filterMembers(
++  members: Member[],
++  query: string,
++  role: MemberRoleFilter
++): Member[] {
++  const q = query.trim().toLowerCase();
++  return members.filter((m) => {
++    if (role !== "ALL" && m.role !== role) return false;
++    if (!q) return true;
++    // member-table 표시명 우선순위(|| 체인)와 동일하게 비교 (표시되는 값을 검색)
++    const name = (
++      m.user?.name ||
++      m.guestSession?.nickname ||
++      m.displayName ||
++      ""
++    ).toLowerCase();
++    const email = (m.user?.email ?? "").toLowerCase();
++    return name.includes(q) || email.includes(q);
++  });
++}
+diff --git a/src/components/dashboard/member-table.tsx b/src/components/dashboard/member-table.tsx
+index 86cb241..9009a3c 100644
+--- a/src/components/dashboard/member-table.tsx
++++ b/src/components/dashboard/member-table.tsx
+@@ -2,7 +2,7 @@
+ 
+ import { useState } from "react";
+ 
+-interface Member {
++export interface Member {
+   id: string;
+   role: "OWNER" | "STAFF" | "PARTICIPANT";
+   restriction: "NONE" | "MUTED" | "BANNED";
+@@ -12,6 +12,9 @@ interface Member {
+   createdAt: string;
+ }
+ 
++/** 멤버 검색 가능한 역할 필터 값 ("ALL" = 전체) */
++export type MemberRoleFilter = "ALL" | "OWNER" | "STAFF" | "PARTICIPANT";
++
+ interface MemberTableProps {
+   spaceId: string;
+   members: Member[];
+
+ succeeded in 726ms:
+diff --git a/vitest.config.ts b/vitest.config.ts
+index b7bb9b0..86c968f 100644
+--- a/vitest.config.ts
++++ b/vitest.config.ts
+@@ -2,6 +2,10 @@ import { defineConfig } from "vitest/config";
+ import path from "path";
+ 
+ export default defineConfig({
++  // Next.js 소스는 React 자동 JSX 런타임 전제(React 미import) → esbuild도 automatic 사용
++  esbuild: {
++    jsx: "automatic",
++  },
+   test: {
+     globals: true,
+     environment: "jsdom",
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\components\\dashboard\\event-log-table.tsx" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\components\\dashboard\\message-moderation.tsx" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw src\\components\\dashboard\\member-table.tsx" in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw -LiteralPath 'src\\app\\api\\spaces\\[id]\\admin\\members\\route.ts'" in C:\Team-jane\FlowSpace
+ succeeded in 250ms:
+"use client";
+
+import type { PublicSpaceEventPayload } from "@/lib/space-event-log-payload";
+
+interface EventLog {
+  id: string;
+  eventType: string;
+  // API臧€ allowlist搿??曣窚?旐暅 瓿店皽 payload(WI-032) ???旊┐?€ 攴鸽?搿?歆侂牞???滌嫓.
+  payload?: PublicSpaceEventPayload;
+  createdAt: string;
+  user?: { name: string | null; email: string } | null;
+}
+
+interface EventLogTableProps {
+  logs: EventLog[];
+  onLoadMore?: () => void;
+  hasMore: boolean;
+  isLoading: boolean;
+}
+
+const EVENT_COLORS: Record<string, string> = {
+  ENTER: "bg-green-100 text-green-700",
+  EXIT: "bg-cream-deep text-ink-muted",
+  CHAT: "bg-blue-100 text-ink",
+  INTERACTION: "bg-yellow-100 text-yellow-700",
+  ADMIN_ACTION: "bg-red-100 text-red-700",
+};
+
+export function EventLogTable({ logs, onLoadMore, hasMore, isLoading }: EventLogTableProps) {
+  return (
+    <div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-line text-left text-ink-muted">
+            <th className="pb-3 font-medium">Event</th>
+            <th className="pb-3 font-medium">User</th>
+            <th className="pb-3 font-medium">Details</th>
+            <th className="pb-3 font-medium text-right">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map((log) => (
+            <tr key={log.id} className="border-b border-line">
+              <td className="py-2">
+                <span
+                  className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                    EVENT_COLORS[log.eventType] || "bg-cream-deep text-ink-muted"
+                  }`}
+                >
+                  {log.eventType}
+                </span>
+              </td>
+              <td className="py-2 text-ink-soft">
+                {log.user?.name || log.user?.email || "-"}
+              </td>
+              <td className="py-2 text-ink-muted text-xs max-w-xs truncate">
+                {log.payload ? JSON.stringify(log.payload) : "-"}
+              </td>
+              <td className="py-2 text-ink-light text-xs text-right whitespace-nowrap">
+                {new Date(log.createdAt).toLocaleString("ko-KR")}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {hasMore && (
+        <div className="mt-4 text-center">
+          <button
+            onClick={onLoadMore}
+            disabled={isLoading}
+            className="px-4 py-2 text-sm text-ink hover:text-brand-deep disabled:opacity-50"
+          >
+            {isLoading ? "Loading..." : "Load more"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+ succeeded in 251ms:
+"use client";
+
+import { useState } from "react";
+
+interface ChatMsg {
+  id: string;
+  senderName: string;
+  content: string;
+  type: string;
+  isDeleted: boolean;
+  createdAt: string;
+}
+
+interface MessageModerationProps {
+  spaceId: string;
+  messages: ChatMsg[];
+  onRefresh: () => void;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  isLoading: boolean;
+}
+
+export function MessageModeration({
+  spaceId,
+  messages,
+  onRefresh,
+  hasMore,
+  onLoadMore,
+  isLoading,
+}: MessageModerationProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDelete(messageId: string) {
+    if (!confirm("??氅旍嫓歆€毳???牅?橃嫓瓴犾姷?堦箤?")) return;
+
+    setDeletingId(messageId);
+    try {
+      const res = await fetch(`/api/spaces/${spaceId}/admin/messages/${messageId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Delete failed");
+      }
+      onRefresh();
+    } catch {
+      alert("Network error");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="space-y-2">
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex items-start justify-between p-3 rounded-md border ${
+              msg.isDeleted ? "bg-red-50 border-red-200 opacity-60" : "bg-white border-line"
+            }`}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-ink">{msg.senderName}</span>
+                <span className="text-xs text-ink-light">
+                  {new Date(msg.createdAt).toLocaleString("ko-KR")}
+                </span>
+                <span className="text-xs px-1.5 py-0.5 rounded bg-cream-deep text-ink-muted">
+                  {msg.type}
+                </span>
+                {msg.isDeleted && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600">
+                    Deleted
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-ink-soft truncate">{msg.content}</p>
+            </div>
+            {!msg.isDeleted && (
+              <button
+                onClick={() => handleDelete(msg.id)}
+                disabled={deletingId === msg.id}
+                className="ml-3 px-2 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded disabled:opacity-50"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {hasMore && (
+        <div className="mt-4 text-center">
+          <button
+            onClick={onLoadMore}
+            disabled={isLoading}
+            className="px-4 py-2 text-sm text-ink hover:text-brand-deep disabled:opacity-50"
+          >
+            {isLoading ? "Loading..." : "Load more"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+ succeeded in 250ms:
+"use client";
+
+import { useState } from "react";
+
+export interface Member {
+  id: string;
+  role: "OWNER" | "STAFF" | "PARTICIPANT";
+  restriction: "NONE" | "MUTED" | "BANNED";
+  displayName: string | null;
+  user?: { id: string; name: string | null; email: string; image: string | null } | null;
+  guestSession?: { id: string; nickname: string } | null;
+  createdAt: string;
+}
+
+/** 氅る矂 瓴€??臧€?ロ暅 ??暊 ?勴劙 臧?("ALL" = ?勳泊) */
+export type MemberRoleFilter = "ALL" | "OWNER" | "STAFF" | "PARTICIPANT";
+
+interface MemberTableProps {
+  spaceId: string;
+  members: Member[];
+  onRefresh: () => void;
+}
+
+const ROLE_COLORS: Record<string, string> = {
+  OWNER: "bg-purple-100 text-purple-700",
+  STAFF: "bg-blue-100 text-ink",
+  PARTICIPANT: "bg-cream-deep text-ink-muted",
+};
+
+const RESTRICTION_COLORS: Record<string, string> = {
+  NONE: "",
+  MUTED: "bg-yellow-100 text-yellow-700",
+  BANNED: "bg-red-100 text-red-700",
+};
+
+export function MemberTable({ spaceId, members, onRefresh }: MemberTableProps) {
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  async function handleAction(memberId: string, action: string, role?: string) {
+    setActionLoading(memberId);
+    try {
+      const res = await fetch(`/api/spaces/${spaceId}/admin/members`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, action, role }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Action failed");
+      }
+      onRefresh();
+    } catch {
+      alert("Network error");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-line text-left text-ink-muted">
+            <th className="pb-3 font-medium">Name</th>
+            <th className="pb-3 font-medium">Role</th>
+            <th className="pb-3 font-medium">Status</th>
+            <th className="pb-3 font-medium">Joined</th>
+            <th className="pb-3 font-medium text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {members.map((m) => {
+            const name = m.user?.name || m.guestSession?.nickname || m.displayName || "Unknown";
+            const isOwner = m.role === "OWNER";
+            const isLoading = actionLoading === m.id;
+
+            return (
+              <tr key={m.id} className="border-b border-line">
+                <td className="py-3">
+                  <div className="font-medium text-ink">{name}</div>
+                  {m.user?.email && (
+                    <div className="text-xs text-ink-light">{m.user.email}</div>
+                  )}
+                  {m.guestSession && (
+                    <div className="text-xs text-ink-light">Guest</div>
+                  )}
+                </td>
+                <td className="py-3">
+                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${ROLE_COLORS[m.role]}`}>
+                    {m.role}
+                  </span>
+                </td>
+                <td className="py-3">
+                  {m.restriction !== "NONE" && (
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${RESTRICTION_COLORS[m.restriction]}`}>
+                      {m.restriction}
+                    </span>
+                  )}
+                </td>
+                <td className="py-3 text-ink-muted">
+                  {new Date(m.createdAt).toLocaleDateString("ko-KR")}
+                </td>
+                <td className="py-3 text-right">
+                  {!isOwner && (
+                    <div className="relative inline-block">
+                      <select
+                        disabled={isLoading}
+                        defaultValue=""
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          e.target.value = "";
+                          if (!val) return;
+                          if (val === "mute" || val === "unmute" || val === "kick" || val === "ban") {
+                            handleAction(m.id, val);
+                          } else if (val.startsWith("role:")) {
+                            handleAction(m.id, "changeRole", val.replace("role:", ""));
+                          }
+                        }}
+                        className="text-xs border border-line rounded px-2 py-1 bg-white disabled:opacity-50"
+                      >
+                        <option value="">Actions...</option>
+                        {m.restriction === "MUTED" ? (
+                          <option value="unmute">Unmute</option>
+                        ) : (
+                          <option value="mute">Mute</option>
+                        )}
+                        <option value="kick">Kick</option>
+                        <option value="ban">Ban</option>
+                        <option value="role:STAFF">Set Staff</option>
+                        <option value="role:PARTICIPANT">Set Participant</option>
+                      </select>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
+ succeeded in 252ms:
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { internalErrorResponse } from "@/lib/api-error";
+import { prisma } from "@/lib/prisma";
+import { canActOn, isSpaceRole } from "@/lib/space-role";
+import { dispatchEnforcement, type EnforceAction } from "@/features/space/enforce";
+import type { SpaceRole, ChatRestriction } from "@prisma/client";
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+export async function GET(_request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: spaceId } = await params;
+
+    const self = await prisma.spaceMember.findUnique({
+      where: { spaceId_userId: { spaceId, userId: session.user.id } },
+      select: { role: true },
+    });
+    if (!self && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (self && self.role !== "OWNER" && self.role !== "STAFF" && !session.user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // ?‘ë‹µ allowlist ??restrictedBy/restrictedReason/restrictedUntil ê´€ë¦?ë©”í??€
+    // guestSessionId/spaceId ?´ë? ?¤ì¹¼??ë¯¸ë°˜?? PATCH ?•í˜•?”ê? onRefresh GETë¡?    // ë¬´ë ¥?”ë˜ì§€ ?Šë„ë¡??™ì¼ ë¦¬ì†Œ?¤ì˜ GET???•í˜•?”í•œ??(?Œë¹„ì²? member-tableÂ·media-management).
+    // userId??media-managementê°€ ?¤í¬?¸ë¼?´íŠ¸ ?€??? íƒ???¬ìš©(?´ë? user.idë¡??¸ì¶œ??.
+    const members = await prisma.spaceMember.findMany({
+      where: { spaceId },
+      select: {
+        id: true,
+        role: true,
+        restriction: true,
+        displayName: true,
+        userId: true,
+        createdAt: true,
+        user: { select: { id: true, name: true, email: true, image: true } },
+        guestSession: { select: { id: true, nickname: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return NextResponse.json({ members });
+  } catch (error) {
+    return internalErrorResponse("GET /api/spaces/[id]/admin/members", error, "Failed to fetch members");
+  }
+}
+
+export async function PATCH(request: Request, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: spaceId } = await params;
+    const isSuperAdmin = session.user.isSuperAdmin === true;
+
+    const self = await prisma.spaceMember.findUnique({
+      where: { spaceId_userId: { spaceId, userId: session.user.id } },
+      select: { role: true },
+    });
+    if (!self && !isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (self && self.role !== "OWNER" && self.role !== "STAFF" && !isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const actorRole = (self?.role ?? "OWNER") as SpaceRole;
+
+    const body = await request.json();
+    const { memberId, action, role } = body as {
+      memberId: string;
+      action: "changeRole" | "mute" | "unmute" | "kick" | "ban";
+      role?: SpaceRole;
+    };
+
+    if (!memberId || !action) {
+      return NextResponse.json({ error: "memberId and action are required" }, { status: 400 });
+    }
+
+    const target = await prisma.spaceMember.findUnique({
+      where: { id: memberId },
+      include: { user: { select: { name: true } } },
+    });
+    if (!target || target.spaceId !== spaceId) {
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+
+    // OWNER??ë³€ê²?ë¶ˆê?
+    if (target.role === "OWNER" && !isSuperAdmin) {
+      return NextResponse.json({ error: "Cannot modify the space owner" }, { status: 403 });
+    }
+
+    // ??•  ê³„ì¸µ: ?¸ì¶œ????• ???€?ë³´???ìœ„???Œë§Œ ?œìž¬/ë³€ê²?ê°€??    // (STAFFê°€ ?™ê¸‰ STAFFë¥?ban/kick/mute ?˜ëŠ” ê²ƒì„ ì°¨ë‹¨)
+    if (!canActOn(actorRole, target.role, isSuperAdmin)) {
+      return NextResponse.json(
+        { error: "Cannot modify a member of equal or higher role" },
+        { status: 403 }
+      );
+    }
+
+    let updatedRestriction: ChatRestriction | undefined;
+    let updatedRole: SpaceRole | undefined;
+    const actionLabel = action;
+    const actorName = session.user.name ?? undefined;
+
+    switch (action) {
+      case "changeRole": {
+        if (!role) {
+          return NextResponse.json({ error: "role is required for changeRole" }, { status: 400 });
+        }
+        // enum allowlist (?„ì˜ ê°?ì£¼ìž… ì°¨ë‹¨)
+        if (!isSpaceRole(role)) {
+          return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+        }
+        // OWNER ??• ?€ superAdminë§?ë¶€??ê°€??        if (role === "OWNER" && !isSuperAdmin) {
+          return NextResponse.json({ error: "Only superAdmin can assign OWNER role" }, { status: 403 });
+        }
+        // ë¶€?¬í•˜?¤ëŠ” ??• ???¸ì¶œ?ë³´???˜ìœ„?¬ì•¼ ??(STAFF?’STAFF/OWNER ì°¨ë‹¨)
+        if (!canActOn(actorRole, role, isSuperAdmin)) {
+          return NextResponse.json(
+            { error: "Cannot assign a role equal to or higher than your own" },
+            { status: 403 }
+          );
+        }
+        updatedRole = role;
+        break;
+      }
+      case "mute":
+        updatedRestriction = "MUTED";
+        break;
+      case "unmute":
+        updatedRestriction = "NONE";
+        break;
+      case "ban":
+        updatedRestriction = "BANNED";
+        break;
+      case "kick": {
+        // kick?€ ë©¤ë²„ ?? œ
+        await prisma.spaceMember.delete({ where: { id: memberId } });
+        await prisma.spaceEventLog.create({
+          data: {
+            spaceId,
+            userId: session.user.id,
+            eventType: "ADMIN_ACTION",
+            payload: { action: "kick", targetName: target.user?.name || target.displayName },
+          },
+        });
+        // ?´ì•„?ˆëŠ” ?Œì¼“ ?¤ì‹œê°?ì¶”ë°© (DB ?? œ ??best-effort)
+        let realtimeEnforced = false;
+        if (target.userId) {
+          const r = await dispatchEnforcement({
+            spaceId,
+            userId: target.userId,
+            action: "kick",
+            actorName,
+          });
+          realtimeEnforced = r.enforced;
+        }
+        return NextResponse.json({ message: "Member kicked", realtimeEnforced });
+      }
+      default:
+        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (updatedRole) updateData.role = updatedRole;
+    if (updatedRestriction !== undefined) {
+      updateData.restriction = updatedRestriction;
+      updateData.restrictedBy = session.user.id;
+    }
+
+    // ?‘ë‹µ allowlist ??restrictedBy ??ê´€ë¦?ë©”í?Â·?ë³„??ë¯¸ë°˜??member-table??ë³¸ë¬¸ ë¯¸ì‚¬??.
+    const updated = await prisma.spaceMember.update({
+      where: { id: memberId },
+      data: updateData,
+      select: { id: true, role: true, restriction: true },
+    });
+
+    // ?´ë²¤??ë¡œê·¸ ê¸°ë¡
+    await prisma.spaceEventLog.create({
+      data: {
+        spaceId,
+        userId: session.user.id,
+        eventType: "ADMIN_ACTION",
+        payload: {
+          action: actionLabel,
+          targetMemberId: memberId,
+          targetName: target.user?.name || target.displayName,
+        },
+      },
+    });
+
+    // ?´ì•„?ˆëŠ” ?Œì¼“???¤ì‹œê°?ë°˜ì˜ (ban/mute/unmute/changeRole). DB ê°±ì‹  ??best-effort.
+    // changeRole ê°•ë“±?€ ê¶Œí•œ ?Œìˆ˜?´ë?ë¡??¸ë©”ëª¨ë¦¬ role ìºì‹œ ê°±ì‹ ) ë³´ì•ˆ???¤ì‹œê°?ë°˜ì˜ ?„ìš”.
+    let realtimeEnforced = false;
+    if (target.userId) {
+      const enforceAction: EnforceAction = actionLabel === "changeRole" ? "role" : actionLabel;
+      const r = await dispatchEnforcement({
+        spaceId,
+        userId: target.userId,
+        action: enforceAction,
+        role: actionLabel === "changeRole" ? updatedRole : undefined,
+        actorName,
+      });
+      realtimeEnforced = r.enforced;
+    }
+
+    return NextResponse.json({ member: updated, realtimeEnforced });
+  } catch (error) {
+    return internalErrorResponse("PATCH /api/spaces/[id]/admin/members", error, "Failed to update member");
+  }
+}
+
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git log --format="%h%x09%cn <%ce>%x09%s" ba3a82f..77e690a --reverse' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git log --format="%h%x09%an <%ae>%x09%s" ba3a82f..77e690a --reverse' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --name-only ba3a82f..77e690a | rg "''^(server/|prisma/|Dockerfile|Dockerfile'"\\.socket|docker-compose|compose|\\.github/workflows/|package(-lock)?\\.json|pnpm-lock\\.yaml|yarn\\.lock|next\\.config|vercel\\.json)"'$|''^(server|prisma)/|''^'"\\.github/workflows/|"'^Dockerfile|''^deploy-|''^compose"' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git branch --contains 77e690a -a; git branch --contains ba3a82f -a' in C:\Team-jane\FlowSpace
+ succeeded in 223ms:
+76cf44b	flowcoder25 <flowcoder25@gmail.com>	docs: develop→main 승격 완료 원장 (PR#29 ba3a82f) — WI-017~024 라이브
+580d1de	flowcoder25 <flowcoder25@gmail.com>	WI-029-fix 대시보드 품질 마감 — 에러 처리 + Members 로딩/검색·필터
+e1ca2f7	flowcoder25 <flowcoder25@gmail.com>	WI-029-fix r2 Members 로드 실패 시 빈 상태 억제 + 우선순위 테스트 강화
+834feb2	flowcoder25 <flowcoder25@gmail.com>	WI-029-fix 듀얼검증 산출물 + .pass + 원장 (codex PASS · evaluator 9.85)
+1bdf225	GitHub <noreply@github.com>	Merge pull request #30 from flowcoder2025/fix/WI-029-fix-dashboard-quality-hardening
+c22bd89	flowcoder25 <flowcoder25@gmail.com>	docs: WI-029-fix develop 머지 완료 원장 (PR#30 1bdf225) + WI-030/031 후속
+a4b3dd0	flowcoder25 <flowcoder25@gmail.com>	WI-030-feat 대시보드 고급 필터 — 메시지/로그 날짜·타입
+f2135ef	flowcoder25 <flowcoder25@gmail.com>	WI-030-feat r2 날짜 입력 엄격화 (codex P3×2 — ISO instant 계약 + 롤오버 거부)
+c7176f9	flowcoder25 <flowcoder25@gmail.com>	WI-030-feat r3 parseInstant 달력 검증 (codex r2 P3 fixNow — 서버 롤오버 거부)
+298d0ae	flowcoder25 <flowcoder25@gmail.com>	WI-030-feat 듀얼검증 산출물 + .pass + 원장 (codex PASS 3R · evaluator 9.85)
+a41e2a8	GitHub <noreply@github.com>	Merge pull request #31 from flowcoder2025/feature/WI-030-feat-dashboard-advanced-filters
+23bf8ab	flowcoder25 <flowcoder25@gmail.com>	docs: WI-030-feat develop 머지 완료 원장 (PR#31 a41e2a8)
+788ea0e	flowcoder25 <flowcoder25@gmail.com>	@ WI-031-feat 어드민 대시보드 CSV 내보내기 (멤버/로그/analytics)
+d106a4b	flowcoder25 <flowcoder25@gmail.com>	@ WI-031-feat r2 codex 검증 P2 해소 (이름 폴백 + 다운로드 finally)
+056ce56	flowcoder25 <flowcoder25@gmail.com>	@ WI-031-feat r3 codex r2 P2 해소 (선두 LF 인젝션 중화)
+ea7b6d7	flowcoder25 <flowcoder25@gmail.com>	@ WI-031-feat 듀얼검증 산출물 + .pass + merged (codex r3 PASS · evaluator 9.85)
+6bdee98	GitHub <noreply@github.com>	Merge pull request #32 from flowcoder2025/feature/WI-031-feat-dashboard-csv-export
+e8c8f0d	flowcoder25 <flowcoder25@gmail.com>	@ docs: WI-031-feat develop 머지 완료 원장 (PR#32 6bdee98)
+b3dd931	flowcoder25 <flowcoder25@gmail.com>	WI-032-fix 어드민 로그 payload 응답 allowlist 정형화 + lean DTO
+b6e3811	flowcoder25 <flowcoder25@gmail.com>	WI-032-fix r2 codex P2 해소 — admin/stats recentActivity 동일 정규화
+f9c7919	flowcoder25 <flowcoder25@gmail.com>	WI-032-fix 듀얼검증 산출물 + .pass + 원장 (codex r2 PASS · evaluator 9.85)
+bf4a3ea	GitHub <noreply@github.com>	Merge pull request #33 from flowcoder2025/fix/WI-032-fix-log-payload-allowlist
+77e690a	flowcoder25 <flowcoder25@gmail.com>	docs: WI-032-fix develop 머지 완료 원장 (PR#33 bf4a3ea)
+
+ succeeded in 217ms:
+76cf44b	flowcoder25 <flowcoder25@gmail.com>	docs: develop→main 승격 완료 원장 (PR#29 ba3a82f) — WI-017~024 라이브
+580d1de	flowcoder25 <flowcoder25@gmail.com>	WI-029-fix 대시보드 품질 마감 — 에러 처리 + Members 로딩/검색·필터
+e1ca2f7	flowcoder25 <flowcoder25@gmail.com>	WI-029-fix r2 Members 로드 실패 시 빈 상태 억제 + 우선순위 테스트 강화
+834feb2	flowcoder25 <flowcoder25@gmail.com>	WI-029-fix 듀얼검증 산출물 + .pass + 원장 (codex PASS · evaluator 9.85)
+1bdf225	FlowCoder_CYH <kryou1@naver.com>	Merge pull request #30 from flowcoder2025/fix/WI-029-fix-dashboard-quality-hardening
+c22bd89	flowcoder25 <flowcoder25@gmail.com>	docs: WI-029-fix develop 머지 완료 원장 (PR#30 1bdf225) + WI-030/031 후속
+a4b3dd0	flowcoder25 <flowcoder25@gmail.com>	WI-030-feat 대시보드 고급 필터 — 메시지/로그 날짜·타입
+f2135ef	flowcoder25 <flowcoder25@gmail.com>	WI-030-feat r2 날짜 입력 엄격화 (codex P3×2 — ISO instant 계약 + 롤오버 거부)
+c7176f9	flowcoder25 <flowcoder25@gmail.com>	WI-030-feat r3 parseInstant 달력 검증 (codex r2 P3 fixNow — 서버 롤오버 거부)
+298d0ae	flowcoder25 <flowcoder25@gmail.com>	WI-030-feat 듀얼검증 산출물 + .pass + 원장 (codex PASS 3R · evaluator 9.85)
+a41e2a8	FlowCoder_CYH <kryou1@naver.com>	Merge pull request #31 from flowcoder2025/feature/WI-030-feat-dashboard-advanced-filters
+23bf8ab	flowcoder25 <flowcoder25@gmail.com>	docs: WI-030-feat develop 머지 완료 원장 (PR#31 a41e2a8)
+788ea0e	flowcoder25 <flowcoder25@gmail.com>	@ WI-031-feat 어드민 대시보드 CSV 내보내기 (멤버/로그/analytics)
+d106a4b	flowcoder25 <flowcoder25@gmail.com>	@ WI-031-feat r2 codex 검증 P2 해소 (이름 폴백 + 다운로드 finally)
+056ce56	flowcoder25 <flowcoder25@gmail.com>	@ WI-031-feat r3 codex r2 P2 해소 (선두 LF 인젝션 중화)
+ea7b6d7	flowcoder25 <flowcoder25@gmail.com>	@ WI-031-feat 듀얼검증 산출물 + .pass + merged (codex r3 PASS · evaluator 9.85)
+6bdee98	FlowCoder_CYH <kryou1@naver.com>	Merge pull request #32 from flowcoder2025/feature/WI-031-feat-dashboard-csv-export
+e8c8f0d	flowcoder25 <flowcoder25@gmail.com>	@ docs: WI-031-feat develop 머지 완료 원장 (PR#32 6bdee98)
+b3dd931	flowcoder25 <flowcoder25@gmail.com>	WI-032-fix 어드민 로그 payload 응답 allowlist 정형화 + lean DTO
+b6e3811	flowcoder25 <flowcoder25@gmail.com>	WI-032-fix r2 codex P2 해소 — admin/stats recentActivity 동일 정규화
+f9c7919	flowcoder25 <flowcoder25@gmail.com>	WI-032-fix 듀얼검증 산출물 + .pass + 원장 (codex r2 PASS · evaluator 9.85)
+bf4a3ea	FlowCoder_CYH <kryou1@naver.com>	Merge pull request #33 from flowcoder2025/fix/WI-032-fix-log-payload-allowlist
+77e690a	flowcoder25 <flowcoder25@gmail.com>	docs: WI-032-fix develop 머지 완료 원장 (PR#33 bf4a3ea)
+
+ succeeded in 241ms:
+* develop
+  remotes/origin/develop
+* develop
+  remotes/origin/HEAD -> origin/main
+  remotes/origin/develop
+  remotes/origin/feature/WI-030-feat-dashboard-advanced-filters
+  remotes/origin/feature/WI-031-feat-dashboard-csv-export
+  remotes/origin/fix/WI-029-fix-dashboard-quality-hardening
+  remotes/origin/fix/WI-032-fix-log-payload-allowlist
+  remotes/origin/main
+
+2026-06-23T04:37:20.302840Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.3 seconds
+Output:
+
+ exited 1 in 283ms:
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git rev-parse origin/main origin/develop main develop' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git log --oneline --decorate --max-count=12 origin/main origin/develop --graph --first-parent' in C:\Team-jane\FlowSpace
+ succeeded in 207ms:
+ba3a82f4b82f0b889d7c4d14f06228ee9dbe658c
+77e690ad8a9ca53592638804c78dd00d8e24a53f
+9cde274ef0d15d0d1066362dfd39be33aa72ddd7
+77e690ad8a9ca53592638804c78dd00d8e24a53f
+
+ succeeded in 221ms:
+* 77e690a (HEAD -> develop, origin/develop) docs: WI-032-fix develop 머지 완료 원장 (PR#33 bf4a3ea)
+* bf4a3ea Merge pull request #33 from flowcoder2025/fix/WI-032-fix-log-payload-allowlist
+* e8c8f0d @ docs: WI-031-feat develop 머지 완료 원장 (PR#32 6bdee98)
+* 6bdee98 Merge pull request #32 from flowcoder2025/feature/WI-031-feat-dashboard-csv-export
+* 23bf8ab docs: WI-030-feat develop 머지 완료 원장 (PR#31 a41e2a8)
+* a41e2a8 Merge pull request #31 from flowcoder2025/feature/WI-030-feat-dashboard-advanced-filters
+* c22bd89 docs: WI-029-fix develop 머지 완료 원장 (PR#30 1bdf225) + WI-030/031 후속
+* 1bdf225 Merge pull request #30 from flowcoder2025/fix/WI-029-fix-dashboard-quality-hardening
+* 76cf44b docs: develop→main 승격 완료 원장 (PR#29 ba3a82f) — WI-017~024 라이브
+* ba3a82f (origin/main, origin/HEAD) docs: WI-017-fix develop 머지 완료 원장 (PR#28 333df76)
+* deadf93 WI-017-fix 듀얼검증 산출물 + .pass + 원장 갱신
+* 87fb67e WI-017-fix r2 getSocketClient pending 가드 + use-socket generation 가드
+
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git merge-base origin/main develop; git merge-base --is-ancestor origin/main develop; Write-Output "origin_main_ancestor_exit=$LASTEXITCODE"' in C:\Team-jane\FlowSpace
+exec
+"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --name-only origin/main..develop | Measure-Object -Line' in C:\Team-jane\FlowSpace
+ succeeded in 263ms:
+
+Lines Words Characters Property
+----- ----- ---------- --------
+   68                          
+
+
+
+ succeeded in 290ms:
+ba3a82f4b82f0b889d7c4d14f06228ee9dbe658c
+origin_main_ancestor_exit=0
+
+codex
+GO 판단입니다. `origin/main=ba3a82f` 기준으로 `develop=77e690a`가 정상 상위이고, 승격 차단 결함은 보이지 않습니다. WI-029/030/031/032의 공유 지점도 정합합니다. `query-filter`는 메시지/로그/assets 필터에서 enum allowlist와 날짜 instant 계약을 일관되게 적용하고, `pagination`은 기존 cursor 응답 계약을 유지합니다. CSV는 클라이언트 로드분만 내보내며, 로그 payload는 API DTO 계층에서 allowlist 처리되어 화면/CSV가 raw JSON에 의존하지 않습니다. `admin/logs`와 `admin/stats recentActivity` 양쪽에 같은 `toPublicSpaceEventLog`가 적용된 점도 통합상 맞습니다.
+
+배포 영향 판단도 맞습니다. 기준 SHA diff상 `server/`, `prisma/`, 패키지/락파일, Docker/compose/workflow/Vercel 설정 변경은 없습니다. 신규 `process.env` 참조나 runtime/dynamic/revalidate 설정 변경도 확인되지 않았습니다. 따라서 OCI 소켓 재배포와 DB 마이그레이션은 no-op이고, 실제 반영 범위는 Vercel 웹/Next API 라우트입니다. 단, `src/app/api/assets/route.ts`도 `query-filter` 공용화로 touched 되어 있으니 “대시보드만”은 아니고 “Vercel 웹 앱 안의 일부 API까지”가 정확합니다.
+
+rebase 머지 방식이 맞습니다. 현재 develop 안에는 GitHub merge commit들이 있고 그 author가 Vercel 인가 계정이 아닙니다. 일반 merge로 main HEAD가 그 계정/merge author가 되면 기존 선례대로 Vercel 인가 리스크가 생깁니다. rebase merge로 최종 main HEAD를 `flowcoder25` authored non-merge commit 계열로 만들고, 이후 develop은 main에 back-sync(force-with-lease 권장)하는 절차가 이 상황에 맞습니다.
+
+참고로 로컬 `main`은 `9cde274`로 보였고, 실제 기준은 `origin/main=ba3a82f`였습니다. 승격 작업 전에는 로컬 main을 기준으로 판단하지 말고 원격 main SHA를 다시 확인하는 게 좋습니다.
+
+내가(요청자가) 놓칠 위험 1가지: rebase merge 후 develop back-sync를 놓치면 main과 develop이 SHA 단위로 분기되어 다음 승격 diff에 이미 배포된 커밋/문서 산출물이 다시 섞이고, 이후 GO 판정이 불필요하게 흐려질 수 있습니다.
+tokens used
+63,474
+GO 판단입니다. `origin/main=ba3a82f` 기준으로 `develop=77e690a`가 정상 상위이고, 승격 차단 결함은 보이지 않습니다. WI-029/030/031/032의 공유 지점도 정합합니다. `query-filter`는 메시지/로그/assets 필터에서 enum allowlist와 날짜 instant 계약을 일관되게 적용하고, `pagination`은 기존 cursor 응답 계약을 유지합니다. CSV는 클라이언트 로드분만 내보내며, 로그 payload는 API DTO 계층에서 allowlist 처리되어 화면/CSV가 raw JSON에 의존하지 않습니다. `admin/logs`와 `admin/stats recentActivity` 양쪽에 같은 `toPublicSpaceEventLog`가 적용된 점도 통합상 맞습니다.
+
+배포 영향 판단도 맞습니다. 기준 SHA diff상 `server/`, `prisma/`, 패키지/락파일, Docker/compose/workflow/Vercel 설정 변경은 없습니다. 신규 `process.env` 참조나 runtime/dynamic/revalidate 설정 변경도 확인되지 않았습니다. 따라서 OCI 소켓 재배포와 DB 마이그레이션은 no-op이고, 실제 반영 범위는 Vercel 웹/Next API 라우트입니다. 단, `src/app/api/assets/route.ts`도 `query-filter` 공용화로 touched 되어 있으니 “대시보드만”은 아니고 “Vercel 웹 앱 안의 일부 API까지”가 정확합니다.
+
+rebase 머지 방식이 맞습니다. 현재 develop 안에는 GitHub merge commit들이 있고 그 author가 Vercel 인가 계정이 아닙니다. 일반 merge로 main HEAD가 그 계정/merge author가 되면 기존 선례대로 Vercel 인가 리스크가 생깁니다. rebase merge로 최종 main HEAD를 `flowcoder25` authored non-merge commit 계열로 만들고, 이후 develop은 main에 back-sync(force-with-lease 권장)하는 절차가 이 상황에 맞습니다.
+
+참고로 로컬 `main`은 `9cde274`로 보였고, 실제 기준은 `origin/main=ba3a82f`였습니다. 승격 작업 전에는 로컬 main을 기준으로 판단하지 말고 원격 main SHA를 다시 확인하는 게 좋습니다.
+
+내가(요청자가) 놓칠 위험 1가지: rebase merge 후 develop back-sync를 놓치면 main과 develop이 SHA 단위로 분기되어 다음 승격 diff에 이미 배포된 커밋/문서 산출물이 다시 섞이고, 이후 GO 판정이 불필요하게 흐려질 수 있습니다.
