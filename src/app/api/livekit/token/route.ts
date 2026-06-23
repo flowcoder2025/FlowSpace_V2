@@ -161,13 +161,25 @@ export async function POST(request: NextRequest) {
       const [spaceMember, space] = await Promise.all([
         prisma.spaceMember.findFirst({
           where: { spaceId: spaceIdFromRoom, userId: session.user.id },
-          select: { id: true },
+          select: { id: true, restriction: true },
         }),
         prisma.space.findFirst({
           where: { id: spaceIdFromRoom, ownerId: session.user.id },
           select: { id: true },
         }),
       ]);
+
+      // WI-045: 차단(BANNED)된 멤버는 LiveKit 화상 토큰 발급 거부 — 소켓 join 게이트(room.ts BANNED)와
+      // 정합. 미차단이면 ban 의 removeSpaceParticipant 후 새 토큰으로 화상 재입장하는 우회가 가능했다.
+      // owner 예외(!space)는 두지 않는다 — room.ts BANNED 게이트도 owner 면제가 없고, 정상 owner 는
+      // 애초에 차단되지 않으므로(admin 라우트 owner 보호) 무영향이며, 데이터 드리프트로 BANNED 된
+      // owner 라도 소켓과 동일하게 차단해야 일관(소켓 차단·화상 허용 불일치 방지 — codex r2).
+      if (spaceMember?.restriction === "BANNED") {
+        return NextResponse.json(
+          { error: "차단된 사용자는 입장할 수 없습니다.", code: "BANNED" },
+          { status: 403 }
+        );
+      }
 
       if (!spaceMember && !space) {
         if (!sessionToken) {

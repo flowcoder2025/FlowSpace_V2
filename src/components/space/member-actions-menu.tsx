@@ -22,7 +22,7 @@ import { SPACE_COPY } from "@/constants/space-copy";
 import type { SpaceRole } from "@prisma/client";
 import type { ManagedMember } from "./use-space-members";
 
-type RestrictAction = "mute" | "unmute" | "kick" | "ban";
+type RestrictAction = "mute" | "unmute" | "kick" | "ban" | "unban";
 
 interface MemberActionsMenuProps {
   spaceId: string;
@@ -195,8 +195,10 @@ export function MemberActionsMenu({
   if (!canActOn(actorRole, member.role)) return null;
 
   const isMuted = member.restriction === "MUTED";
+  // WI-045: 차단된 멤버는 "차단 해제"만 노출(mute/음성/kick/ban 숨김 — 의미 없는 액션·중복 ban 방지).
+  const isBanned = member.restriction === "BANNED";
   // 음성 액션은 LiveKit identity가 있을 때만(LiveKit room 참가자). 메뉴 가시성과 분리된 게이트.
-  const showVoiceActions = !!participantIdentity;
+  const showVoiceActions = !!participantIdentity && !isBanned;
 
   return (
     <>
@@ -259,6 +261,20 @@ export function MemberActionsMenu({
                   </button>
                 </div>
               </div>
+            ) : isBanned ? (
+              /* WI-045: 차단된 멤버 — 차단 해제(unban)만 노출. */
+              <ul className="py-1">
+                <li>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => runAction("unban")}
+                    className="block w-full px-3 py-1.5 text-left transition-colors hover:bg-cream/10 disabled:opacity-50"
+                  >
+                    {COPY.actions.unban}
+                  </button>
+                </li>
+              </ul>
             ) : (
               <ul className="py-1">
                 <li>
