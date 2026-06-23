@@ -71,8 +71,9 @@ export async function GET(request: Request, { params }: RouteParams) {
     });
 
     // 응답 계약 보존: { logs, nextCursor }만 반환(buildCursorPage로 messages와 통일).
-    // payload는 키 allowlist로 정규화하고 행은 lean DTO로 축소한다(WI-032): 이 API가
-    // payload 노출 차단의 단일 chokepoint다(화면/CSV만 필터하면 raw 직접 호출로 우회).
+    // payload는 키 allowlist로 정규화하고 행은 lean DTO로 축소한다(WI-032). 차단은 응답
+    // DTO 계층에서 한다(화면/CSV만 필터하면 raw 직접 호출로 우회) — SpaceEventLog 행을
+    // 반환하는 모든 API(여기 + admin/stats recentActivity)에 동일 정규화를 적용한다.
     const { items, nextCursor } = buildCursorPage(logs, limit);
 
     return NextResponse.json({ logs: items.map(toPublicSpaceEventLog), nextCursor });
