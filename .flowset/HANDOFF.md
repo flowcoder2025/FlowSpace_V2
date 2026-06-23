@@ -1,5 +1,8 @@
 # HANDOFF
 
+## 🔴 다음 세션 1순위 — 멤버 제재가 라이브에서 실제 동작 안 함 (root cause 조사)
+**`.flowset/INVESTIGATION-moderation.md` 먼저 읽고 시작.** 사용자 라이브 실측(2026-06-24): 음소거/강퇴/차단/음성 강제음소거가 **전부 실제로는 동작 안 함**(음성→"참가자가 음성 방에 연결되어 있지 않습니다"=getParticipant 404인데 비디오 타일은 보임 / 채팅음소거 무효 / kick 무효 / ban은 새로고침해야 빠짐). **WI-035/038/039/044/045 증분 패치가 기능 표면만 고치고 근본 원인을 못 짚었다 — 증분 패치 금지, root cause 먼저.** codex consult(2026-06-24, scratchpad/consult-moderation-rootcause.out.txt) **1순위 가설=제어평면 불일치**(클라 `NEXT_PUBLIC_LIVEKIT_URL`/`NEXT_PUBLIC_SOCKET_URL` vs 서버 `LIVEKIT_URL`/`SOCKET_INTERNAL_URL`가 다른 인스턴스면 "클라엔 타일·서버 404"가 정확히 발생) **2순위=식별자 불일치**(같은 사람이 DB `SpaceMember.userId`·소켓 `socket.data.userId`·LiveKit `user-{id}`에서 동일인 미확정). 합성 archive probe는 HMAC만 증명·실제 dispatch 도달 미증명. 5단계 결정적 진단 시퀀스 + 놓칠위험("참가자 2명"이 같은 계정 다중탭?)은 INVESTIGATION 문서에. **사용자 지시로 컨텍스트 가득 차 다음 세션(프레시) 처리.**
+
 ## ✅ WI-045-feat (강퇴/차단/해제 완성) 승격·라이브 (2026-06-24, PR#48 rebase main `350d336`)
 **사용자 라이브 제보로 강퇴/차단이 반-구현임을 발견 → 완성.** 결함 3건(코드 확정): ①kick이 `prisma.spaceMember.delete`로 멤버 삭제 → `server/handlers/room.ts` join 게이트 `!member→거부`에 걸려 **재입장 불가**("재입장 가능" 안내 거짓) ②kick/ban이 **LiveKit 화상 참가자 미제거**(서버 enforce는 소켓만 detach+disconnect) → 카메라 타일 잔존 ③**unban(차단 해제) UI 없음** → 운영자 복원 불가.
 
