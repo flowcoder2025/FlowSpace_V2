@@ -1,16 +1,26 @@
 {
   "activeWI": null,
   "lastWI": "WI-041-fix",
-  "nextQueue": ["promotion-review", "WI-042", "WI-040", "WI-043"],
+  "nextQueue": ["WI-042", "WI-040", "WI-043"],
   "type": "fix",
-  "status": "MERGED_TO_DEVELOP",
+  "status": "PROMOTED_TO_MAIN_LIVE",
   "integrationBranch": "develop",
-  "branch": "fix/WI-041-fix-staff-settings-readonly",
+  "branch": "develop",
   "mergedPR": 43,
   "mergeCommit": "821c6d9",
   "implCommit": "070b371",
+  "promotion": {
+    "pr": 44,
+    "mainHead": "150428d",
+    "delta": ["WI-026", "WI-033", "WI-034", "WI-035", "WI-036", "WI-037", "WI-038", "WI-039", "WI-041"],
+    "prodDbMigration": "20260623180000_space_deleted_by (applied via pooler·checksum 검증)",
+    "ociImage": "91d1622f (WI-036 archive 코드·healthy·CD workflow_dispatch success)",
+    "vercel": "flowspace-v2-42jofa0l4-flowcoder ● Ready",
+    "smoke": "web 200/307 + socket auth probe connect 성공",
+    "backSync": "develop == main == 150428d"
+  },
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "070b371",
-  "note": "[✅ WI-041-fix develop 머지 완료(PR#43 merge 821c6d9)] WI-037 codex consult 놓칠위험 해소(설정 편집 권한 정합). settings/page는 requireSpaceAdmin(OWNER/STAFF/superAdmin) 진입 가능하나 PATCH /api/spaces/[id]는 owner/superAdmin만(STAFF 403) → STAFF '보이는데 저장 실패' 혼란. 보수적 수정(PATCH STAFF 확대 안 함=별도 정책): canEditSettings(PATCH 게이트 De Morgan 미러)로 STAFF 폼 읽기전용(입력 6개 disabled+저장버튼 숨김+readOnlyNotice 안내+handleSubmit !canEdit 가드 이중방어). canEditSettings/canDelete 별도 변수(향후 발산 대비). 듀얼 1R 수렴 codex PASS 0 issues·evaluator 9.83(P0/P1/P2/fixNow=0·변이검증 3/3·P3x3 defer)·.pass. 게이트 tsc0/lint0err/vitest 550→561/build0. Vercel 전용(server/·prisma/ 무관). impl 070b371. === 다음: develop→main 승격 검토 = codex 권고 1순위(WI-041 완료 후 바로 승격). 승격 델타=WI-026/033/034/035/036/037/038/039/041(9건) — server/(WI-036 enforce.ts/room.ts)+prisma/(WI-036 Space.deletedBy 마이그레이션) 포함 → OCI 소켓 재배포 + prod DB migrate deploy 승인 게이트(사용자 승인 필요). 승격 위험=Vercel↔OCI 버전 불일치 구간(codex). 순서 권고: prod DB migrate deploy → main 승격(rebase 머지로 author=flowcoder25 보존) → OCI 재배포 확인 → Vercel 확인 → archive/mute 핵심 플로우 라이브 스모크. 승격 미선택 시 후속 코드 WI: WI-042(대시보드 archived 가드)·WI-040(귓속말 발견성·저가치)·WI-043(공용 Dialog/focus-trap a11y)."
+  "lastVerifiedCommit": "150428d",
+  "note": "[✅ develop→main 승격 완료·라이브 반영(2026-06-23, PR#44 rebase main HEAD 150428d)] WI-026/033/034/035/036/037/038/039/041(9건) 라이브. codex 조건부 GO(코드 정합성 GO). 안전 순서 적용: prod DB → OCI 선배포(역호환) → main rebase 머지(author=flowcoder25 보존) → Vercel Ready 확인 → 라이브 스모크 → develop back-sync. ★인프라 변화: Supabase 직결(5432) IPv4 폐기→IPv6 전용 → prisma migrate deploy 불가, transaction pooler(6543)로 멱등 DDL+_prisma_migrations 기록(기존 3개 checksum 대조 검증). ★OCI: 버전-스큐 위험(구 OCI가 archive enforce 400 거부) 차단 위해 develop SHA 선배포, 자동배포는 detached HEAD로 1회 실패(컨테이너 무중단=안전)→main 정렬+workflow_dispatch로 CD success 재확인. ★스모크: web 200/307·socket auth probe connect 성공(AUTH_SECRET 44자·새 OCI 인증 수락). === 🟡 잔여 사용자 게이트(비차단·기존 degrade): ①SOCKET_INTERNAL_SECRET 미설정(OCI) → WI-036 archive 즉시추방 미작동(DB ARCHIVED·신규 join 차단·deletedBy는 정상, 접속자 즉시추방만 안 됨). 활성=OCI .env SOCKET_INTERNAL_SECRET + Vercel SOCKET_INTERNAL_URL/SECRET(사용자 권한). ②인증 archive/mute e2e 심층 스모크(자격증명+다중 클라이언트 필요·HTTP 200만으론 불충분). === 다음 코드 WI(codex 권고 순서): WI-042(대시보드 archived 가드)·WI-040(귓속말 발견성·저가치)·WI-043(공용 Dialog/focus-trap a11y)."
 }
