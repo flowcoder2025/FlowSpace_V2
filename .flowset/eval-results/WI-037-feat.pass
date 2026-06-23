@@ -1,0 +1,16 @@
+WI=WI-037-feat
+commit=ed266b6
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-037-feat.codex-r2.json
+evaluator=.flowset/eval-results/WI-037-feat.eval.json
+merged=.flowset/eval-results/WI-037-feat.merged.json
+gates=tsc,lint,vitest,build
+gateResults=tsc:0,lint:0err(1 preexisting LiveKit warning),vitest:501pass,build:0
+codexVerdict=PASS(r1 WARNING P3x2 → r2 PASS 0 issues)
+evaluatorVerdict=WARNING:9.9(P0/P1/P2/fixNow=0)
+blockingIssues=0
+deferredP2=0
+deferredP3=2
+rounds=2
+note=듀얼 블라인드 2R 수렴 — codex r1 WARNING(P3x2: ①fixNow=true 빈 이름 스페이스에서 빈 입력 즉시 일치로 삭제 무타이핑 활성 ②fixNow=false focus-trap)→r2 PASS 0 issues / evaluator r1 9.88→최종HEAD 9.9(P0/P1/P2/fixNow=0, P3x2 defer). 설정 화면에서 OWNER/superAdmin이 스페이스를 삭제(soft delete=ARCHIVED)하는 순수 UI 추가. 백엔드 DELETE /api/spaces/[id]는 WI-036에서 완성(이 WI 백엔드 무변경·Vercel 전용). 설계 codex consult 1R 반영(설정 페이지 전용·ownerId 미러 게이팅·이름 타이핑 확인·/my-spaces redirect·멱등 200 성공취급). (A) 신규 DeleteSpaceSection(client): 위험 구역 카드 + 이름 타이핑 확인 모달(role=dialog·aria-modal·aria-labelledby·ESC·백드롭/취소 닫기·진행중 닫기차단). 입력값이 스페이스 이름과 정확히 일치(+length>0 가드)할 때만 삭제 활성 → fetch DELETE /api/spaces/[id] → 200(이미 archived 멱등 200 포함)이면 router.replace("/my-spaces"). non-ok/throw → 서버 에러메시지(또는 기본)·모달 유지·redirect 안 함. 성공 후 isDeleting 미리셋(언마운트 무해+중복제출 방지). (B) settings/page: requireSpaceAdmin 컨텍스트 캡처 + findUnique select에 ownerId 추가 + canDelete = isSuperAdmin || ownerId===userId(DELETE 게이트의 De Morgan 등가 미러·role 아님 — superAdmin도 role:OWNER 반환·데이터 드리프트 방지) → canDelete일 때만 DeleteSpaceSection 렌더(STAFF·비소유자 미노출). (C) DASHBOARD_COPY.SETTINGS.dangerZone 한글 카피(하드코딩 0). r2: codex fixNow=true 빈 이름 가드(spaceName.length>0 선행). 양 검증자 독립 확인: canDelete ownerId 미러 정확·서버 hard gate·멱등/에러/중복제출 정합·/my-spaces redirect(GET /api/spaces status=ACTIVE 자연제외)·하드코딩0·server/prisma 무변경. evaluator 변이검증 5종 검출(M1 length>0 가드·M2 이름일치·M3 isDeleting 중복제출·M4 non-ok no-redirect·M5 ownerId 미러 role 변이, 전부 원복 clean). 게이트 tsc0/lint0err/vitest 478→501[+23]/build0. sourceFingerprint=empty(소스 전 커밋·작업트리 clean). impl f023e77/r2 ed266b6. Vercel 전용(server/·prisma/ 무관 — OCI 소켓 재배포·prod DB 마이그레이션 불요). main 미승격. 잔여 defer P3x2: ①모달 focus-trap/focus-restore(repo 유일 role=dialog·전역 focus-trap 패턴 전무·기존 avatar-editor-modal은 role/aria/ESC조차 없음 → 공용 Dialog 추출 a11y 후속 WI·파괴적 액션은 이름 정확일치 게이트로 별도 보호) ②delete-space-title 하드코딩 id(단일 인스턴스 렌더·충돌 실표면0). codex consult 놓칠위험: 설정 PATCH 권한 불일치(설정 페이지 STAFF 진입 가능하나 PATCH는 owner만 403 — 삭제 UI만 숨겨도 STAFF는 폼 보고 저장 시 403) → 후속 WI(설정 편집 권한 정리).
+createdAt=2026-06-23T20:25:00Z

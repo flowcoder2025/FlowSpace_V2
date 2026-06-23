@@ -230,6 +230,22 @@ export const DASHBOARD_COPY = {
     },
     // 접근 유형(PUBLIC/PRIVATE/PASSWORD) 표시 라벨은 다른 enum과 동일하게
     // `accessTypeLabel()` 헬퍼(ACCESS_TYPE_LABELS SoT)를 렌더 지점에서 사용한다.
+
+    // 위험 구역 — 스페이스 삭제(WI-037). OWNER/superAdmin에게만 노출(서버 DELETE가 hard gate).
+    dangerZone: {
+      title: "위험 구역",
+      description: "스페이스를 삭제하면 접속 중인 사용자가 모두 추방되며, 복구할 수 없습니다.",
+      deleteButton: "스페이스 삭제",
+      modalTitle: "스페이스 삭제",
+      modalWarning:
+        "이 작업은 되돌릴 수 없습니다. 접속 중인 사용자가 모두 즉시 추방되고, 스페이스는 보관 처리되어 목록에서 사라집니다.",
+      confirmPrompt: "계속하려면 아래 스페이스 이름을 정확히 입력하세요.",
+      confirmPlaceholder: "스페이스 이름 입력",
+      cancel: "취소",
+      confirm: "영구 삭제",
+      deleting: "삭제 중...",
+      deleteError: "스페이스 삭제에 실패했습니다.",
+    },
   },
 
   CHART: {
