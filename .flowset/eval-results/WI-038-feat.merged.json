@@ -1,0 +1,40 @@
+{
+  "wi": "WI-038-feat",
+  "schemaVersion": 1,
+  "finalCommit": "3b8fed4",
+  "rounds": 2,
+  "codex": {
+    "r1": {
+      "verdict": "FAIL",
+      "issues": 1,
+      "note": "P2/fixNow=true — buildModeratedPermission이 canSubscribe/canPublish/canPublishData/hidden 4개만 보존. ParticipantPermission에는 recorder/canUpdateMetadata/agent/canSubscribeMetrics/canManageAgentSession도 있고 updateParticipant permission은 atomic이라 미열거 5필드가 mute/unmute 시 false로 silently reset(codex risk #1의 심층 버전 — 음성 음소거가 다른 권한 해제)."
+    },
+    "r2": {
+      "verdict": "WARNING",
+      "issues": 1,
+      "note": "P2 fixNow 해소 확인. 유일 잔여 = 환경적 P3(defer·fixNow=false): read-only 샌드박스 esbuild EPERM으로 vitest 미실행(권위 환경에서 541 pass 실증·tsc 0 codex 직접 확인). 구현 결함 0."
+    }
+  },
+  "evaluator": {
+    "r1": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.83,
+      "issues": "P0/P1/P2/fixNow=0, P3x3 defer (부분성공 감사공백·getParticipant outage 404 마스킹·식별자 charset 미재검증). 변이검증 3종 검출(permission 보존·idempotency·order). ⚠️ r1에선 codex가 찾은 permission atomic-reset P2를 evaluator도 놓침."
+    },
+    "final": {
+      "verdict": "WARNING",
+      "weightedTotal": 9.88,
+      "issues": "P0/P1=0, P2 RESOLVED at HEAD(r2 fix 독립 확인·정확), P3x3 defer, fixNow=0. r1 9.83→9.88: SDK 진실(ParticipantPermission 10필드) 독립 실측해 P2가 실결함임을 확인하고 r2 spread 수정이 surgical correct임을 변이검증(spread→부분열거 복원→신규 보존 테스트 FAIL)으로 실증."
+    }
+  },
+  "convergence": {
+    "blockingIssues": 0,
+    "fixNow": 0,
+    "deferredP2": 0,
+    "deferredP3": 3,
+    "summary": "듀얼 블라인드 2R 수렴 — codex r1 FAIL(P2 fixNow permission atomic-reset)→r2 WARNING(환경 P3만·구현 0) / evaluator r1 WARNING 9.83→최종HEAD 9.88(P0/P1/P2/fixNow=0, P3x3 defer). 핵심 교훈: codex가 r1에서 단독으로 permission atomic-reset P2를 적출(evaluator도 r1에선 놓침) — updateParticipant permission은 atomic이라 부분 enumeration이 미열거 필드를 false로 리셋. r2에서 `{...current, canPublishSources}` spread 보존으로 해소(codex 권고: current 있으면 전체 보존·없을 때만 기본값 합성). evaluator가 r2에서 SDK 10필드를 독립 실측해 P2 실재성+수정 정확성을 변이검증으로 확인. 양 검증자 독립으로 모듈 경계(server-safe 분리·클라 배럴 미오염)·stickiness=권한회수(canPublishSources []=전체허용 시맨틱)·canActOn 게이트(admin/members 미러)·식별자 allowlist(user-/guest-·dev-anon 거부·self 거부)·실패코드(503/404/502)·unmute 권한복원만(force-unmute 안함)·정보위생(raw 미노출)·Vercel 전용(token grant·server/·prisma/ 무변경) 클린 확인. 잔여 P3x3 전부 defer(부분성공 감사공백=console.error 보존·idempotent 재시도, getParticipant 404 마스킹=Q5 의도된 트레이드오프·console.error 보존, 식별자 charset=actor 게이트+getParticipant 실매칭이 사실상 게이트·실표면0)."
+  },
+  "mutationTests": "codex r1이 적출한 P2를 evaluator r2가 독립 변이검증으로 재현: spread를 r1 부분열거 형태로 되돌리면 신규 보존 회귀 테스트(열거 안 된 5필드 mute·unmute 보존) FAIL → 강한 오라클. r1 evaluator 변이검증 3종(canSubscribe 하드코딩→preservation FAIL·!mic.muted idempotency 제거→FAIL·revoke-then-mute 순서 스왑→invocationCallOrder FAIL), 전부 원복 clean.",
+  "machineGates": "tsc:0, lint:0err(1 preexisting LiveKit warning·WI무관), vitest:501→541(+40: moderation.ts 21[r1 20+r2 1] + route 19), build:0(next build). diff는 src/features/space/livekit-moderation/** + src/app/api/spaces/[id]/livekit/moderate/** 한정 — token route grant·server/·prisma/ 무변경(Vercel 전용, OCI 소켓 재배포·prod DB 마이그레이션 불요).",
+  "issues": []
+}
