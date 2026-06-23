@@ -19,34 +19,29 @@ vi.mock("livekit-server-sdk", () => ({
 
 import { resolveLiveKitConfig, removeSpaceParticipant } from "./eviction";
 
-const ENV_KEYS = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "NODE_ENV"] as const;
-const saved: Record<string, string | undefined> = {};
-
+// 환경변수는 vi.stubEnv 로 조작한다(readonly NODE_ENV 직접 대입은 TS2540 — WI-018 패턴).
+// 빈 문자열 "" 은 config 의 `!apiKey` falsy 검사상 "미설정"과 동치(키 부재 표현).
 beforeEach(() => {
-  for (const k of ENV_KEYS) saved[k] = process.env[k];
   mockRemoveParticipant.mockReset();
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 afterEach(() => {
-  for (const k of ENV_KEYS) {
-    if (saved[k] === undefined) delete process.env[k];
-    else process.env[k] = saved[k];
-  }
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
 describe("resolveLiveKitConfig", () => {
   it("prod에서 키 없으면 null(미설정)", () => {
-    process.env.NODE_ENV = "production";
-    delete process.env.LIVEKIT_API_KEY;
-    delete process.env.LIVEKIT_API_SECRET;
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("LIVEKIT_API_KEY", "");
+    vi.stubEnv("LIVEKIT_API_SECRET", "");
     expect(resolveLiveKitConfig()).toBeNull();
   });
 
   it("키가 있으면 config 반환", () => {
-    process.env.LIVEKIT_URL = "wss://lk.example.com";
-    process.env.LIVEKIT_API_KEY = "k";
-    process.env.LIVEKIT_API_SECRET = "s";
+    vi.stubEnv("LIVEKIT_URL", "wss://lk.example.com");
+    vi.stubEnv("LIVEKIT_API_KEY", "k");
+    vi.stubEnv("LIVEKIT_API_SECRET", "s");
     expect(resolveLiveKitConfig()).toEqual({
       url: "wss://lk.example.com",
       apiKey: "k",
@@ -55,9 +50,9 @@ describe("resolveLiveKitConfig", () => {
   });
 
   it("dev에서 키 없으면 devkey 폴백", () => {
-    process.env.NODE_ENV = "development";
-    delete process.env.LIVEKIT_API_KEY;
-    delete process.env.LIVEKIT_API_SECRET;
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("LIVEKIT_API_KEY", "");
+    vi.stubEnv("LIVEKIT_API_SECRET", "");
     const cfg = resolveLiveKitConfig();
     expect(cfg?.apiKey).toBe("devkey");
     expect(cfg?.apiSecret).toBe("devsecret");
@@ -66,9 +61,9 @@ describe("resolveLiveKitConfig", () => {
 
 describe("removeSpaceParticipant (best-effort)", () => {
   it("미설정(prod no key) → 스킵(not_configured), SDK 미호출", async () => {
-    process.env.NODE_ENV = "production";
-    delete process.env.LIVEKIT_API_KEY;
-    delete process.env.LIVEKIT_API_SECRET;
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("LIVEKIT_API_KEY", "");
+    vi.stubEnv("LIVEKIT_API_SECRET", "");
 
     const r = await removeSpaceParticipant("space-1", "u-1");
     expect(r).toEqual({ removed: false, reason: "not_configured" });
@@ -76,8 +71,8 @@ describe("removeSpaceParticipant (best-effort)", () => {
   });
 
   it("성공 → removed, room=space-{id}·identity=user-{userId}로 호출", async () => {
-    process.env.LIVEKIT_API_KEY = "k";
-    process.env.LIVEKIT_API_SECRET = "s";
+    vi.stubEnv("LIVEKIT_API_KEY", "k");
+    vi.stubEnv("LIVEKIT_API_SECRET", "s");
     mockRemoveParticipant.mockResolvedValue(undefined);
 
     const r = await removeSpaceParticipant("space-1", "u-1");
@@ -86,8 +81,8 @@ describe("removeSpaceParticipant (best-effort)", () => {
   });
 
   it("throw(미접속/이미 퇴장) → 무시(remove_failed), 호출측에 예외 전파 안 함", async () => {
-    process.env.LIVEKIT_API_KEY = "k";
-    process.env.LIVEKIT_API_SECRET = "s";
+    vi.stubEnv("LIVEKIT_API_KEY", "k");
+    vi.stubEnv("LIVEKIT_API_SECRET", "s");
     mockRemoveParticipant.mockRejectedValue(new Error("participant not found"));
 
     const r = await removeSpaceParticipant("space-1", "u-1");
