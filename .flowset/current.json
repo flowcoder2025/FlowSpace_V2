@@ -3,13 +3,13 @@
   "lastWI": "WI-037-feat",
   "nextQueue": ["WI-038", "WI-039", "WI-040"],
   "type": "feat",
-  "status": "PR_OPEN_DEVELOP",
+  "status": "MERGED_TO_DEVELOP",
   "integrationBranch": "develop",
   "branch": "feature/WI-037-feat-space-delete-ui",
-  "mergedPR": null,
-  "mergeCommit": null,
+  "mergedPR": 40,
+  "mergeCommit": "3b6d671",
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": "ed266b6",
-  "note": "[다음: WI-038-feat — 사용자 기능 요청 큐 6/8] WI-038 = LiveKit moderator mute 서버 계약(타인 음성 강제 음소거·순 신규·P2). RoomServiceClient.mutePublishedTrack로 server-side 강제 음소거 + 권한/감사/실패처리. 채팅 음소거(WI-035)와 분리. 후행 WI-039(UI 연결). === 직전: ✅ WI-037-feat(설정 화면 스페이스 삭제 UI) develop PR 생성. 설정 화면에서 OWNER/superAdmin이 스페이스 삭제(soft delete=ARCHIVED)하는 순수 UI. 백엔드 DELETE는 WI-036에서 완성(이 WI 백엔드 무변경·Vercel 전용). (A) 신규 DeleteSpaceSection: 위험 구역 카드+이름 타이핑 확인 모달(role=dialog·ESC·중복제출 방지·진행중 닫기차단)→DELETE→router.replace('/my-spaces'). 멱등 200 성공취급·non-ok 에러+모달유지. canConfirm=spaceName.length>0 && confirmInput===spaceName && !isDeleting. (B) settings/page: findUnique select ownerId 추가+canDelete=isSuperAdmin||ownerId===userId(DELETE 게이트 De Morgan 미러·role 아님·STAFF 미노출). (C) DASHBOARD_COPY.SETTINGS.dangerZone 카피. 설계 codex consult 1R(설정페이지 전용·ownerId 미러·이름타이핑·/my-spaces redirect). 듀얼 블라인드 2R 수렴 codex r1 WARNING(P3x2: fixNow 빈이름가드·focus-trap)→r2 PASS 0 issues·evaluator 9.9(P0/P1/P2/fixNow=0, P3x2 defer). r2: 빈 이름 가드 length>0 추가. 변이검증 5종. 게이트 tsc0/lint0err/vitest 478→501[+23]/build0. impl f023e77/r2 ed266b6. Vercel 전용(server/·prisma/ 무관). main 미승격. 잔여 defer P3x2: focus-trap(전역 a11y 후속)·하드코딩 id(충돌0). === codex consult 놓칠위험(후속 BACKLOG): ①설정 PATCH 권한 불일치(설정 페이지 STAFF 진입가능하나 PATCH는 owner만 403 — 설정 편집 권한 정리 WI) ②대시보드 layout이 archived(status!=ACTIVE) 거부 안 함(멤버행 잔존시 archived 대시보드 계속 보임). === 큐 잔여 WI-038/039(LiveKit moderator mute·P2)/WI-040(귓속말 발견성·P3선택). 저우선 BACKLOG: WI-025(표면0)/WI-028(운영 runbook)."
+  "note": "[다음: WI-038-feat — 사용자 기능 요청 큐 6/8] WI-038 = LiveKit moderator mute 서버 계약(타인 음성 강제 음소거·순 신규·P2). RoomServiceClient.mutePublishedTrack로 server-side 강제 음소거 + 권한/감사/실패처리. 채팅 음소거(WI-035)와 분리. 후행 WI-039(UI 연결). === 직전: ✅ WI-037-feat(설정 화면 스페이스 삭제 UI) develop 머지 완료(PR#40 merge 3b6d671). 설정 화면에서 OWNER/superAdmin이 스페이스 삭제(soft delete=ARCHIVED)하는 순수 UI. 백엔드 DELETE는 WI-036에서 완성(이 WI 백엔드 무변경·Vercel 전용). (A) 신규 DeleteSpaceSection: 위험 구역 카드+이름 타이핑 확인 모달(role=dialog·ESC·중복제출 방지·진행중 닫기차단)→DELETE→router.replace('/my-spaces'). 멱등 200 성공취급·non-ok 에러+모달유지. canConfirm=spaceName.length>0 && confirmInput===spaceName && !isDeleting. (B) settings/page: findUnique select ownerId 추가+canDelete=isSuperAdmin||ownerId===userId(DELETE 게이트 De Morgan 미러·role 아님·STAFF 미노출). (C) DASHBOARD_COPY.SETTINGS.dangerZone 카피. 설계 codex consult 1R(설정페이지 전용·ownerId 미러·이름타이핑·/my-spaces redirect). 듀얼 블라인드 2R 수렴 codex r1 WARNING(P3x2: fixNow 빈이름가드·focus-trap)→r2 PASS 0 issues·evaluator 9.9(P0/P1/P2/fixNow=0, P3x2 defer). r2: 빈 이름 가드 length>0 추가. 변이검증 5종. 게이트 tsc0/lint0err/vitest 478→501[+23]/build0. impl f023e77/r2 ed266b6. Vercel 전용(server/·prisma/ 무관). main 미승격. 잔여 defer P3x2: focus-trap(전역 a11y 후속)·하드코딩 id(충돌0). === codex consult 놓칠위험(후속 BACKLOG): ①설정 PATCH 권한 불일치(설정 페이지 STAFF 진입가능하나 PATCH는 owner만 403 — 설정 편집 권한 정리 WI) ②대시보드 layout이 archived(status!=ACTIVE) 거부 안 함(멤버행 잔존시 archived 대시보드 계속 보임). === 큐 잔여 WI-038/039(LiveKit moderator mute·P2)/WI-040(귓속말 발견성·P3선택). 저우선 BACKLOG: WI-025(표면0)/WI-028(운영 runbook)."
 }
