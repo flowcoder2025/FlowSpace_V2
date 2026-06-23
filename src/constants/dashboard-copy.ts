@@ -228,12 +228,8 @@ export const DASHBOARD_COPY = {
       saving: "저장 중...",
       save: "설정 저장",
     },
-    /** 접근 유형 옵션 — value는 enum 코드(PUBLIC/PRIVATE/PASSWORD), 라벨만 한글. */
-    accessTypes: {
-      PUBLIC: "공개",
-      PRIVATE: "비공개",
-      PASSWORD: "비밀번호",
-    },
+    // 접근 유형(PUBLIC/PRIVATE/PASSWORD) 표시 라벨은 다른 enum과 동일하게
+    // `accessTypeLabel()` 헬퍼(ACCESS_TYPE_LABELS SoT)를 렌더 지점에서 사용한다.
   },
 
   CHART: {
