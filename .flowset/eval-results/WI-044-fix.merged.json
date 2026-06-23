@@ -1,0 +1,1 @@
+{"wi":"WI-044-fix","commit":"9300b83","rounds":1,"blocking":{"P0":0,"P1":0,"P2":0,"fixNow":0},"codexVerdict":"PASS","issues":[],"gates":{"tsc":0,"lint":"0err(1 preexisting LiveKit warning)","vitest":"563pass(561→563)","build":0},"note":"멤버 관리 메뉴 드롭다운 portal 화(VideoTile overflow-hidden 클리핑 해소). 긴급 라이브 버그 단일 codex 블라인드 PASS 0 issues. Vercel 전용."}
