@@ -13,13 +13,17 @@
  * - **멱등** — 이미 공개 키(+batchId)만 가진 행은 건드리지 않는다(재실행 안전).
  * - **batchId 보존** — GET /api/assets/batch가 `metadata.path:["batchId"]`로 의존하므로
  *   저장 전용 운영 키 batchId는 정화 후에도 유지한다.
- * - **COMPLETED만 대상** — FAILED 행은 `{ error }`/`{ batchId, error }`만 가져(WI-024) 과다
- *   저장 클래스가 아니며, error 키는 별도 정책(WI-024)이라 건드리지 않는다.
- * - prod 적용은 사용자 승인 게이트(DATABASE_URL이 prod를 가리킬 때 신중히).
+ * - **COMPLETED만 대상** — 쿼리가 `status:"COMPLETED"`로 제한한다. 과다 저장 클래스는
+ *   성공 경로(전체 metadata 저장)뿐이다. FAILED 행(`{ error }`/`{ batchId, error }`,
+ *   WI-024)은 애초에 조회 대상이 아니다.
+ * - **prod 코드 게이트** — `--apply`만으로는 부족하다: DATABASE_URL이 비-로컬(원격/prod)을
+ *   가리키면 `CONFIRM_PROD_BACKFILL=WI-026` 환경변수 없이는 abort한다(오설정 mutate 방지).
+ *   로컬(localhost/127.0.0.1)은 `--apply`만으로 적용된다.
  *
  * 사용법:
- *   node scripts/backfill-stored-asset-metadata.mjs           # dry-run (영향 행 보고만)
- *   node scripts/backfill-stored-asset-metadata.mjs --apply   # 실제 정화 적용
+ *   node scripts/backfill-stored-asset-metadata.mjs                              # dry-run (보고만)
+ *   node scripts/backfill-stored-asset-metadata.mjs --apply                      # 로컬 적용
+ *   CONFIRM_PROD_BACKFILL=WI-026 node scripts/backfill-stored-asset-metadata.mjs --apply  # 원격/prod 적용
  */
 import { PrismaClient } from "@prisma/client";
 import { config } from "dotenv";
@@ -68,8 +72,28 @@ function normalizeStored(metadata) {
   return out;
 }
 
+/** DATABASE_URL이 로컬 개발 DB가 아닌 원격(prod 포함)을 가리키는지 보수적으로 판정. */
+function isRemoteDatabase(dbUrl) {
+  if (!dbUrl) return false;
+  return !/(localhost|127\.0\.0\.1|\[::1\]|@db:|@postgres:)/i.test(dbUrl);
+}
+
 async function main() {
   const apply = process.argv.includes("--apply");
+
+  // prod 코드 게이트: 원격 DB에 --apply 하려면 명시 확인 환경변수가 필요하다.
+  if (
+    apply &&
+    isRemoteDatabase(process.env.DATABASE_URL) &&
+    process.env.CONFIRM_PROD_BACKFILL !== "WI-026"
+  ) {
+    console.error(
+      "[중단] DATABASE_URL이 비-로컬(원격/prod)을 가리킵니다. 의도된 prod 적용이면\n" +
+        "       CONFIRM_PROD_BACKFILL=WI-026 환경변수와 함께 다시 실행하십시오."
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   const completed = await prisma.generatedAsset.findMany({
     where: { status: "COMPLETED" },
