@@ -27,56 +27,14 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { config } from "dotenv";
+import {
+  hasExtraStoredKeys,
+  normalizeStored,
+  isRemoteDatabase,
+} from "./backfill-stored-asset-metadata.core.mjs";
 config();
 
 const prisma = new PrismaClient();
-
-// src/features/assets/internal/public-asset.ts 의 PUBLIC_METADATA_KEYS와 동일해야 한다
-// (.mjs 운영 스크립트는 TS 상수를 직접 import할 수 없어 리터럴로 미러링).
-const PUBLIC_METADATA_KEYS = [
-  "width",
-  "height",
-  "frameWidth",
-  "frameHeight",
-  "columns",
-  "rows",
-  "format",
-  "seed",
-  "generatedAt",
-  "processingTime",
-];
-
-// 저장 시 허용되는 키 = 공개 런타임 키 + 저장 전용 운영 키(batchId).
-const ALLOWED_STORED_KEYS = new Set([...PUBLIC_METADATA_KEYS, "batchId"]);
-
-/** metadata가 허용 집합 밖의 키를 가진(=과다 저장된) 평범한 객체인지 판정. */
-function hasExtraStoredKeys(metadata) {
-  if (
-    metadata === null ||
-    typeof metadata !== "object" ||
-    Array.isArray(metadata)
-  ) {
-    return false;
-  }
-  return Object.keys(metadata).some((key) => !ALLOWED_STORED_KEYS.has(key));
-}
-
-/** 허용 키만 골라 새 metadata 객체로 정화(원본 키 순서 무관, 값 보존). */
-function normalizeStored(metadata) {
-  const out = {};
-  for (const key of Object.keys(metadata)) {
-    if (ALLOWED_STORED_KEYS.has(key)) {
-      out[key] = metadata[key];
-    }
-  }
-  return out;
-}
-
-/** DATABASE_URL이 로컬 개발 DB가 아닌 원격(prod 포함)을 가리키는지 보수적으로 판정. */
-function isRemoteDatabase(dbUrl) {
-  if (!dbUrl) return false;
-  return !/(localhost|127\.0\.0\.1|\[::1\]|@db:|@postgres:)/i.test(dbUrl);
-}
 
 async function main() {
   const apply = process.argv.includes("--apply");
