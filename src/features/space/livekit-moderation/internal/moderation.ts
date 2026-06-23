@@ -88,22 +88,29 @@ export function computePublishSourcesForUnmute(
 /**
  * updateParticipant에 넘길 permission을 만든다.
  * ⚠️ LiveKit permission은 atomic("all desired permissions would need to be set")이라
- * 현재 permission의 canSubscribe/canPublish/canPublishData/hidden을 **그대로 보존**하고
- * canPublishSources만 마이크 add/remove로 수정한다(codex risk #1: 다른 제재 해제 방지).
- * 현재 permission이 없으면 토큰 라우트 grant와 동일한 기본값을 사용한다.
+ * **미열거 필드는 false로 리셋된다**. ParticipantPermission에는 canPublishSources 외에도
+ * canSubscribe/canPublish/canPublishData/hidden/recorder/canUpdateMetadata/agent/
+ * canSubscribeMetrics/canManageAgentSession이 있으므로, 현재 permission이 있으면
+ * **전체를 그대로 보존하고 canPublishSources만** 마이크 add/remove로 덮어쓴다
+ * (codex risk #1: 음성 음소거가 다른 권한/제재를 실수로 해제하는 것 방지).
+ * 현재 permission이 없을 때만 토큰 라우트 grant와 동일한 기본값을 합성한다.
  */
 export function buildModeratedPermission(
   current: Partial<ParticipantPermission> | undefined,
   muted: boolean
 ): Partial<ParticipantPermission> {
   const sources = current?.canPublishSources ?? [];
+  const canPublishSources = muted
+    ? computePublishSourcesForMute(sources)
+    : computePublishSourcesForUnmute(sources);
+  if (current) {
+    return { ...current, canPublishSources };
+  }
   return {
-    canSubscribe: current?.canSubscribe ?? true,
-    canPublish: current?.canPublish ?? true,
-    canPublishData: current?.canPublishData ?? true,
-    hidden: current?.hidden ?? false,
-    canPublishSources: muted
-      ? computePublishSourcesForMute(sources)
-      : computePublishSourcesForUnmute(sources),
+    canSubscribe: true,
+    canPublish: true,
+    canPublishData: true,
+    hidden: false,
+    canPublishSources,
   };
 }

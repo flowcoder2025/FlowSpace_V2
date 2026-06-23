@@ -157,6 +157,36 @@ describe("buildModeratedPermission — permission atomic 보존(codex risk #1)",
     expect(result.canPublishSources).toContain(TrackSource.CAMERA);
   });
 
+  it("열거 안 된 permission 필드(canUpdateMetadata/canSubscribeMetrics/recorder/agent/canManageAgentSession)도 mute·unmute 양쪽에서 보존(codex P2 — atomic reset 방지)", () => {
+    const current = {
+      canSubscribe: true,
+      canPublish: true,
+      canPublishData: true,
+      hidden: false,
+      canPublishSources: [TrackSource.CAMERA, TrackSource.MICROPHONE],
+      canUpdateMetadata: true,
+      canSubscribeMetrics: true,
+      recorder: true,
+      agent: true,
+      canManageAgentSession: true,
+    };
+    const muted = buildModeratedPermission(current, true);
+    expect(muted.canUpdateMetadata).toBe(true);
+    expect(muted.canSubscribeMetrics).toBe(true);
+    expect(muted.recorder).toBe(true);
+    expect(muted.agent).toBe(true);
+    expect(muted.canManageAgentSession).toBe(true);
+    expect(muted.canPublishSources).not.toContain(TrackSource.MICROPHONE);
+
+    const unmuted = buildModeratedPermission(current, false);
+    expect(unmuted.canUpdateMetadata).toBe(true);
+    expect(unmuted.canSubscribeMetrics).toBe(true);
+    expect(unmuted.recorder).toBe(true);
+    expect(unmuted.agent).toBe(true);
+    expect(unmuted.canManageAgentSession).toBe(true);
+    expect(unmuted.canPublishSources).toContain(TrackSource.MICROPHONE);
+  });
+
   it("current undefined → 토큰 grant 기본값으로 폴백", () => {
     const result = buildModeratedPermission(undefined, true);
     expect(result.canSubscribe).toBe(true);
