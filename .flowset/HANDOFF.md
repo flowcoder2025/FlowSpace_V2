@@ -1,6 +1,6 @@
 # HANDOFF
 
-## 직전 Active — ✅ WI-033-feat (어드민 대시보드 한글화 + copy constants 분리) develop 머지 완료(2026-06-23, PR#__)
+## 직전 Active — ✅ WI-033-feat (어드민 대시보드 한글화 + copy constants 분리) develop 머지 완료(2026-06-23, PR#36 merge `bde92f0`)
 사용자 기능 요청 큐 **1/8 완료**. 어드민 대시보드(18 소스파일) 100% 영문 → 단일 SoT `src/constants/dashboard-copy.ts`(`DASHBOARD_COPY`, 키 영문/값 한글, `as const`)로 분리·한글화. i18n 미도입(단일 한국어 제품). **설계 codex consult 1R**: 단일 파일·scope dashboard 엄격 고정(인-스페이스 player-list 별도 후속)·CSV/에러/aria-label 전부 한글·동적 함수 엔트리. **핵심 위험(codex Q5)=표시 라벨/도메인 값 분리**: `<option value>`·필터키·액션토큰·색상맵 키 전수 enum 코드 유지, `*Label()` 헬퍼로 표시만 매핑(미정의 코드 폴백). CSV는 헤더+표시값 화면과 동일 한글 라벨 SoT 공유, payload JSON 키 미번역. **듀얼 2R 수렴 codex r1/r2 PASS 0 issues·evaluator r1 9.81→r2 9.88**(P0/P1/P2 0). evaluator 유일 P3(accessType만 패턴 이탈·SoT 중복) r2 즉시 해소(accessTypeLabel 단일 SoT·consistency 10.0). 변이검증 2종. 게이트 4/4(tsc0/lint0err/vitest 407→**416**/build0)+`.pass`(empty `e3b0c44`). impl `77f77e6`/r2 `82b39ed`. **Vercel 전용(server/·prisma/ 무관). main 미승격.** 교훈: 표시 라벨↔도메인/API 값 분리(`*Label(code)` 코드 폴백)·CSV↔화면 동일 SoT·헬퍼 패턴 통일=단일 SoT. 상세 fix_plan.md Done.
 
 ## 다음 세션 — 순차 진행 큐 (사용자 지시 2026-06-23)
