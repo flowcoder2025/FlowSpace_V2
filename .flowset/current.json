@@ -3,11 +3,11 @@
   "lastWI": "WI-034-fix",
   "nextQueue": ["WI-035", "WI-036", "WI-037", "WI-038", "WI-039", "WI-040"],
   "type": "fix",
-  "status": "VERIFIED_PENDING_PR",
+  "status": "MERGED_TO_DEVELOP",
   "integrationBranch": "develop",
   "branch": "fix/WI-034-fix-space-role-prop",
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "5379485",
-  "note": "[다음: WI-035-feat — 사용자 기능 요청 큐 3/8] WI-035 = 인-스페이스 참가자 패널(player-list.tsx) 멤버관리 UI(채팅음소거/해제/강퇴, OWNER/STAFF canActOn 게이팅). dashboard HTTP admin API(PATCH /api/spaces/[id]/admin/members) 재사용(socket 채팅명령 경로 아님). WI-034가 user.role 전달을 마쳤으므로 권한 게이팅 선결조건 충족. codex 놓칠위험(WI-034 consult): 세션 중 role 변경(WI-035 승강) 시 SpaceClient user.role prop은 stale — enforce가 socket.data.role만 갱신하고 클라 prop 미갱신 → 보안은 서버가 막으나 UI/명령파서 발산 가능(reload 전). WI-035에서 socket 이벤트로 클라 role 동기화 고려. === 직전: ✅ WI-034-fix(인-스페이스 role 전달) develop PR 대기. page가 SpaceMember.role 조회→SpaceClient.user.role 주입(선결버그). 신규 순수헬퍼 resolveSpaceRoleDecision(SpaceMember.role SoT·합성OWNER 금지 self-heal·superAdmin 비특례). BANNED 멤버 redirect(소켓 정합·맵편집 HTTP BANNED 미검사 우회 차단)+upsert 원자화+post-upsert BANNED 재평가(TOCTOU). 듀얼 3R 수렴 codex r3 PASS·evaluator 9.94(P0/P1/P2=0). 게이트 4/4(tsc0/lint0err/vitest 416→442/build0). 설계 codex consult 1R. impl c75e351/r2 22aa279/r3 5379485. Vercel 전용. main 미승격."
+  "lastVerifiedCommit": "70a7bac",
+  "note": "[다음: WI-035-feat — 사용자 기능 요청 큐 3/8] WI-035 = 인-스페이스 참가자 패널(player-list.tsx) 멤버관리 UI(채팅음소거/해제/강퇴, OWNER/STAFF canActOn 게이팅). dashboard HTTP admin API(PATCH /api/spaces/[id]/admin/members) 재사용(socket 채팅명령 경로 아님 — use-socket.ts:584 admin:ban 누락·canActOn/감사 약함). WI-034가 user.role 전달을 마쳤으므로 권한 게이팅 선결조건 충족. codex 놓칠위험(WI-034 consult): 세션 중 role 변경(WI-035 승강) 시 SpaceClient user.role prop은 stale — enforce가 socket.data.role만 갱신하고 클라 prop 미갱신 → 보안은 서버가 막으나 UI/명령파서 발산 가능(reload 전) → WI-035에서 socket 이벤트로 클라 role 동기화 고려. === 직전: ✅ WI-034-fix(인-스페이스 role 전달) develop 머지 완료(PR#37 merge 70a7bac). page가 SpaceMember.role(+restriction) 조회→SpaceClient.user.role 주입(선결버그). 신규 순수헬퍼 resolveSpaceRoleDecision(SpaceMember.role SoT·합성OWNER 금지 self-heal·superAdmin 비특례). BANNED 멤버 redirect(소켓 정합·맵편집 HTTP BANNED 미검사 우회 차단)+upsert 원자화+post-upsert BANNED 재평가(TOCTOU). 듀얼 3R 수렴 codex r3 PASS·evaluator 9.94(P0/P1/P2=0, 양검증자 BANNED·race 독립수렴, 변이검증 9종). 게이트 4/4(tsc0/lint0err/vitest 416→442/build0). 설계 codex consult 1R. impl c75e351/r2 22aa279/r3 5379485/테스트강화 41d5156. Vercel 전용. main 미승격. === 큐 잔여 WI-035~040. 저우선 BACKLOG: WI-025(표면0)/WI-028(운영 runbook)."
 }
