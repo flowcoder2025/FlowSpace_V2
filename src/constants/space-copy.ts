@@ -22,6 +22,27 @@ export const SPACE_COPY = {
       kick: "내보내기",
       ban: "차단",
     },
+    /**
+     * 음성 제어(WI-038/039) — LiveKit 서버 측 강제 음소거. **채팅 음소거와 별개 레이어**라
+     * 라벨로 명확히 구분한다(운영자 오제재 방지). LiveKit room 참가자에게만 노출.
+     * - mute: 마이크 publish 권한 회수 + 기존 트랙 강제 음소거(muted:true).
+     * - allow: publish 권한 복원만(muted:false). **사용자 self-mute는 풀지 않음** →
+     *   "해제"가 아니라 "발언 허용"으로 표기(force-unmute 아님을 드러냄).
+     */
+    voiceSectionLabel: "음성 제어",
+    voiceActions: {
+      mute: "음성 강제 음소거",
+      allow: "음성 발언 허용",
+    },
+    /** 음성 제어 실패 — 라우트 code별 한글 매핑(서버 영문 미노출). 미지의 code는 actionFailed 폴백. */
+    voiceError: {
+      INVALID_IDENTITY: "참가자 식별자가 올바르지 않습니다.",
+      SELF_TARGET: "자기 자신은 음성 제어할 수 없습니다.",
+      TARGET_NOT_MEMBER: "대상이 이 공간의 멤버가 아닙니다.",
+      PARTICIPANT_NOT_FOUND: "참가자가 음성 방에 연결되어 있지 않습니다.",
+      LIVEKIT_NOT_CONFIGURED: "음성 서버 설정을 확인할 수 없습니다.",
+      LIVEKIT_OPERATION_FAILED: "음성 제한 처리에 실패했습니다.",
+    } as Record<string, string>,
     /** 파괴적 액션(내보내기/차단) 인라인 확인 — kick=재입장 가능, ban=재입장 차단. */
     confirm: {
       kick: (nickname: string) =>

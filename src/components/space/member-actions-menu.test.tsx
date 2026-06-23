@@ -161,3 +161,116 @@ describe("MemberActionsMenu — 액션", () => {
     expect(onActionDone).not.toHaveBeenCalled();
   });
 });
+
+// ============================================================
+// WI-039: 음성 강제 음소거(LiveKit) — identity 게이트·라우트·라벨 구분·refetch 미호출·에러 매핑
+// ============================================================
+describe("MemberActionsMenu — 음성 제어(WI-039)", () => {
+  it("participantIdentity 없음 → 음성 액션 미노출(채팅 액션은 유지)", () => {
+    renderMenu(); // participantIdentity 미전달
+    fireEvent.click(screen.getByLabelText("Staff Kim 관리"));
+    expect(screen.getByText("채팅 음소거")).toBeTruthy();
+    expect(screen.queryByText("음성 강제 음소거")).toBeNull();
+    expect(screen.queryByText("음성 발언 허용")).toBeNull();
+  });
+
+  it("participantIdentity 있음 → '음성 강제 음소거'+'음성 발언 허용' 노출(채팅 음소거와 별개 라벨)", () => {
+    renderMenu({ participantIdentity: "user-u-staff" });
+    fireEvent.click(screen.getByLabelText("Staff Kim 관리"));
+    // 채팅 음소거와 음성 강제 음소거가 라벨로 명확히 구분됨(운영자 오제재 방지)
+    expect(screen.getByText("채팅 음소거")).toBeTruthy();
+    expect(screen.getByText("음성 강제 음소거")).toBeTruthy();
+    expect(screen.getByText("음성 발언 허용")).toBeTruthy();
+  });
+
+  it("'음성 강제 음소거' → POST moderate {identity,muted:true} + onActionDone 미호출(refetch 안 함)", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ identity: "user-u-staff", muted: true, trackSid: "TR_x" }),
+    });
+    const { onActionDone } = renderMenu({ participantIdentity: "user-u-staff" });
+    fireEvent.click(screen.getByLabelText("Staff Kim 관리"));
+    fireEvent.click(screen.getByText("음성 강제 음소거"));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const [url, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe("/api/spaces/space-1/livekit/moderate");
+    expect((init as RequestInit).method).toBe("POST");
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body).toEqual({ identity: "user-u-staff", muted: true });
+    // 음성 식별자는 LiveKit identity — SpaceMember.id(memberId)를 보내지 않는다.
+    expect(JSON.stringify(body)).not.toContain("m-staff");
+    // 멤버 상태 미변경 → refetch 호출 안 함(LiveKit 이벤트로 갱신).
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    expect(onActionDone).not.toHaveBeenCalled();
+  });
+
+  it("'음성 발언 허용' → POST moderate {identity,muted:false}", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ identity: "user-u-staff", muted: false, trackSid: null }),
+    });
+    renderMenu({ participantIdentity: "user-u-staff" });
+    fireEvent.click(screen.getByLabelText("Staff Kim 관리"));
+    fireEvent.click(screen.getByText("음성 발언 허용"));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const body = JSON.parse(
+      ((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit).body as string
+    );
+    expect(body).toEqual({ identity: "user-u-staff", muted: false });
+  });
+
+  it("음성 액션 성공 → 메뉴 닫힘", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ identity: "user-u-staff", muted: true, trackSid: "TR_x" }),
+    });
+    renderMenu({ participantIdentity: "user-u-staff" });
+    fireEvent.click(screen.getByLabelText("Staff Kim 관리"));
+    fireEvent.click(screen.getByText("음성 강제 음소거"));
+    await waitFor(() => expect(screen.queryByText("음성 강제 음소거")).toBeNull());
+  });
+
+  it("음성 실패(code) → 영문 미노출, 한글 매핑 에러 표시", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: "Participant is not connected", code: "PARTICIPANT_NOT_FOUND" }),
+    });
+    renderMenu({ participantIdentity: "user-u-staff" });
+    fireEvent.click(screen.getByLabelText("Staff Kim 관리"));
+    fireEvent.click(screen.getByText("음성 강제 음소거"));
+
+    await screen.findByText("참가자가 음성 방에 연결되어 있지 않습니다.");
+    // 서버 영문 error 문자열은 화면에 노출되지 않는다.
+    expect(screen.queryByText("Participant is not connected")).toBeNull();
+  });
+
+  it("음성 실패(미지의 code) → actionFailed 폴백", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: "boom", code: "SOMETHING_NEW" }),
+    });
+    renderMenu({ participantIdentity: "user-u-staff" });
+    fireEvent.click(screen.getByLabelText("Staff Kim 관리"));
+    fireEvent.click(screen.getByText("음성 강제 음소거"));
+
+    await screen.findByText("작업에 실패했습니다.");
+  });
+
+  it("음성 네트워크 예외 → networkError 표시", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("net"));
+    renderMenu({ participantIdentity: "user-u-staff" });
+    fireEvent.click(screen.getByLabelText("Staff Kim 관리"));
+    fireEvent.click(screen.getByText("음성 강제 음소거"));
+
+    await screen.findByText("네트워크 오류가 발생했습니다.");
+  });
+
+  it("게이트 미통과(canActOn 불가)면 identity 있어도 메뉴 자체 미렌더 → 음성 액션 없음", () => {
+    // 메뉴 가시성 게이트(member/actorRole/canActOn)와 음성 액션 게이트는 분리 —
+    // 멤버 게이트를 통과 못하면 음성 액션도 노출되지 않는다.
+    renderMenu({ actorRole: "STAFF", member: STAFF_MEMBER, participantIdentity: "user-u-staff" });
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+});

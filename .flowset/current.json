@@ -1,15 +1,13 @@
 {
-  "activeWI": null,
+  "activeWI": "WI-039-feat",
   "lastWI": "WI-038-feat",
-  "nextQueue": ["WI-039", "WI-040"],
+  "nextQueue": ["WI-040"],
   "type": "feat",
-  "status": "MERGED_TO_DEVELOP",
+  "status": "DESIGN_CONSULT",
   "integrationBranch": "develop",
-  "branch": "feature/WI-038-feat-livekit-moderator-mute",
-  "mergedPR": 41,
-  "mergeCommit": "6f197bb",
+  "branch": "feature/WI-039-feat-voice-mute-ui",
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
-  "lastVerifiedCommit": "3b8fed4",
-  "note": "[다음: WI-039-feat — 사용자 기능 요청 큐 7/8] WI-039 = 인-스페이스 UI에 음성 강제 음소거 액션 연결(WI-038 백엔드를 ParticipantPanel/MemberActionsMenu에 연결). 위험: '채팅 음소거'(WI-035 restriction) vs '음성 음소거'(WI-038 LiveKit) 라벨 혼동 → SPACE_COPY로 명확 구분. WI-038 라우트 POST /api/spaces/[id]/livekit/moderate {identity,muted} 호출. 클라는 participant.identity(user-/guest-) 보유. === 직전: ✅ WI-038-feat(LiveKit moderator mute 서버 계약) develop 머지(PR#41 merge 6f197bb·impl 0ede616/r2 3b8fed4). 전용 라우트 + server-safe 신규모듈 src/features/space/livekit-moderation(livekit 배럴 클라전용이라 enforce 패턴 분리). stickiness=권한회수(updateParticipant permission ATOMIC이라 current 전체 spread 보존+canPublishSources mic만 add/remove — codex r1 단독 P2 적출[evaluator도 r1 놓침]: ParticipantPermission 10필드 중 4개만 보존하면 미열거 5필드 false reset). mutePublishedTrack(trackSid 필요·getParticipant 1회로 tracks+permission 동시획득). unmute=권한복원만(force-unmute 안함). 실패 503/404/502. 듀얼 2R 수렴 codex r1 FAIL→r2 WARNING(환경 P3만)·evaluator 9.88. 게이트 tsc0/lint0err/vitest 501→541[+40]/build0. Vercel 전용(token grant·server/·prisma/ 무변경). main 미승격. 잔여 defer P3x3(부분성공 감사공백·getParticipant outage 404·식별자 charset). === 큐 잔여 WI-039(음성음소거 UI·P2)/WI-040(귓속말 발견성·P3선택). 후속 BACKLOG: WI-041(설정 PATCH 권한·STAFF)/WI-042(대시보드 archived 가드)/WI-043(공용 Dialog focus-trap a11y). 저우선: WI-025(표면0)/WI-028(운영 runbook)."
+  "lastVerifiedCommit": "3cb8bf0",
+  "note": "[착수: WI-039-feat — 인-스페이스 UI에 음성 강제 음소거 액션 연결(WI-038 백엔드 POST /api/spaces/[id]/livekit/moderate {identity,muted}를 MemberActionsMenu에 연결)] 위험: '채팅 음소거'(WI-035 restriction) vs '음성 음소거'(WI-038 LiveKit) 라벨 혼동 → SPACE_COPY로 명확 구분. 클라는 track.participantId(=LiveKit identity user-/guest-)를 moderate 라우트 identity로 사용. 설계 codex consult 진행 중."
 }
