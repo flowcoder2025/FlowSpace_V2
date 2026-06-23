@@ -103,3 +103,78 @@ describe("POST /api/assets/generate — 비동기 실패 경로 정보위생 (WI
     expect(JSON.stringify(arg.data.metadata)).not.toContain("/secret/path");
   });
 });
+
+describe("POST /api/assets/generate — 성공 경로 저장 metadata 정규화 (WI-026)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue(makeSession({ id: "user-1" }));
+    mockPrisma.generatedAsset.create.mockResolvedValue({ id: "asset-1" });
+    mockPrisma.generatedAsset.update.mockResolvedValue({});
+  });
+
+  /** processAssetGeneration이 반환하는 후처리 완료 메타데이터(민감 필드 포함). */
+  const FULL_METADATA = {
+    id: "asset-1",
+    type: "character",
+    name: "전사",
+    prompt: "a brave warrior, highly detailed, secret style tokens",
+    workflow: "character-default",
+    width: 512,
+    height: 256,
+    frameWidth: 64,
+    frameHeight: 64,
+    columns: 8,
+    rows: 4,
+    filePath: "/assets/generated/characters/character_전사_v1.png",
+    thumbnailPath: "/assets/generated/thumbnails/thumb_asset-1.png",
+    fileSize: 12345,
+    format: "png",
+    comfyuiJobId: "comfy-job-abc123",
+    seed: 7,
+    generatedAt: "2026-06-23T00:00:00.000Z",
+    processingTime: 9876,
+    status: "completed",
+  };
+
+  it("성공 시 전체 metadata가 아닌 공개 런타임 키만 저장한다 (민감 필드 미저장)", async () => {
+    mockProcess.mockResolvedValue(FULL_METADATA);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(202);
+
+    await vi.waitFor(() =>
+      expect(mockPrisma.generatedAsset.update).toHaveBeenCalled()
+    );
+
+    const arg = mockPrisma.generatedAsset.update.mock.calls[0][0];
+    expect(arg.data.status).toBe("COMPLETED");
+    // 저장 metadata는 정확히 공개 런타임 키만.
+    expect(Object.keys(arg.data.metadata).sort()).toEqual(
+      [
+        "columns",
+        "format",
+        "frameHeight",
+        "frameWidth",
+        "generatedAt",
+        "height",
+        "processingTime",
+        "rows",
+        "seed",
+        "width",
+      ].sort()
+    );
+    // 민감 필드(prompt/workflow/comfyuiJobId)는 metadata에 미저장 (top-level 컬럼엔 보존).
+    expect(arg.data.metadata.prompt).toBeUndefined();
+    expect(arg.data.metadata.workflow).toBeUndefined();
+    expect(arg.data.metadata.comfyuiJobId).toBeUndefined();
+
+    // 변이 가드: 직렬화한 저장값에 프롬프트/워크플로우 문자열이 전혀 없어야 한다.
+    const stored = JSON.stringify(arg.data.metadata);
+    expect(stored).not.toContain("secret style tokens");
+    expect(stored).not.toContain("character-default");
+    expect(stored).not.toContain("comfy-job-abc123");
+
+    // 민감 필드는 별도 top-level 컬럼으로는 계속 저장된다(검색/관리).
+    expect(arg.data.comfyuiJobId).toBe("comfy-job-abc123");
+  });
+});

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { internalErrorResponse } from "@/lib/api-error";
-import { processAssetGeneration, GENERATION_FAILURE_MESSAGE } from "@/features/assets";
+import {
+  processAssetGeneration,
+  buildStoredAssetMetadata,
+  GENERATION_FAILURE_MESSAGE,
+} from "@/features/assets";
 import type { CreateAssetParams } from "@/features/assets";
 
 const ASSET_TYPE_MAP = {
@@ -77,10 +81,10 @@ export async function POST(request: Request) {
               thumbnailPath: metadata.thumbnailPath,
               fileSize: metadata.fileSize,
               comfyuiJobId: metadata.comfyuiJobId,
-              metadata: {
-                ...JSON.parse(JSON.stringify(metadata)),
-                batchId,
-              },
+              // WI-026: 공개 런타임 필드만 저장 + batchId는 저장 전용 운영 키로
+              // 보존(GET /api/assets/batch가 metadata.path:["batchId"]로 의존).
+              // batchId는 public allowlist에 없어 응답엔 미노출된다.
+              metadata: buildStoredAssetMetadata(metadata, { batchId }),
             },
           });
         })
