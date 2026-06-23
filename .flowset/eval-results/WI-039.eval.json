@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 9.85,
+    "specificity": 9.8,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.77,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/components/space/video/ParticipantPanel.tsx:186-227 + src/components/space/member-actions-menu.tsx:142",
+      "description": "guest-* 참가자에 대해 음성 강제 음소거 액션이 UI에서 실제로 노출되지 못한다. ParticipantPanel은 mediaUserId=managedUserIdFromIdentity(track.participantId)로 멤버를 찾는데, managedUserIdFromIdentity는 'user-' 접두사만 userId로 해석하고 guest-*/dev-*는 null을 반환한다(use-space-members.ts:54-57). 그 결과 guest 참가자는 member=null이 되어 MemberActionsMenu가 line 142 `if (!member || !actorRole) return null`에서 메뉴 자체를 미렌더 → participantIdentity가 'guest-*'로 전달돼도 음성 액션 버튼이 절대 나타나지 않는다. WI-038 라우트(moderate/route.ts:159-161)는 guest-* moderation을 명시 지원하고, participantIdentity prop 문서주석(member-actions-menu.tsx:34-40)은 'guest-* 확장을 막지 않기 위함'이라고 주장하나 실제 UI 경로에서는 guest 강제 음소거가 불가능하다. 보안 결함 아님(라우트가 hard gate, 노출 약화 아님) — 운영자가 게스트 마이크를 UI로 제재할 수 없는 기능 커버리지 갭. WI-035의 기존 메뉴 동작(게스트 비관리)과 일관되며 이번 WI 스코프상 user-* 참가자 제어가 1차 목표.",
+      "recommendation": "guest 음성 제어를 UI 범위에 포함할 경우, 음성 액션을 member 존재 게이트와 완전히 분리(예: actorRole 권한만으로 guest tile에 별도 음성 컨트롤 노출)하거나 게스트용 별도 메뉴 경로를 추가한다. 후속 WI로 분리 권장 — 음성 액션 게이트를 멤버 가시성 게이트와 분리한다는 설계 의도를 ParticipantPanel 배선 단계까지 끝까지 관철해야 prop 문서주석과 실제 동작이 일치한다.",
+      "defer": true,
+      "deferRationale": "보안/인가 약화 아님(라우트가 SoT hard gate). user-* 참가자 제어는 완전 동작하며 이번 WI의 1차 수용 기준 충족. 게스트 음성 제어는 WI-035 기존 메뉴 동작(게스트 비관리)과 일관된 의도된 한계로 볼 수 있고 후속 WI 스코프. prop 문서주석과 실동작 불일치는 문서 정밀화 부채 수준.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/components/space/member-actions-menu.tsx:114-139 (runVoiceAction)",
+      "description": "chat 액션(runAction)과 voice 액션(runVoiceAction)이 동일한 단일 `loading` state와 `error` state를 공유한다. 한 음성 액션이 진행 중(loading=true)이면 disabled로 chat 버튼까지 잠기고, 음성 액션 실패 에러가 동일 error 슬롯에 표시된다. 메뉴가 1인 대상에 대한 직렬 단일 액션 UX라 기능적 결함은 아니나, 음성 액션과 멤버 액션의 상태를 공유함으로써 '액션별 게이트 분리' 설계 의도가 로딩/에러 표현 레이어에서는 부분적으로만 지켜진다. 회귀 테스트도 'voice loading 중 chat 버튼 disabled' 또는 'voice error가 chat 액션에 잔존하지 않음' 상호작용을 직접 검증하지 않는다.",
+      "recommendation": "현 단일 메뉴 직렬 모델에서는 수용 가능. 향후 음성/멤버 액션을 동시 트리거 가능한 UI로 확장 시 per-action loading/error 분리 고려. 선택적으로 'voice 액션 후 chat 액션 트리거 시 이전 voice error가 사라지는지' 테스트 1건 추가로 매트릭스 보강 가능.",
+      "defer": true,
+      "deferRationale": "단일 대상·직렬 액션 메뉴라 공유 loading/error가 실제 UX 회귀를 만들지 않음. 설계 합의의 'per-action 로딩 가드'는 동시 중복 호출 방지 목적이며 `if(...||loading)return` early-guard로 충족됨. 상태 슬롯 분리는 표현 정제 수준의 저우선 개선.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/constants/space-copy.ts:38-45 (voiceError) + member-actions-menu.tsx:126-128",
+      "description": "voiceError 맵은 라우트의 code 부여 응답(INVALID_IDENTITY/SELF_TARGET/TARGET_NOT_MEMBER/PARTICIPANT_NOT_FOUND/LIVEKIT_NOT_CONFIGURED/LIVEKIT_OPERATION_FAILED)만 매핑한다. 라우트는 code 없는 에러 응답도 반환한다: 401 'Unauthorized', 400 'Invalid request body'/'muted must be a boolean', 403 'Forbidden'/'Cannot modify the space owner'/'Cannot modify a member of equal or higher role'(moderate/route.ts:61,69,73,98,101,121,125). 이 경로들은 data.code가 undefined → actionFailed('작업에 실패했습니다.') 폴백으로 처리되어 영문 누출은 없고(보안 OK) 동작도 안전하나, 403 권한 거부('당신은 이 대상을 제어할 권한이 없습니다' 류)와 같은 의미 있는 사유가 일반 폴백에 묻힌다. 클라 게이트와 서버 게이트가 일치해 정상 흐름에서 403은 드물지만 stale UI/race 시 발생 가능.",
+      "recommendation": "정보 위생상 폴백(actionFailed)이 안전한 기본값이므로 필수는 아님. 운영자 UX를 더 명확히 하려면 라우트의 403 권한/owner-보호 응답에도 code를 부여(예: FORBIDDEN/OWNER_PROTECTED)하고 voiceError에 한글 매핑 추가. 이는 라우트(WI-038, 백엔드) 변경을 수반하므로 이번 순수 프론트 WI 스코프 밖.",
+      "defer": true,
+      "deferRationale": "영문 누출 없음(폴백이 한글 actionFailed). 정상 흐름에서 클라 가시성 게이트가 403을 선제 차단해 표면 작음. code 부여는 백엔드 라우트 변경이라 Vercel 전용 프론트 WI 스코프 밖.",
+      "fixNow": false
+    }
+  ]
+}
