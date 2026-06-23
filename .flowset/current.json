@@ -3,14 +3,14 @@
   "lastWI": "WI-041-fix",
   "nextQueue": ["promotion-review", "WI-042", "WI-040", "WI-043"],
   "type": "fix",
-  "status": "DUAL_VERIFIED_PR_PENDING",
+  "status": "MERGED_TO_DEVELOP",
   "integrationBranch": "develop",
   "branch": "fix/WI-041-fix-staff-settings-readonly",
-  "mergedPR": null,
-  "mergeCommit": null,
+  "mergedPR": 43,
+  "mergeCommit": "821c6d9",
   "implCommit": "070b371",
   "startedAt": "2026-06-23",
   "requiredGates": ["tsc", "lint", "vitest", "build", "codex", "evaluator", "pass"],
   "lastVerifiedCommit": "070b371",
-  "note": "[✅ WI-041-fix 듀얼검증 완료·develop PR 대기] WI-037 codex consult 놓칠위험 해소(설정 편집 권한 정합). settings/page는 requireSpaceAdmin(OWNER/STAFF/superAdmin) 진입 가능하나 PATCH /api/spaces/[id]는 owner/superAdmin만(STAFF 403) → STAFF '보이는데 저장 실패' 혼란. 보수적 수정(PATCH STAFF 확대 안 함=별도 정책): canEditSettings(PATCH 게이트 De Morgan 미러)로 STAFF 폼 읽기전용(입력 6개 disabled+저장버튼 숨김+readOnlyNotice 안내+handleSubmit !canEdit 가드 이중방어). canEditSettings/canDelete 별도 변수(향후 발산 대비). 듀얼 1R 수렴 codex PASS 0 issues·evaluator 9.83(P0/P1/P2/fixNow=0·변이검증 3/3·P3x3 defer)·.pass. 게이트 tsc0/lint0err/vitest 550→561/build0. Vercel 전용(server/·prisma/ 무관). impl 070b371. === 다음: develop→main 승격 검토 = codex 권고 1순위(WI-041 완료 후 바로 승격). 승격 델타=WI-026/033/034/035/036/037/038/039/041(9건) — server/(WI-036 enforce.ts/room.ts)+prisma/(WI-036 Space.deletedBy 마이그레이션) 포함 → OCI 소켓 재배포 + prod DB migrate deploy 승인 게이트(사용자 승인 필요). 승격 위험=Vercel↔OCI 버전 불일치 구간(codex). 순서 권고: prod DB migrate deploy → main 승격(rebase 머지로 author=flowcoder25 보존) → OCI 재배포 확인 → Vercel 확인 → archive/mute 핵심 플로우 라이브 스모크. 승격 미선택 시 후속 코드 WI: WI-042(대시보드 archived 가드)·WI-040(귓속말 발견성·저가치)·WI-043(공용 Dialog/focus-trap a11y)."
+  "note": "[✅ WI-041-fix develop 머지 완료(PR#43 merge 821c6d9)] WI-037 codex consult 놓칠위험 해소(설정 편집 권한 정합). settings/page는 requireSpaceAdmin(OWNER/STAFF/superAdmin) 진입 가능하나 PATCH /api/spaces/[id]는 owner/superAdmin만(STAFF 403) → STAFF '보이는데 저장 실패' 혼란. 보수적 수정(PATCH STAFF 확대 안 함=별도 정책): canEditSettings(PATCH 게이트 De Morgan 미러)로 STAFF 폼 읽기전용(입력 6개 disabled+저장버튼 숨김+readOnlyNotice 안내+handleSubmit !canEdit 가드 이중방어). canEditSettings/canDelete 별도 변수(향후 발산 대비). 듀얼 1R 수렴 codex PASS 0 issues·evaluator 9.83(P0/P1/P2/fixNow=0·변이검증 3/3·P3x3 defer)·.pass. 게이트 tsc0/lint0err/vitest 550→561/build0. Vercel 전용(server/·prisma/ 무관). impl 070b371. === 다음: develop→main 승격 검토 = codex 권고 1순위(WI-041 완료 후 바로 승격). 승격 델타=WI-026/033/034/035/036/037/038/039/041(9건) — server/(WI-036 enforce.ts/room.ts)+prisma/(WI-036 Space.deletedBy 마이그레이션) 포함 → OCI 소켓 재배포 + prod DB migrate deploy 승인 게이트(사용자 승인 필요). 승격 위험=Vercel↔OCI 버전 불일치 구간(codex). 순서 권고: prod DB migrate deploy → main 승격(rebase 머지로 author=flowcoder25 보존) → OCI 재배포 확인 → Vercel 확인 → archive/mute 핵심 플로우 라이브 스모크. 승격 미선택 시 후속 코드 WI: WI-042(대시보드 archived 가드)·WI-040(귓속말 발견성·저가치)·WI-043(공용 Dialog/focus-trap a11y)."
 }

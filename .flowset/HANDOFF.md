@@ -1,6 +1,6 @@
 # HANDOFF
 
-## 직전 Active — ✅ WI-041-fix (설정 편집 권한 정합 — STAFF 읽기전용 폼) develop PR 대기(2026-06-23, impl `070b371`)
+## 직전 Active — ✅ WI-041-fix (설정 편집 권한 정합 — STAFF 읽기전용 폼) develop 머지 완료(2026-06-23, PR#43 merge `821c6d9`, impl `070b371`)
 **큐 분기점에서 codex 협의(2R)로 다음 작업 선정 → WI-041 처리.** 직전 broad consult: 사용자 기능 요청 큐 7/8(WI-040만 남음·DM 이미 완전구현이라 저가치) + develop 8 WI 누적 미승격(server/prisma 포함). codex 권고 우선순위 = **WI-041 → develop→main 승격 → WI-042 → WI-040 → WI-043**. WI-041(STAFF "보이는데 저장 실패" 실사용 혼란)을 승격 전 짧게 닫고 바로 승격 권고. WI-041은 내가 완결 가능한 코드 WI, 승격은 사용자 승인 게이트(prod DB+OCI)라 별도 → **WI-041 먼저 처리**.
 
 **WI-041 결함(코드 실측)**: `src/app/dashboard/spaces/[id]/settings/page.tsx`(서버 컴포넌트)는 `requireSpaceAdmin(id)`로 게이트해 OWNER/STAFF/superAdmin 모두 진입하나, 저장 라우트 `PATCH /api/spaces/[id]`(route.ts:94)는 `if (space.ownerId !== session.user.id && !session.user.isSuperAdmin) return 403`으로 **owner/superAdmin만** 허용 → STAFF가 설정 폼 보고 값 바꿔 저장 시 403("Forbidden") "보이는데 저장 실패" 혼란.
