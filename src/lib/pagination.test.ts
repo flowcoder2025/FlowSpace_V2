@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
+  MAX_PAGE_NUMBER,
   parsePageLimit,
   parsePageNumber,
   buildCursorPage,
@@ -83,12 +84,27 @@ describe("parsePageNumber (WI-022)", () => {
     expect(parsePageNumber("NaN")).toBe(1);
   });
 
-  it("상한 없음 (offset 범위는 데이터 크기에 의존)", () => {
-    expect(parsePageNumber("100000")).toBe(100000);
-  });
-
   it("소수점 절삭은 parsePageLimit과 동일 시맨틱 (parseInt 일관성)", () => {
     expect(parsePageNumber("2.9")).toBe(2);
+  });
+
+  // WI-025: 과대 page → MAX_PAGE_NUMBER cap (전역 skip 폭주 방지)
+  describe("MAX_PAGE_NUMBER cap (WI-025)", () => {
+    it("MAX 이하 page → 그대로 (정상 페이지 접근 무회귀)", () => {
+      expect(parsePageNumber("1")).toBe(1);
+      expect(parsePageNumber("9999")).toBe(9999);
+      expect(parsePageNumber(String(MAX_PAGE_NUMBER))).toBe(MAX_PAGE_NUMBER);
+    });
+
+    it("MAX 초과 page → MAX로 절상", () => {
+      expect(parsePageNumber(String(MAX_PAGE_NUMBER + 1))).toBe(MAX_PAGE_NUMBER);
+      expect(parsePageNumber("100000")).toBe(MAX_PAGE_NUMBER);
+      expect(parsePageNumber("999999999")).toBe(MAX_PAGE_NUMBER);
+    });
+
+    it("MAX_PAGE_NUMBER 상수값 = 10_000 (방어선·호환 균형)", () => {
+      expect(MAX_PAGE_NUMBER).toBe(10_000);
+    });
   });
 });
 
