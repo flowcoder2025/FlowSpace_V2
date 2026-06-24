@@ -1,0 +1,10 @@
+WI=WI-025-perf
+commit=48a7888
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-025-perf.codex.json
+evaluator=.flowset/eval-results/WI-025.eval.json
+gates=tsc,lint,vitest,build
+verdict=codex:WARNING(코드결함0·유일 잔여=샌드박스 vitest EPERM 환경 P3 defer) evaluator:WARNING 9.93(P0/P1/P2 0,fixNow0,P3x2 defer)
+notes=parsePageNumber offset 상한 추가(WI-023 분리). MAX_PAGE_NUMBER=10_000 상수+Math.min cap(page 10000 x limit 100=~999,900행 skip 상한). 기존 "상한 없음" 테스트를 cap 테스트로 의도적 교체(계약 변경). 소비처 assets/route.ts 유일·클라 page 미전송→실표면0 방어적(evaluator 독립 확인). parsePageLimit MAX cap 패턴 정합. evaluator 변이검증 4종(M1 cap제거·M2 off-by-one·M4 fallback 변이 검출, M3 n<2=등가변이 관측불가). 게이트 tsc0/lint0err/vitest 659->661/build0. Vercel 전용(server/·prisma 무관). main 미승격. defer P3x2: cap=10_000 임의정책값(실표면0)·parsePageLimit n<=0 vs parsePageNumber n<1 정수도메인 동치 nit.
+rounds=1
+createdAt=2026-06-24

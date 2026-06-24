@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.9,
+    "consistency": 9.9,
+    "specificity": 10,
+    "actionability": 10
+  },
+  "weightedTotal": 9.93,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/lib/pagination.ts:54",
+      "description": "MAX_PAGE_NUMBER cap=10_000은 임의 정책값이며 소비처 실표면이 0이다. src/app/api/assets/route.ts:50이 유일 소비처이고, 실제 클라이언트(asset-palette.tsx:38·asset-loader.ts:124)는 `/api/assets?status=...&limit=100`만 호출하며 `page` 파라미터를 전혀 보내지 않음을 grep으로 확인(server/ 번들엔 parsePageNumber 참조 0). 즉 이 cap은 직접/위조 API 호출에 대한 순수 방어막이다. cap 자체에 기능 결함은 없으나, 10_000의 근거(limit=100시 ~999,900행 skip 상한)는 주석에만 있고 정상 자산 규모를 측정한 데이터가 아닌 추정 방어선이다.",
+      "recommendation": "현 cap은 합리적 방어선이므로 변경 불요. 향후 자산 목록이 1M행에 근접하거나 page 파라미터를 실제 사용하는 UI(무한 스크롤 대체 등)가 도입되면 EXPLAIN 기반으로 cap 적정성을 재평가.",
+      "defer": true,
+      "deferRationale": "perf 하드닝 정책값으로 실표면 0(방어적). WI 목표·codex consult가 명시적으로 '임의 정책·저우선'으로 분류한 항목이며 기능/회귀 영향 없음.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/pagination.ts:38,53",
+      "description": "parsePageLimit과 parsePageNumber가 하한 처리 시맨틱이 미묘하게 다르다. parsePageLimit은 `n <= 0` → defaultLimit(주석은 '0 이하'), parsePageNumber는 `n < 1` → 1. 정수 입력에서는 두 조건이 동치(n<=0 ⟺ n<1)라 실동작 차이는 없으나, 두 함수가 '동일 시맨틱'(테스트 line 87 주석)이라 명시하면서 비교 연산자가 상이해 향후 부동소수 경로/리팩토링 시 혼동 여지가 있다.",
+      "recommendation": "둘 중 한 연산자로 통일(예 둘 다 `n < 1` 또는 둘 다 `n <= 0`)하거나, 차이가 의도임을 주석으로 명시. 동작 무영향이라 선택사항.",
+      "defer": true,
+      "deferRationale": "정수 도메인에서 두 가드는 완전 동치이며 parseInt가 정수만 반환하므로 관측 가능한 동작 차이 0. 순수 가독성/일관성 nit.",
+      "fixNow": false
+    }
+  ]
+}
