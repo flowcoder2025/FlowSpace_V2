@@ -1,0 +1,10 @@
+WI=WI-046-fix
+commit=f2977c2
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-046-fix.codex.json
+evaluator=.flowset/eval-results/WI-046-fix.eval.json
+gates=tsc,lint,vitest,build,esbuild
+verdict=codex:PASS(P3 defer,fixNow0) evaluator:WARNING 9.78(P0/P1/P2 0,fixNow0,P3x2 defer)
+notes=codex P3(테스트 breadth) 즉시 해소-라우트별 archived 회귀 9파일 추가(변이검증 실증). vitest 585->632. evaluator P3-1=livekit/token archived 미검사(스코프밖)->WI-047 후속.
+rounds=1
+createdAt=2026-06-24
