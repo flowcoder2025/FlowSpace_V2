@@ -59,6 +59,26 @@ describe("createKickCooldown (WI-047)", () => {
     expect(c.isActive("k", 55_000)).toBe(false);
   });
 
+  it("mark 시 만료된 다른 키를 opportunistic sweep — 재입장 없는 entry 누수 방지", () => {
+    const c = createKickCooldown(30_000);
+    c.mark("a", 1000); // until 31000
+    c.mark("b", 2000); // until 32000
+    expect(c.size()).toBe(2);
+    // 새 mark(now=40000) → a·b 둘 다 만료 → sweep으로 제거, c만 남음
+    c.mark("c", 40_000);
+    expect(c.size()).toBe(1);
+    expect(c.isActive("a", 40_000)).toBe(false);
+    expect(c.isActive("c", 40_000)).toBe(true);
+  });
+
+  it("sweep은 아직 유효한 다른 키를 지우지 않는다", () => {
+    const c = createKickCooldown(30_000);
+    c.mark("a", 1000); // until 31000
+    c.mark("b", 20_000); // until 50000 — 아직 유효
+    expect(c.isActive("b", 20_001)).toBe(true);
+    expect(c.size()).toBe(2);
+  });
+
   it("KICK_COOLDOWN_MS는 30초", () => {
     expect(KICK_COOLDOWN_MS).toBe(30_000);
   });

@@ -33,6 +33,13 @@ export function createKickCooldown(ttlMs: number): KickCooldown {
   const expiry = new Map<string, number>();
   return {
     mark(key, now) {
+      // opportunistic sweep — 재입장하지 않은 강퇴자 entry가 프로세스 수명 동안 남아
+      // Map이 누적되는 것을 막는다(isActive lazy 삭제는 재조회가 있어야 동작). mark는
+      // kick 시에만 호출되어 저빈도라 O(n) 전수 정리 비용이 무의미하다. Map 순회 중
+      // 방문 항목 삭제는 JS에서 안전.
+      for (const [k, until] of expiry) {
+        if (now >= until) expiry.delete(k);
+      }
       expiry.set(key, now + ttlMs);
     },
     isActive(key, now) {
