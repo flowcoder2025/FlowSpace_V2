@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 10,
+    "consistency": 10,
+    "specificity": 10,
+    "actionability": 9.5
+  },
+  "weightedTotal": 9.88,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/livekit/token/route.ts:162-168 + :177-186",
+      "description": "status 게이트가 ACTIVE 스페이스(공통 경로)에서 prisma.space.findUnique({select:{status}}) 1회를 auth() 전에 추가 실행하나, 그 결과(status)는 이후 인증 멤버 경로의 Promise.all 내 space.findFirst(ownerId 매치)와 재사용되지 않아 같은 Space 행을 두 번 조회한다. 정확성/보안 무영향(분기 의미가 달라 통합 시 owner 판정 회귀 위험) — WI-048 consult가 의도적으로 통합 최적화를 회피한 사항. 순수 round-trip 미세 비용.",
+      "recommendation": "현 상태 유지 권장. 향후 핫패스 최적화가 필요하면 status+ownerId를 단일 findUnique로 묶되 owner 분기 의미(space truthy=owner)를 보존하는 별도 WI로 분리.",
+      "defer": true,
+      "deferRationale": "정확성/인가 무영향의 미세 성능 부채이며, consult가 분기 의미 회귀 방지를 위해 의도적으로 통합을 배제했다. archived는 드문 경로라 추가 쿼리 비용은 무시 가능.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": ".flowset/fix_plan.md (WI-048 항목) / 기존 4h 토큰",
+      "description": "WI-048은 신규 토큰 발급만 차단하고, archive 직전 발급된 4시간 TTL 토큰·이미 연결된 LiveKit participant 는 차단하지 않는다(아카이브 시점 LiveKit 강제 제거는 WI-045 eviction/별도 후속 책임). 본 WI 스코프 밖이며 코드에 명시 주석으로 기재됨 — 회귀 아님.",
+      "recommendation": "archive 시점 LiveKit participant 강제 제거(RoomServiceClient.removeParticipant) 보장을 별도 후속 WI로 추적. 본 WI 변경 불요.",
+      "defer": true,
+      "deferRationale": "WI-048의 명시적 스코프(strictly additive — 신규 발급만 차단). 부분완화는 WI-036 소켓 purge·page status:ACTIVE 로드로 이미 잔존 표면이 좁다. 코드와 fix_plan에 후속으로 문서화됨.",
+      "fixNow": false
+    }
+  ]
+}
