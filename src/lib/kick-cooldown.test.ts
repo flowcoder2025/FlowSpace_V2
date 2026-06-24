@@ -71,12 +71,16 @@ describe("createKickCooldown (WI-047)", () => {
     expect(c.isActive("c", 40_000)).toBe(true);
   });
 
-  it("sweep은 아직 유효한 다른 키를 지우지 않는다", () => {
+  it("sweep은 만료 키만 지우고 아직 유효한 키는 보존한다(선택적 삭제)", () => {
     const c = createKickCooldown(30_000);
     c.mark("a", 1000); // until 31000
-    c.mark("b", 20_000); // until 50000 — 아직 유효
-    expect(c.isActive("b", 20_001)).toBe(true);
-    expect(c.size()).toBe(2);
+    c.mark("b", 20_000); // until 50000
+    // now=40000에서 mark("c") → sweep 발동: a(31000)는 만료라 제거, b(50000)는 유효라 보존.
+    c.mark("c", 40_000);
+    expect(c.size()).toBe(2); // a 제거, b·c 잔존
+    expect(c.isActive("a", 40_000)).toBe(false);
+    expect(c.isActive("b", 40_000)).toBe(true);
+    expect(c.isActive("c", 40_000)).toBe(true);
   });
 
   it("KICK_COOLDOWN_MS는 30초", () => {
