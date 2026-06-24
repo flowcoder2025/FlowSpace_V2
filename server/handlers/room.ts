@@ -78,6 +78,12 @@ function getSpacePlayers(spaceId: string): Map<string, PlayerData> {
   return spacePlayersMap.get(spaceId)!;
 }
 
+/** WI-047: 강퇴 쿨다운 중 join 거부 통지(early 체크 + post-await TOCTOU 재확인 공용). */
+const KICKED_JOIN_ERROR = {
+  code: "KICKED",
+  message: "강퇴되어 잠시 후 다시 입장할 수 있습니다.",
+} as const;
+
 export function handleRoom(io: IO, socket: TypedSocket) {
   socket.on("join:space", async ({ spaceId, nickname, avatar }) => {
     // 인증된 userId 사용 (클라이언트 값 무시)
@@ -86,12 +92,10 @@ export function handleRoom(io: IO, socket: TypedSocket) {
 
     // WI-047: 최근 강퇴(kick) 쿨다운 중이면 즉시 거부. kick은 DB를 바꾸지 않으므로
     // 이 게이트가 없으면 클라 소켓 재생성/재연결의 자동 join 재발송으로 즉시 복귀한다.
-    // DB 조회 전에 차단해 불필요한 쿼리도 줄인다.
+    // 여기 early 체크는 효율(DB 조회 전 빠른 거부)용 — **권위 검증은 아래 모든 await 이후
+    // socket.join 직전의 재확인**이다(그 사이 kick이 일어나는 TOCTOU를 닫는다).
     if (isUserKicked(spaceId, userId)) {
-      socket.emit("space:error", {
-        code: "KICKED",
-        message: "강퇴되어 잠시 후 다시 입장할 수 있습니다.",
-      });
+      socket.emit("space:error", KICKED_JOIN_ERROR);
       return;
     }
 
@@ -154,6 +158,15 @@ export function handleRoom(io: IO, socket: TypedSocket) {
         code: "SPACE_NOT_FOUND",
         message: "공간을 찾을 수 없거나 비활성 상태입니다.",
       });
+      return;
+    }
+
+    // TOCTOU 보강(WI-047): DB 조회(await) 동안 이 사용자가 kick 됐을 수 있다. 그 경우
+    // applyEnforcement 의 markUserKicked 는 아직 room 미합류인 이 소켓을 socketsForUser 로
+    // 잡지 못하므로, archive 와 동일하게 socket.join 직전 쿨다운을 재확인해 강퇴 직후
+    // in-flight join 이 살아남는 창을 닫는다(서버 게이트=최종 강제력).
+    if (isUserKicked(spaceId, userId)) {
+      socket.emit("space:error", KICKED_JOIN_ERROR);
       return;
     }
 
