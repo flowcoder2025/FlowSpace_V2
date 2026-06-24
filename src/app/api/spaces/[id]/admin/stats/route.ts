@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
+import { enforceAdminReadable } from "@/lib/space-status-policy";
 import { toPublicSpaceEventLog } from "@/lib/space-event-log-payload";
 
 interface RouteParams {
@@ -29,6 +30,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (member && member.role !== "OWNER" && member.role !== "STAFF" && !session.user.isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // 비-ACTIVE 스페이스의 관리 조회는 superAdmin(감사)만 허용, 일반 OWNER/STAFF 차단(WI-046).
+    const readGate = await enforceAdminReadable(spaceId, session.user.isSuperAdmin === true);
+    if (readGate) return readGate;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

@@ -6,6 +6,7 @@ const { mockAuth, mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     spaceMember: { findUnique: vi.fn() },
     spaceEventLog: { findMany: vi.fn() },
+    space: { findUnique: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
@@ -31,8 +32,11 @@ beforeEach(() => {
   mockAuth.mockReset();
   mockPrisma.spaceMember.findUnique.mockReset();
   mockPrisma.spaceEventLog.findMany.mockReset();
+  mockPrisma.space.findUnique.mockReset();
   mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
   mockPrisma.spaceMember.findUnique.mockResolvedValue({ role: "OWNER" });
+  // WI-046: 기본 ACTIVE(status 게이트 통과). archived 케이스는 개별 override.
+  mockPrisma.space.findUnique.mockResolvedValue({ status: "ACTIVE" });
 });
 
 describe("GET /api/spaces/[id]/admin/logs — 권한·페이지네이션", () => {
@@ -229,5 +233,26 @@ describe("GET /api/spaces/[id]/admin/logs — payload 정규화 + lean DTO (WI-0
     const res = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/logs`), ctx);
     const body = await readJson<{ logs: Array<{ payload: unknown }> }>(res);
     expect(body.logs[0].payload).toBeNull();
+  });
+});
+
+describe("GET /api/spaces/[id]/admin/logs — archived 조회 가드 (WI-046)", () => {
+  it("일반 OWNER는 ARCHIVED 스페이스 조회 차단(403 SPACE_NOT_ACTIVE), 로그 미조회", async () => {
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+    const res = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/logs`), ctx);
+    expect(res.status).toBe(403);
+    const body = await readJson<{ code: string }>(res);
+    expect(body.code).toBe("SPACE_NOT_ACTIVE");
+    expect(mockPrisma.spaceEventLog.findMany).not.toHaveBeenCalled();
+  });
+
+  it("superAdmin은 ARCHIVED 스페이스도 감사 조회 허용(200)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValue(null);
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+    mockPrisma.spaceEventLog.findMany.mockResolvedValue([]);
+    const res = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/logs`), ctx);
+    expect(res.status).toBe(200);
+    expect(mockPrisma.spaceEventLog.findMany).toHaveBeenCalled();
   });
 });

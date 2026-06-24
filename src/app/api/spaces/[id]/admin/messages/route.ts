@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { buildCursorPage, parsePageLimit } from "@/lib/pagination";
 import { normalizeEnumFilter, parseDateRangeFilter } from "@/lib/query-filter";
 import { internalErrorResponse } from "@/lib/api-error";
+import { enforceAdminReadable } from "@/lib/space-status-policy";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -33,6 +34,9 @@ export async function GET(request: Request, { params }: RouteParams) {
     if (self && self.role !== "OWNER" && self.role !== "STAFF" && !session.user.isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // 비-ACTIVE 스페이스의 관리 조회는 superAdmin(감사)만 허용, 일반 OWNER/STAFF 차단(WI-046).
+    const readGate = await enforceAdminReadable(spaceId, session.user.isSuperAdmin === true);
+    if (readGate) return readGate;
 
     const { searchParams } = new URL(request.url);
     const cursor = searchParams.get("cursor");

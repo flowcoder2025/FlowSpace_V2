@@ -7,6 +7,7 @@ const { mockAuth, mockPrisma } = vi.hoisted(() => ({
     spaceMember: { findUnique: vi.fn(), count: vi.fn() },
     chatMessage: { count: vi.fn() },
     spaceEventLog: { findMany: vi.fn() },
+    space: { findUnique: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
@@ -23,11 +24,14 @@ beforeEach(() => {
   mockPrisma.spaceMember.count.mockReset();
   mockPrisma.chatMessage.count.mockReset();
   mockPrisma.spaceEventLog.findMany.mockReset();
+  mockPrisma.space.findUnique.mockReset();
   mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
   mockPrisma.spaceMember.findUnique.mockResolvedValue({ role: "OWNER" });
   mockPrisma.spaceMember.count.mockResolvedValue(3);
   mockPrisma.chatMessage.count.mockResolvedValue(10);
   mockPrisma.spaceEventLog.findMany.mockResolvedValue([]);
+  // WI-046: 기본 ACTIVE(status 게이트 통과). archived 케이스는 개별 override.
+  mockPrisma.space.findUnique.mockResolvedValue({ status: "ACTIVE" });
 });
 
 describe("GET /api/spaces/[id]/admin/stats — 권한", () => {
@@ -42,6 +46,24 @@ describe("GET /api/spaces/[id]/admin/stats — 권한", () => {
     mockPrisma.spaceMember.findUnique.mockResolvedValue({ role: "PARTICIPANT" });
     const res = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/stats`), ctx);
     expect(res.status).toBe(403);
+  });
+
+  it("일반 OWNER는 ARCHIVED 스페이스 조회 차단(403 SPACE_NOT_ACTIVE, WI-046)", async () => {
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+    const res = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/stats`), ctx);
+    expect(res.status).toBe(403);
+    const body = await readJson<{ code: string }>(res);
+    expect(body.code).toBe("SPACE_NOT_ACTIVE");
+    expect(mockPrisma.spaceMember.count).not.toHaveBeenCalled();
+  });
+
+  it("superAdmin은 ARCHIVED 스페이스도 감사 조회 허용(200, WI-046)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValue(null);
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+    const res = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/stats`), ctx);
+    expect(res.status).toBe(200);
+    expect(mockPrisma.spaceMember.count).toHaveBeenCalled();
   });
 });
 

@@ -12,6 +12,7 @@ const { mockAuth, mockPrisma, mockDispatch, mockRemoveLiveKit } = vi.hoisted(() 
   mockPrisma: {
     spaceMember: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
     spaceEventLog: { create: vi.fn() },
+    space: { findUnique: vi.fn() },
   },
   mockDispatch: vi.fn(),
   mockRemoveLiveKit: vi.fn(),
@@ -40,6 +41,9 @@ beforeEach(() => {
   mockRemoveLiveKit.mockReset();
   mockRemoveLiveKit.mockResolvedValue({ removed: true, reason: "removed" });
   mockPrisma.spaceEventLog.create.mockResolvedValue({});
+  mockPrisma.space.findUnique.mockReset();
+  // WI-046: 기본 ACTIVE(status 게이트 통과). archived 케이스는 개별 override.
+  mockPrisma.space.findUnique.mockResolvedValue({ status: "ACTIVE" });
 });
 
 /** PATCH 호출 시 호출자(OWNER) + 대상(PARTICIPANT) findUnique 시퀀스 셋업. */
@@ -270,5 +274,66 @@ describe("PATCH — WI-045 강퇴/차단/해제 (kick·ban·unban)", () => {
     expect(mockDispatch).toHaveBeenCalledWith(
       expect.objectContaining({ action: "mute" })
     );
+  });
+});
+
+describe("admin/members — archived 가드 (WI-046)", () => {
+  it("PATCH: 일반 OWNER는 ARCHIVED 스페이스 제재 차단(403 SPACE_NOT_ACTIVE), 대상조회/update/enforce 미진입", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+
+    const res = await PATCH(
+      buildJsonRequest(`/api/spaces/${SPACE_ID}/admin/members`, "PATCH", {
+        memberId: "m-target",
+        action: "ban",
+      }),
+      ctx
+    );
+
+    expect(res.status).toBe(403);
+    const body = await readJson<{ code: string }>(res);
+    expect(body.code).toBe("SPACE_NOT_ACTIVE");
+    // 호출자 멤버십(1회)만 — 대상 멤버 조회는 status 게이트 이후라 미발생
+    expect(mockPrisma.spaceMember.findUnique).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.spaceMember.update).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockRemoveLiveKit).not.toHaveBeenCalled();
+  });
+
+  it("PATCH: superAdmin이어도 ARCHIVED 제재 차단(403)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa", isSuperAdmin: true }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+
+    const res = await PATCH(
+      buildJsonRequest(`/api/spaces/${SPACE_ID}/admin/members`, "PATCH", {
+        memberId: "m-target",
+        action: "kick",
+      }),
+      ctx
+    );
+
+    expect(res.status).toBe(403);
+    expect(mockPrisma.spaceMember.update).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it("GET: 일반 OWNER는 ARCHIVED 조회 차단(403), superAdmin은 허용(200)", async () => {
+    // 일반 OWNER → 차단
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValue({ role: "OWNER" });
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+    const blocked = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/members`), ctx);
+    expect(blocked.status).toBe(403);
+    expect(mockPrisma.spaceMember.findMany).not.toHaveBeenCalled();
+
+    // superAdmin → 허용
+    mockAuth.mockResolvedValue(makeSession({ id: "sa", isSuperAdmin: true }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValue(null);
+    mockPrisma.spaceMember.findMany.mockResolvedValue([]);
+    const allowed = await GET(buildGetRequest(`/api/spaces/${SPACE_ID}/admin/members`), ctx);
+    expect(allowed.status).toBe(200);
+    expect(mockPrisma.spaceMember.findMany).toHaveBeenCalled();
   });
 });

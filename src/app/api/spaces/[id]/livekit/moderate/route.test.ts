@@ -13,6 +13,7 @@ const {
   mockPrisma: {
     spaceMember: { findUnique: vi.fn() },
     spaceEventLog: { create: vi.fn() },
+    space: { findUnique: vi.fn() },
   },
   mockGetParticipant: vi.fn(),
   mockUpdateParticipant: vi.fn(),
@@ -71,6 +72,9 @@ beforeEach(() => {
   mockPrisma.spaceMember.findUnique.mockReset();
   mockPrisma.spaceEventLog.create.mockReset();
   mockPrisma.spaceEventLog.create.mockResolvedValue({});
+  mockPrisma.space.findUnique.mockReset();
+  // WI-046: 기본 ACTIVE(status 게이트 통과). archived 케이스는 개별 override.
+  mockPrisma.space.findUnique.mockResolvedValue({ status: "ACTIVE" });
   mockGetParticipant.mockReset();
   mockUpdateParticipant.mockReset();
   mockUpdateParticipant.mockResolvedValue({});
@@ -338,5 +342,33 @@ describe("POST moderate — guest 대상", () => {
     const logArg = mockPrisma.spaceEventLog.create.mock.calls[0][0].data;
     expect(logArg.payload.targetName).toBe("게스트짱");
     expect(logArg.payload.targetIdentity).toBe("guest-sess-9");
+  });
+});
+
+describe("POST /api/spaces/[id]/livekit/moderate — archived 가드 (WI-046)", () => {
+  it("ARCHIVED 스페이스는 OWNER여도 403 SPACE_NOT_ACTIVE, LiveKit 미진입", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+
+    const res = await POST(req({ identity: "user-target", muted: true }), ctx);
+
+    expect(res.status).toBe(403);
+    expect((await readJson<{ code: string }>(res)).code).toBe("SPACE_NOT_ACTIVE");
+    expect(mockGetParticipant).not.toHaveBeenCalled();
+    expect(mockUpdateParticipant).not.toHaveBeenCalled();
+    // self 조회(1회)만 — target 멤버 조회는 status 게이트 이후라 미발생
+    expect(mockPrisma.spaceMember.findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  it("ARCHIVED 스페이스는 superAdmin이어도 차단(403)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa", isSuperAdmin: true }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+
+    const res = await POST(req({ identity: "user-target", muted: true }), ctx);
+
+    expect(res.status).toBe(403);
+    expect(mockUpdateParticipant).not.toHaveBeenCalled();
   });
 });
