@@ -42,13 +42,19 @@ const DEFAULT_BACKDROP =
   "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4";
 
 const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/** 패널 내 focusable 요소(순서대로). disabled/[hidden]은 제외. */
+/**
+ * 패널 내 tabbable 요소(순서대로). 실제 탭 가능 여부로 거른다:
+ * - `disabled`/`input[type=hidden]`/음수 tabIndex 제외(`el.tabIndex >= 0`).
+ * - **조상**이 `[hidden]`/`aria-hidden="true"`/`fieldset[disabled]`인 요소 제외(자신뿐 아니라 조상 — codex P2).
+ */
 function getFocusable(panel: HTMLElement): HTMLElement[] {
-  return Array.from(
-    panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-  ).filter((el) => !el.hasAttribute("hidden") && el.getAttribute("aria-hidden") !== "true");
+  return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (el) =>
+      el.tabIndex >= 0 &&
+      !el.closest('[hidden], [aria-hidden="true"], fieldset[disabled]')
+  );
 }
 
 export function Dialog({
@@ -101,14 +107,17 @@ export function Dialog({
       }
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
-      const active = document.activeElement;
+      const active = document.activeElement as HTMLElement | null;
+      // active가 현재 tabbable 목록에 없으면(패널 밖이거나, 포커스된 채 disabled로 바뀐 요소 등)
+      // 경계와 동일하게 처리해 Tab이 패널 밖으로 새지 않게 한다(codex P3 — 동적 disabled).
+      const activeInTrap = !!active && focusables.includes(active);
       if (e.shiftKey) {
-        if (active === first || !panel.contains(active)) {
+        if (!activeInTrap || active === first) {
           e.preventDefault();
           last.focus();
         }
       } else {
-        if (active === last || !panel.contains(active)) {
+        if (!activeInTrap || active === last) {
           e.preventDefault();
           first.focus();
         }
