@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isSpaceMutable, spaceNotActiveResponse } from "@/lib/space-status-policy";
 
 // ============================================
 // Configuration
@@ -149,6 +150,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // roomName(=space-{id})에서 도출한 스페이스 id — 상태 게이트와 세션 검증이 공유.
+    const spaceIdFromRoom = roomName.replace("space-", "");
+
+    // 3.5. (WI-048) archived(비-ACTIVE) 스페이스 화상 토큰 발급 거부 — 심층방어.
+    //   스페이스가 존재하면서 ACTIVE 가 아니면 멤버/owner/게스트/dev-anon 모든 발급 경로를
+    //   한 곳에서 균일하게 차단한다(소켓 join 게이트[room.ts]·space/[id] 페이지 status:ACTIVE
+    //   로드와 정합 — WI-036/WI-046). 응답은 WI-046 정책 헬퍼와 일관된 403 SPACE_NOT_ACTIVE.
+    //   미존재 스페이스는 기존 흐름(비-멤버 403 / 게스트 세션 검증)이 처리하므로 여기서 404 로
+    //   바꾸지 않는다 — strictly additive(archived 차단만 추가, 기존 동작 무변경).
+    const spaceStatusRow = await prisma.space.findUnique({
+      where: { id: spaceIdFromRoom },
+      select: { status: true },
+    });
+    if (spaceStatusRow && !isSpaceMutable(spaceStatusRow.status)) {
+      return spaceNotActiveResponse();
+    }
+
     // 4. 세션 검증 (🔒 participantId는 서버에서 파생)
     const session = await auth();
     let serverParticipantId: string | undefined = undefined;
@@ -156,8 +174,6 @@ export async function POST(request: NextRequest) {
 
     // 인증된 사용자
     if (session?.user?.id) {
-      const spaceIdFromRoom = roomName.replace("space-", "");
-
       const [spaceMember, space] = await Promise.all([
         prisma.spaceMember.findFirst({
           where: { spaceId: spaceIdFromRoom, userId: session.user.id },
