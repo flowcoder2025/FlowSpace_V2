@@ -1,0 +1,13 @@
+결론은 **이번 WI는 A, 소켓 서버 in-memory 쿨다운을 추천**합니다. 이유는 이 결함의 핵심 게이트가 `join:space`이고, 그 게이트는 OCI 소켓 서버 안에 있기 때문입니다. kick은 30초짜리 임시 퇴장 시맨틱이라 재시작 시 소실되어도 BANNED처럼 정책 위반이 되지 않습니다. 반대로 `kickedUntil` DB 컬럼은 마이그레이션 비용이 크고, LiveKit 토큰 게이팅까지 해도 기존 4h 토큰 재사용 문제를 해결하지 못합니다. 즉 DB안은 “더 완전해 보이지만 실제로 핵심 리스크를 충분히 더 줄이지 못하는” 선택입니다. 다만 제품 요구가 “kick 후 30초 동안 새 LiveKit 토큰 발급도 반드시 403이어야 한다”라면 그때는 B가 맞습니다.
+
+LiveKit 토큰 게이팅의 한계효용은 낮게 봅니다. 신규 토큰 발급은 막을 수 있지만, 이미 발급된 토큰이 4시간 유효하고 SDK가 같은 토큰으로 재합류할 수 있다면 `kickedUntil` DB 컬럼만으로는 LiveKit 쪽 강제력이 완성되지 않습니다. 그러면 DB 마이그레이션을 정당화하려면 단순 토큰 라우트 체크가 아니라 토큰 TTL 축소, 참여 세션 nonce, LiveKit 재접속 차단 설계 같은 별도 작업이 같이 필요합니다. 이번 WI에서는 소켓 재입장 차단과 클라 자동 재생성 차단에 집중하는 게 맞습니다.
+
+in-memory안이면 `applyEnforcement`에서 **대상 소켓 조회보다 먼저** `kickedUntilMap.set(spaceId:userId, now + cooldown)`을 해야 합니다. `targets.length === 0`이어도 set해야 합니다. 오프라인이거나 이미 disconnect된 사용자가 구버전 클라/다른 탭으로 바로 들어오는 경로를 막아야 하기 때문입니다. `join:space`에서는 map을 먼저 확인하고, 만료됐으면 lazy delete 후 정상 흐름으로 넘기면 됩니다. `enforce` kick postcondition은 지금처럼 `member !== null && restriction !== "BANNED"` 정도로 유지하는 편이 좋습니다. `kickedUntil` 확인을 postcondition에 넣으면 “kick 요청이 쿨다운을 생성한다”는 명령형 동작과 “이미 쿨다운인지 검증한다”는 상태 검증이 섞입니다.
+
+클라는 `KICKED` 수신 시 공간 단위 가드가 필요합니다. 단순히 navigate만 하면 cleanup과 effect 재실행으로 다시 `getSocketClient()`가 새 소켓을 만들 수 있습니다. 모듈 레벨 또는 전역 store 레벨에 `kickedSpaces[spaceId] = expiresAt`를 두고, `connect` 핸들러와 reconnect 핸들러의 `join:space` 발송 직전에 반드시 확인해야 합니다. 가능하면 `disconnectSocket()`에도 “intentional/kicked” 같은 reason을 넘겨서 cleanup성 disconnect가 즉시 재생성 루프로 이어지지 않게 하세요. ban/archive는 영구 deny라 UI에서 계속 차단 상태를 유지해도 되지만, kick은 임시이므로 `/my-spaces`로 이동하고 해당 space 자동 join만 cooldown 동안 막는 차이가 있어야 합니다.
+
+스코프는 kick에 집중하는 편을 추천합니다. 다만 재연결 루프 증폭기를 완전히 방치하면 이번 수정 검증이 흔들릴 수 있으니, “KICKED 이후 해당 space에 대한 자동 join 금지”까지는 이번 WI 범위에 포함하세요. pagehide/beforeunload 정책, effect deps로 인한 remount, stale tile/ban refresh 문제까지 일반화해서 고치는 건 별도 WI가 낫습니다. 이번에는 루프의 일반 구조를 고치는 게 아니라 kick을 무력화하는 경로만 닫는 것이 적절합니다.
+
+mute/ban은 이번에 코드 변경 대상으로 삼지 않는 게 좋습니다. restriction 기반 DB 게이트가 이미 있고, kick 쿨다운과 의미가 다릅니다. 다만 라이브 검증은 반드시 같이 하세요. 특히 ban 후 새 소켓 생성, mute 후 재입장, 기존 탭/새 탭/새로고침 흐름은 회귀 테스트 가치가 큽니다.
+
+**내가 놓칠 위험 1가지**: 다중 탭입니다. 한 탭이 `KICKED`를 받고 `/my-spaces`로 이동해도 다른 탭의 클라 메모리 가드는 공유되지 않습니다. 그래서 최종 강제력은 반드시 소켓 서버 `join:space` 쿨다운에 있어야 하고, 클라 가드는 UX 보조로만 취급해야 합니다.
