@@ -14,6 +14,13 @@
 export const DEFAULT_PAGE_LIMIT = 50;
 /** 클라이언트가 요청 가능한 최대 페이지 크기 (전역 목록 폭주 방지) */
 export const MAX_PAGE_LIMIT = 100;
+/**
+ * offset 페이지 번호의 상한 (전역 skip 폭주 방지, WI-025).
+ * `skip: (page - 1) * limit`이므로 page=10_000·limit=100이면 ~999,900행 skip이
+ * 상한이다 — 정상 자산/목록 규모 대비 충분히 큰 방어선이며, 이를 넘는 page는
+ * 조작/스크립트성 요청으로 보고 절상(cap)한다(정상 페이지 접근 회귀 없음).
+ */
+export const MAX_PAGE_NUMBER = 10_000;
 
 /**
  * 쿼리스트링 `limit` 값을 안전한 정수 페이지 크기로 정규화한다.
@@ -35,15 +42,16 @@ export function parsePageLimit(
 /**
  * 쿼리스트링 `page`(1-base offset 페이지 번호)를 안전한 양의 정수로 정규화한다.
  * - null/빈값/비정수/1 미만 → 1
- * - 상한 없음 (offset 페이지 범위는 데이터 크기에 의존)
+ * - MAX_PAGE_NUMBER 초과 → MAX_PAGE_NUMBER로 절상(cap) (WI-025, 전역 skip 폭주 방지)
  *
  * offset 라우트에서 `skip: (page - 1) * limit` 계산 시 page가 NaN/0/음수면
- * 음수 skip이 되어 Prisma가 throw(→500)하던 것을 방지한다.
+ * 음수 skip이 되어 Prisma가 throw(→500)하던 것을 방지하고, 과대 page로 거대
+ * offset skip(DB 부하)이 발생하는 것을 상한으로 막는다.
  */
 export function parsePageNumber(raw: string | null): number {
   const n = parseInt(raw ?? "", 10);
   if (!Number.isFinite(n) || n < 1) return 1;
-  return n;
+  return Math.min(n, MAX_PAGE_NUMBER);
 }
 
 export interface CursorPage<T> {
