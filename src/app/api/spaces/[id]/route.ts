@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { internalErrorResponse } from "@/lib/api-error";
+import { isSpaceMutable, spaceNotActiveResponse } from "@/lib/space-status-policy";
 import { dispatchEnforcement } from "@/features/space/enforce";
 
 interface RouteParams {
@@ -93,6 +94,10 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
     if (space.ownerId !== session.user.id && !session.user.isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    // soft-delete(ARCHIVED) 등 비-ACTIVE 스페이스는 설정 편집 불가(superAdmin 포함, WI-046).
+    if (!isSpaceMutable(space.status)) {
+      return spaceNotActiveResponse();
     }
 
     const body = (await request.json()) as {

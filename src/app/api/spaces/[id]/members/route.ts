@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
+import { isSpaceMutable, spaceNotActiveResponse } from "@/lib/space-status-policy";
 import {
   canActOn,
   isChatRestriction,
@@ -163,6 +164,18 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const actorRole = (myMember?.role ?? "OWNER") as SpaceRole;
+
+    // 비-ACTIVE 스페이스(soft-delete 등)는 역할/제재 변경 불가(superAdmin 포함, WI-046).
+    const space = await prisma.space.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (!space) {
+      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    }
+    if (!isSpaceMutable(space.status)) {
+      return spaceNotActiveResponse();
+    }
 
     // enum allowlist 검증 (임의 값 주입 차단)
     if (body.role !== undefined && !isSpaceRole(body.role)) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
+import { enforceSpaceMutable } from "@/lib/space-status-policy";
 
 interface RouteParams {
   params: Promise<{ id: string; messageId: string }>;
@@ -26,6 +27,9 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     if (self && self.role !== "OWNER" && self.role !== "STAFF" && !session.user.isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // 비-ACTIVE 스페이스(soft-delete 등)는 메시지 삭제(모더레이션) 불가(superAdmin 포함, WI-046).
+    const archivedGate = await enforceSpaceMutable(spaceId);
+    if (archivedGate) return archivedGate;
 
     const message = await prisma.chatMessage.findUnique({
       where: { id: messageId },

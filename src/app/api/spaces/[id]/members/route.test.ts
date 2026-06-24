@@ -10,6 +10,7 @@ const { mockAuth, mockPrisma } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockPrisma: {
     spaceMember: { findUnique: vi.fn(), update: vi.fn() },
+    space: { findUnique: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
@@ -24,6 +25,9 @@ beforeEach(() => {
   mockAuth.mockReset();
   mockPrisma.spaceMember.findUnique.mockReset();
   mockPrisma.spaceMember.update.mockReset();
+  mockPrisma.space.findUnique.mockReset();
+  // WI-046: 기본 ACTIVE(status 게이트 통과). archived 케이스는 개별 override.
+  mockPrisma.space.findUnique.mockResolvedValue({ status: "ACTIVE" });
 });
 
 describe("PATCH /api/spaces/[id]/members — 응답 allowlist (WI-014)", () => {
@@ -80,6 +84,47 @@ describe("PATCH /api/spaces/[id]/members — 응답 allowlist (WI-014)", () => {
     );
 
     expect(res.status).toBe(401);
+    expect(mockPrisma.spaceMember.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("PATCH /api/spaces/[id]/members — archived 가드 (WI-046)", () => {
+  it("ARCHIVED 스페이스는 OWNER여도 403 SPACE_NOT_ACTIVE, 대상 조회/update 미진입", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "owner-1", isSuperAdmin: false }));
+    // 호출자 멤버십(OWNER)만 조회됨 — status 게이트가 대상 조회 전에 막는다.
+    mockPrisma.spaceMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+
+    const res = await PATCH(
+      buildJsonRequest(`/api/spaces/${SPACE_ID}/members`, "PATCH", {
+        memberId: "m-target",
+        restriction: "MUTED",
+      }),
+      ctx
+    );
+
+    expect(res.status).toBe(403);
+    const body = await readJson<{ code: string }>(res);
+    expect(body.code).toBe("SPACE_NOT_ACTIVE");
+    // 호출자 멤버십(1회)만 조회 — 대상 멤버 조회는 status 게이트 이후라 미발생
+    expect(mockPrisma.spaceMember.findUnique).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.spaceMember.update).not.toHaveBeenCalled();
+  });
+
+  it("ARCHIVED 스페이스는 superAdmin이어도 차단(403)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa", isSuperAdmin: true }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+
+    const res = await PATCH(
+      buildJsonRequest(`/api/spaces/${SPACE_ID}/members`, "PATCH", {
+        memberId: "m-target",
+        restriction: "BANNED",
+      }),
+      ctx
+    );
+
+    expect(res.status).toBe(403);
     expect(mockPrisma.spaceMember.update).not.toHaveBeenCalled();
   });
 });

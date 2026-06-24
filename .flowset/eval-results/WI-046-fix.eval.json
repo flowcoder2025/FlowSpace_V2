@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.7,
+    "consistency": 9.9,
+    "specificity": 9.9,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.78,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/livekit/token/route.ts:159-180",
+      "description": "동일 soft-delete 접근제어 클래스의 병렬 표면이 WI-046 선언 스코프(/api/spaces/[id]/*) 밖에 잔존한다. POST /api/livekit/token 은 roomName→spaceId 해석 후 spaceMember.restriction(BANNED, WI-045)만 검사하고 Space.status 는 보지 않아, 일반 OWNER/STAFF 멤버가 archived(soft-delete) 스페이스의 화상 토큰을 계속 발급받을 수 있다(증거: grep 결과 해당 라우트에 status/ACTIVE/ARCHIVED 분기 부재, prisma.space.findFirst 는 ownerId 일치만 select). WI-036 실시간 purge 가 기존 연결은 추방하나, 토큰 재발급으로 빈 룸에 재연결되는 표면은 남는다. WI-046 의 mutation/read 가드 정책과 일관시키려면 token 발급에도 status 검사가 바람직하다.",
+      "recommendation": "후속 WI 로 /api/livekit/token 에 Space.status !== ACTIVE 차단(또는 enforceSpaceMutable 계열 재사용) 추가를 검토. WI-046 수용 기준(/spaces/[id]/* 라우트)에는 영향 없음.",
+      "defer": true,
+      "deferRationale": "WI-046 의 명시 적용 표면(/api/spaces/[id]/* 의 mutation·admin GET)에 포함되지 않은 별도 라우트이며, WI-036 실시간 추방으로 부분 완화된다. 수용 기준 충족과 무관하므로 별도 WI 로 분리 처리가 옳다.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/space-status-policy.ts:68-105 (enforceSpaceMutable/enforceAdminReadable)",
+      "description": "관리 라우트(admin/announce·media·members PATCH·messages·map·moderate 등)는 게이트 호출 시 status 확인용 prisma.space.findUnique 를 추가로 1회 더 수행한다(PATCH /spaces/[id] 는 이미 조회한 space.status 재사용으로 예외). 단일 PK 인덱스 + select:{status:true} 라 비용은 미미하나, 이미 멤버십 조회를 마친 라우트에서 동일 spaceId 에 대한 두 번째 왕복이 발생한다. 정확성·보안에는 영향 없음.",
+      "recommendation": "성능이 문제 될 경우(현재 아님) 멤버십 조회와 status 를 단일 쿼리로 합치거나, 라우트가 이미 space 를 조회하는 경우 isSpaceMutable(status) 인라인을 우선(PATCH /spaces/[id] 선례)하는 일관 패턴 검토.",
+      "defer": true,
+      "deferRationale": "단일 인덱스 PK 조회·필드 1개 select 로 실측 부담 무시 가능하며, 공용 헬퍼화로 얻는 일관성·정확성 이득이 미세 왕복 비용을 상회한다. 최적화는 EXPLAIN 근거 후속 사안.",
+      "fixNow": false
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { canActOn } from "@/lib/space-role";
+import { enforceSpaceMutable } from "@/lib/space-status-policy";
 import {
   parseParticipantIdentity,
   findMicrophoneTrack,
@@ -78,6 +79,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const actorRole = (self?.role ?? "OWNER") as SpaceRole;
+
+    // 비-ACTIVE 스페이스(soft-delete 등)는 마이크 강제 음소거 등 모더레이션 불가(superAdmin 포함, WI-046).
+    const archivedGate = await enforceSpaceMutable(spaceId);
+    if (archivedGate) return archivedGate;
 
     // 5. target 권한 게이트
     //  - user-*: SpaceMember.role 조회 → OWNER 보호 + canActOn(역할 계층)

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { canActOn, isSpaceRole } from "@/lib/space-role";
+import { enforceAdminReadable, enforceSpaceMutable } from "@/lib/space-status-policy";
 import { dispatchEnforcement, type EnforceUserAction } from "@/features/space/enforce";
 import { removeSpaceParticipant } from "@/features/space/livekit-moderation";
 import type { SpaceRole, ChatRestriction } from "@prisma/client";
@@ -30,6 +31,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (self && self.role !== "OWNER" && self.role !== "STAFF" && !session.user.isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // 비-ACTIVE 스페이스의 관리 조회는 superAdmin(감사)만 허용, 일반 OWNER/STAFF 차단(WI-046).
+    const readGate = await enforceAdminReadable(spaceId, session.user.isSuperAdmin === true);
+    if (readGate) return readGate;
 
     // 응답 allowlist — restrictedBy/restrictedReason/restrictedUntil 관리 메타와
     // guestSessionId/spaceId 내부 스칼라 미반환. PATCH 정형화가 onRefresh GET로
@@ -77,6 +81,10 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const actorRole = (self?.role ?? "OWNER") as SpaceRole;
+
+    // 비-ACTIVE 스페이스(soft-delete 등)는 멤버 제재/역할변경 불가(superAdmin 포함, WI-046).
+    const archivedGate = await enforceSpaceMutable(spaceId);
+    if (archivedGate) return archivedGate;
 
     const body = await request.json();
     const { memberId, action, role } = body as {
