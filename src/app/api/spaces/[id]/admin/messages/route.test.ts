@@ -11,6 +11,7 @@ const { mockAuth, mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     spaceMember: { findUnique: vi.fn() },
     chatMessage: { findMany: vi.fn() },
+    space: { findUnique: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
@@ -36,9 +37,12 @@ beforeEach(() => {
   mockAuth.mockReset();
   mockPrisma.spaceMember.findUnique.mockReset();
   mockPrisma.chatMessage.findMany.mockReset();
+  mockPrisma.space.findUnique.mockReset();
   // 기본: OWNER 관리자
   mockAuth.mockResolvedValue(makeSession({ id: "owner-1" }));
   mockPrisma.spaceMember.findUnique.mockResolvedValue({ role: "OWNER" });
+  // WI-046: 기본 ACTIVE(status 게이트 통과). archived 케이스는 개별 override.
+  mockPrisma.space.findUnique.mockResolvedValue({ status: "ACTIVE" });
 });
 
 describe("GET /api/spaces/[id]/admin/messages — cursor(헬퍼 통일, WI-012-2 S5)", () => {
@@ -203,5 +207,34 @@ describe("GET /api/spaces/[id]/admin/messages — 고급 필터(WI-030)", () => 
     const args = mockPrisma.chatMessage.findMany.mock.calls[0][0];
     expect(args.where).toEqual({ spaceId: SPACE_ID, type: "MESSAGE" });
     expect(args.cursor).toEqual({ id: "msg-5" });
+  });
+});
+
+describe("GET /api/spaces/[id]/admin/messages — archived 조회 가드 (WI-046)", () => {
+  it("일반 OWNER는 ARCHIVED 스페이스 조회 차단(403 SPACE_NOT_ACTIVE), 메시지 미조회", async () => {
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+
+    const res = await GET(
+      buildGetRequest(`/api/spaces/${SPACE_ID}/admin/messages`),
+      ctx
+    );
+    expect(res.status).toBe(403);
+    const body = await readJson<{ code: string }>(res);
+    expect(body.code).toBe("SPACE_NOT_ACTIVE");
+    expect(mockPrisma.chatMessage.findMany).not.toHaveBeenCalled();
+  });
+
+  it("superAdmin은 ARCHIVED 스페이스도 감사 조회 허용(200)", async () => {
+    mockAuth.mockResolvedValue(makeSession({ id: "sa-1", isSuperAdmin: true }));
+    mockPrisma.spaceMember.findUnique.mockResolvedValue(null);
+    mockPrisma.space.findUnique.mockResolvedValue({ status: "ARCHIVED" });
+    mockPrisma.chatMessage.findMany.mockResolvedValue([]);
+
+    const res = await GET(
+      buildGetRequest(`/api/spaces/${SPACE_ID}/admin/messages`),
+      ctx
+    );
+    expect(res.status).toBe(200);
+    expect(mockPrisma.chatMessage.findMany).toHaveBeenCalled();
   });
 });

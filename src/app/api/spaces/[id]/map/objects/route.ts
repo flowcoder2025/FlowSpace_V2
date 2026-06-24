@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { internalErrorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
+import { enforceSpaceMutable } from "@/lib/space-status-policy";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -31,6 +32,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!member && !session.user.isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // 비-ACTIVE 스페이스(soft-delete 등)는 맵 편집 불가(superAdmin 포함, WI-046).
+    const archivedGate = await enforceSpaceMutable(id);
+    if (archivedGate) return archivedGate;
 
     const body = (await request.json()) as {
       objectType: string;
