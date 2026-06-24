@@ -6,6 +6,7 @@ export type {
   SceneReadyPayload,
   SceneErrorPayload,
   ChatFocusPayload,
+  ChatStartWhisperPayload,
   UIOverlayPayload,
   AssetRegisteredPayload,
   AssetLoadErrorPayload,

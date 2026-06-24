@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseInput,
   isWhisperFormat,
+  canWhisperTarget,
   extractTargetNickname,
   getAdminCommandSuggestions,
 } from "./chat-parser";
@@ -186,6 +187,48 @@ describe("extractTargetNickname", () => {
 
   it("should return null for non-whisper", () => {
     expect(extractTargetNickname("hello")).toBeNull();
+  });
+});
+
+// ── canWhisperTarget (WI-040) ──
+describe("canWhisperTarget", () => {
+  it("공백 없는 닉네임 → true", () => {
+    expect(canWhisperTarget("홍길동")).toBe(true);
+    expect(canWhisperTarget("Alice")).toBe(true);
+    expect(canWhisperTarget("user_123")).toBe(true);
+  });
+
+  it("공백 포함 닉네임 → false (slash 문법 오배송 방지)", () => {
+    expect(canWhisperTarget("Staff Kim")).toBe(false);
+    expect(canWhisperTarget("John Doe")).toBe(false);
+    expect(canWhisperTarget("a b")).toBe(false);
+  });
+
+  it("빈 문자열/공백류 → false", () => {
+    expect(canWhisperTarget("")).toBe(false);
+    expect(canWhisperTarget(" ")).toBe(false);
+    expect(canWhisperTarget("\t")).toBe(false);
+  });
+
+  it("선행/후행 공백 닉네임 → false (round-trip 불가)", () => {
+    expect(canWhisperTarget(" Alice")).toBe(false);
+    expect(canWhisperTarget("Alice ")).toBe(false);
+  });
+
+  // 핵심 계약: canWhisperTarget(n) true ⟹ `/{n} msg`가 parseInput에서 정확히 n으로 round-trip.
+  it("true인 닉네임은 `/{닉네임} 메시지` prefill이 정확히 그 닉네임으로 파싱됨(round-trip)", () => {
+    for (const n of ["홍길동", "Alice", "user_123", "あ", "Z"]) {
+      expect(canWhisperTarget(n)).toBe(true);
+      const parsed = parseInput(`/${n} 안녕`);
+      expect(parsed).toEqual({ type: "whisper", content: "안녕", targetNickname: n });
+    }
+  });
+
+  // false인 닉네임(공백 포함)은 prefill 시 다른 대상으로 오배송됨을 명시(버튼 미노출 근거).
+  it("false인 공백 닉네임은 prefill 시 첫 토큰으로 오배송됨(버튼 미노출 근거)", () => {
+    expect(canWhisperTarget("Staff Kim")).toBe(false);
+    const parsed = parseInput("/Staff Kim 안녕");
+    expect(parsed).toMatchObject({ type: "whisper", targetNickname: "Staff" }); // "Staff Kim" 아님
   });
 });
 
