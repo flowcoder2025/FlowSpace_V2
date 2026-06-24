@@ -1,0 +1,7 @@
+WI=WI-042-fix
+commit=d2328fb
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-042-fix.codex.json
+evaluator=.flowset/eval-results/WI-042-fix.eval.json
+verdict=codex:WARNING(P2/P3 all defer,fixNow0) evaluator:PASS 9.7(P0/P1/P2 0)
+rounds=1

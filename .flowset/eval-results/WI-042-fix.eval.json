@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.5,
+    "consistency": 9.8,
+    "specificity": 10,
+    "actionability": 9.5
+  },
+  "weightedTotal": 9.7,
+  "verdict": "PASS",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/spaces/[id]/admin/*/route.ts (analytics/announce/logs/media/members/messages/stats)",
+      "description": "독립 검증: 7개 admin API 라우트 전부 status=ARCHIVED 검사 없음(grep으로 ARCHIVED 리터럴 0건 확인). 전부 requireSpaceAdmin(멤버행 기준)만 통과시키므로, archived 스페이스에 대해 (a) 여전히 멤버행을 가진 OWNER/STAFF가 직접 API 호출로 데이터 read/mutate(POST announce 포함) 가능, (b) layout 게이트를 적용받지 않는 superAdmin은 archived 대시보드의 admin API를 그대로 호출 가능. layout.tsx redirect는 대시보드 UI 렌더만 차단하고 API 표면은 무방비. 즉 '직접 URL 진입' 중 fetch 레이어는 가드되지 않음.",
+      "recommendation": "후속 WI에서 requireSpaceAdmin 또는 admin 라우트에 status!=ARCHIVED 거부(또는 read-only 정책)를 추가. 응답 정형화/게이트 미러 패턴(WI-014/041)과 정합되게 설계.",
+      "defer": true,
+      "deferRationale": "WI-042 설계 결정에서 명시적으로 범위 밖 — 게이트는 layout.tsx에만 두고 requireSpaceAdmin/API 라우트는 다수 재사용처 회귀 회피 위해 무변경하기로 의도됨. UI 직접 URL 진입 차단이라는 본 WI 수용 기준은 충족. API 가드는 정책 변경(STAFF/OWNER read-only 허용 여부, superAdmin 감사 경로)을 동반하므로 별도 결정/WI가 옳음.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/dashboard/spaces/[id]/layout.tsx:25",
+      "description": "독립 검증: space===null(존재하지 않는 id) 엣지에서 space?.status===\"ARCHIVED\"는 false → redirect 미발생 → superAdmin은 빈 대시보드(sidebar spaceName=DASHBOARD_COPY.NAV.spaceFallback) 렌더. 일반 사용자는 requireSpaceAdmin이 멤버행 부재로 선행 redirect(/my-spaces)하므로 도달 불가 — 보안 노출 아님. WI-042 이전 코드도 space?.name??fallback로 동일 동작이라 무회귀. 다만 superAdmin이 삭제(하드딜리트)·미존재 스페이스 URL로 빈 대시보드를 보는 것은 사용성상 not-found가 더 적절할 수 있음.",
+      "recommendation": "superAdmin 경로에서 space===null 시 notFound() 또는 /my-spaces redirect로 명시 처리(선택적 UX 개선).",
+      "defer": true,
+      "deferRationale": "보안/접근제어 결함이 아니라 superAdmin 한정 UX nit이며, 본 WI 이전과 동일 동작(무회귀). soft-delete=ARCHIVED만 다루는 WI 범위와 무관하고, 하드딜리트 부재 도메인에서는 거의 도달하지 않는 경로.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/dashboard/spaces/[id]/layout.test.tsx:90-100",
+      "description": "독립 검증: select 형상 회귀 테스트(it 6)가 arg.select를 {name:true,status:true}로 정확히 단언해 status select 제거 변이를 직접 검출 — 우수. 다만 superAdmin+ARCHIVED 통과 케이스(it 4)는 redirect 미호출만 검증하고 반환 element 트리에 status select 호출이 superAdmin 분기에서도 일어남을 별도 단언하지 않음(현 구현은 isSuperAdmin 무관하게 findUnique 항상 호출하므로 무해). 또한 비-superAdmin이 requireSpaceAdmin 자체에서 redirect되는 경로(멤버 아님)는 admin-guard 책임이라 본 테스트가 커버하지 않음(설계상 정당).",
+      "recommendation": "선택적: superAdmin 분기에서도 findUnique가 status를 가져오는지 명시 단언 추가로 향후 '게이트를 비-superAdmin 한정으로 findUnique 호출'식 리팩토링 시 변이 검출 강화.",
+      "defer": true,
+      "deferRationale": "현 6케이스가 가드 제거/조건 반전/superAdmin 예외 제거/리터럴 변경(ARCHIVED→INACTIVE)/status select 제거/redirect 타깃 변경 6대 변이를 전부 FAIL로 검출함을 변이검증으로 확인 — false-pass 없음. 추가 단언은 strict improvement이며 본 WI 수용 기준과 무관.",
+      "fixNow": false
+    }
+  ]
+}
