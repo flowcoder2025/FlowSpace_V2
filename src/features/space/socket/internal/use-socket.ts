@@ -14,8 +14,10 @@ import {
   SocketTokenError,
   type SocketTokenErrorCode,
 } from "./socket-client";
+import { isSpaceKicked, markSpaceKicked } from "./kick-guard";
 import { MOVE_THROTTLE_MS } from "@/features/space/protocol";
 import { DEFAULT_NICKNAME } from "@/features/space/chat";
+import { SPACE_COPY } from "@/constants/space-copy";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -141,6 +143,8 @@ interface UseSocketOptions {
   onEditorObjectMoved?: (data: EditorObjectMovedData) => void;
   onEditorObjectDeleted?: (data: EditorObjectDeletedData) => void;
   onSocketError?: (data: SocketErrorData) => void;
+  /** 본인이 강퇴(KICKED)당했을 때 — 공간 이탈 처리(예: /my-spaces 이동). WI-047. */
+  onKicked?: () => void;
   // Media events
   onRecordingStarted?: (data: RecordingStatusData) => void;
   onRecordingStopped?: (data: RecordingStatusData) => void;
@@ -197,6 +201,7 @@ export function useSocket({
   onEditorObjectMoved,
   onEditorObjectDeleted,
   onSocketError,
+  onKicked,
   onRecordingStarted,
   onRecordingStopped,
   onSpotlightActivated,
@@ -231,6 +236,7 @@ export function useSocket({
   const onEditorObjectMovedRef = useRef(onEditorObjectMoved);
   const onEditorObjectDeletedRef = useRef(onEditorObjectDeleted);
   const onSocketErrorRef = useRef(onSocketError);
+  const onKickedRef = useRef(onKicked);
   const onRecordingStartedRef = useRef(onRecordingStarted);
   const onRecordingStoppedRef = useRef(onRecordingStopped);
   const onSpotlightActivatedRef = useRef(onSpotlightActivated);
@@ -255,6 +261,7 @@ export function useSocket({
     onEditorObjectMovedRef.current = onEditorObjectMoved;
     onEditorObjectDeletedRef.current = onEditorObjectDeleted;
     onSocketErrorRef.current = onSocketError;
+    onKickedRef.current = onKicked;
     onRecordingStartedRef.current = onRecordingStarted;
     onRecordingStoppedRef.current = onRecordingStopped;
     onSpotlightActivatedRef.current = onSpotlightActivated;
@@ -265,7 +272,7 @@ export function useSocket({
     onMessageFailed, onMessageDeleted, onReactionUpdated, onPartyMessage,
     onMemberMuted, onMemberUnmuted, onMemberKicked, onAnnouncement,
     onEditorTileUpdated, onEditorObjectPlaced, onEditorObjectMoved, onEditorObjectDeleted,
-    onSocketError,
+    onSocketError, onKicked,
     onRecordingStarted, onRecordingStopped,
     onSpotlightActivated, onSpotlightDeactivated, onProximityChanged,
   ]);
@@ -297,6 +304,11 @@ export function useSocket({
 
         sock.on("connect", () => {
           setIsConnected(true);
+          // WI-047: 강퇴 쿨다운 중이면 자동 재입장 차단(서버 join 게이트도 거부). 안내만 표시.
+          if (isSpaceKicked(spaceId)) {
+            setSocketError(SPACE_COPY.SOCKET.kickedCooldown);
+            return;
+          }
           setSocketError(null);
           sock.emit("join:space", { spaceId, userId, nickname, avatar });
         });
@@ -319,8 +331,13 @@ export function useSocket({
 
         sock.io.on("reconnect", () => {
           console.log("[Socket] Reconnected successfully");
-          setSocketError(null);
           setIsConnected(true);
+          // WI-047: 강퇴 쿨다운 중이면 재연결 시 자동 join 재발송을 차단(루프 무력화).
+          if (isSpaceKicked(spaceId)) {
+            setSocketError(SPACE_COPY.SOCKET.kickedCooldown);
+            return;
+          }
+          setSocketError(null);
           // 재연결 시 자동 join:space 재발송
           sock.emit("join:space", { spaceId, userId, nickname, avatar });
         });
@@ -334,9 +351,14 @@ export function useSocket({
           setSocketError("서버 연결에 실패했습니다. 페이지를 새로고침해주세요.");
         });
 
-        // 입장 인가 거부 (비멤버/차단/비활성 공간)
+        // 입장 인가 거부 (비멤버/차단/비활성 공간/강퇴)
         sock.on("space:error", (data) => {
           console.error("[Socket] space:error:", data.code, data.message);
+          // WI-047: 본인 강퇴 — 클라 가드 등록(재입장 루프 차단) + 공간 이탈 콜백(/my-spaces).
+          if (data.code === "KICKED") {
+            markSpaceKicked(spaceId);
+            onKickedRef.current?.();
+          }
           setSocketError(data.message);
         });
 

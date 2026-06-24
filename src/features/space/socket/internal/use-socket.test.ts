@@ -24,6 +24,18 @@ vi.mock("./socket-client", async (importActual) => {
   };
 });
 
+// WI-047: kick 가드를 모킹해 isSpaceKicked 반환값을 제어하고 markSpaceKicked 호출을 단언한다.
+const { isSpaceKickedMock, markSpaceKickedMock } = vi.hoisted(() => ({
+  isSpaceKickedMock: vi.fn(() => false),
+  markSpaceKickedMock: vi.fn(),
+}));
+
+vi.mock("./kick-guard", () => ({
+  isSpaceKicked: isSpaceKickedMock,
+  markSpaceKicked: markSpaceKickedMock,
+  clearSpaceKicked: vi.fn(),
+}));
+
 import { useSocket } from "./use-socket";
 
 /** useSocket effect가 반환 소켓에 호출하는 표면을 최소 충족하는 가짜 소켓 */
@@ -58,6 +70,9 @@ const baseProps = {
 beforeEach(() => {
   getSocketClientMock.mockReset();
   disconnectSocketMock.mockReset();
+  isSpaceKickedMock.mockReset();
+  isSpaceKickedMock.mockReturnValue(false); // 기본: 강퇴 아님
+  markSpaceKickedMock.mockReset();
 });
 
 afterEach(() => {
@@ -114,5 +129,101 @@ describe("useSocket — 토큰 발급 중 생명주기 race (WI-017 P2-2)", () =
     expect(disconnectSocketMock.mock.calls.length).toBe(1);
     // 후속 effect는 공유 소켓을 정상 사용(핸들러 등록)
     expect(fake.on).toHaveBeenCalled();
+  });
+});
+
+/** 등록된 sock.on(event) 핸들러 추출 */
+function onHandler(fake: ReturnType<typeof makeFakeSocket>, event: string) {
+  return fake.on.mock.calls.find((c) => c[0] === event)?.[1] as
+    | ((data?: unknown) => void)
+    | undefined;
+}
+/** 등록된 sock.io.on(event) 핸들러 추출 */
+function ioHandler(fake: ReturnType<typeof makeFakeSocket>, event: string) {
+  return fake.io.on.mock.calls.find((c) => c[0] === event)?.[1] as
+    | ((data?: unknown) => void)
+    | undefined;
+}
+const joinEmits = (fake: ReturnType<typeof makeFakeSocket>) =>
+  fake.emit.mock.calls.filter((c) => c[0] === "join:space");
+
+describe("useSocket — kick 가드(WI-047)", () => {
+  it("space:error KICKED 수신 → markSpaceKicked(spaceId) + onKicked 호출", async () => {
+    const fake = makeFakeSocket();
+    getSocketClientMock.mockResolvedValue(fake);
+    const onKicked = vi.fn();
+    renderHook(() => useSocket({ ...baseProps, onKicked }));
+    await act(async () => {
+      await flush();
+    });
+
+    const handler = onHandler(fake, "space:error");
+    expect(handler).toBeTypeOf("function");
+    act(() => handler!({ code: "KICKED", message: "강퇴" }));
+
+    expect(markSpaceKickedMock).toHaveBeenCalledWith("space-1");
+    expect(onKicked).toHaveBeenCalledTimes(1);
+  });
+
+  it("space:error 비-KICKED(BANNED) → 가드/콜백 미발동", async () => {
+    const fake = makeFakeSocket();
+    getSocketClientMock.mockResolvedValue(fake);
+    const onKicked = vi.fn();
+    renderHook(() => useSocket({ ...baseProps, onKicked }));
+    await act(async () => {
+      await flush();
+    });
+
+    const handler = onHandler(fake, "space:error");
+    act(() => handler!({ code: "BANNED", message: "차단" }));
+
+    expect(markSpaceKickedMock).not.toHaveBeenCalled();
+    expect(onKicked).not.toHaveBeenCalled();
+  });
+
+  it("connect 시 강퇴 쿨다운 중(isSpaceKicked=true)이면 join:space 미발송", async () => {
+    isSpaceKickedMock.mockReturnValue(true);
+    const fake = makeFakeSocket();
+    getSocketClientMock.mockResolvedValue(fake);
+    renderHook(() => useSocket(baseProps));
+    await act(async () => {
+      await flush();
+    });
+
+    const connect = onHandler(fake, "connect");
+    expect(connect).toBeTypeOf("function");
+    act(() => connect!());
+    expect(joinEmits(fake).length).toBe(0);
+  });
+
+  it("connect 시 쿨다운 아니면 join:space 발송", async () => {
+    isSpaceKickedMock.mockReturnValue(false);
+    const fake = makeFakeSocket();
+    getSocketClientMock.mockResolvedValue(fake);
+    renderHook(() => useSocket(baseProps));
+    await act(async () => {
+      await flush();
+    });
+
+    const connect = onHandler(fake, "connect");
+    act(() => connect!());
+    const emits = joinEmits(fake);
+    expect(emits.length).toBe(1);
+    expect(emits[0][1]).toMatchObject({ spaceId: "space-1", userId: "user-1" });
+  });
+
+  it("reconnect 시 강퇴 쿨다운 중이면 join:space 자동 재발송 차단", async () => {
+    isSpaceKickedMock.mockReturnValue(true);
+    const fake = makeFakeSocket();
+    getSocketClientMock.mockResolvedValue(fake);
+    renderHook(() => useSocket(baseProps));
+    await act(async () => {
+      await flush();
+    });
+
+    const reconnect = ioHandler(fake, "reconnect");
+    expect(reconnect).toBeTypeOf("function");
+    act(() => reconnect!());
+    expect(joinEmits(fake).length).toBe(0);
   });
 });

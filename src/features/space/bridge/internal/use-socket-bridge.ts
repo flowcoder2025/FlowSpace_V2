@@ -52,6 +52,8 @@ interface UseSocketBridgeOptions {
   onSpotlightDeactivated?: (data: SpotlightData) => void;
   onProximityChanged?: (data: ProximityChangedData) => void;
   onSocketError?: (data: { code: string; message: string }) => void;
+  /** 본인이 강퇴(KICKED)당했을 때 — 공간 이탈 처리. WI-047. */
+  onKicked?: () => void;
 }
 
 interface UseSocketBridgeReturn {
@@ -88,7 +90,7 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
     onEditorTileUpdated, onEditorObjectPlaced, onEditorObjectMoved, onEditorObjectDeleted,
     onRecordingStarted, onRecordingStopped,
     onSpotlightActivated, onSpotlightDeactivated, onProximityChanged,
-    onSocketError,
+    onSocketError, onKicked,
   } = options;
 
   const {
@@ -108,7 +110,7 @@ export function useSocketBridge(options: UseSocketBridgeOptions): UseSocketBridg
     onEditorTileUpdated, onEditorObjectPlaced, onEditorObjectMoved, onEditorObjectDeleted,
     onRecordingStarted, onRecordingStopped,
     onSpotlightActivated, onSpotlightDeactivated, onProximityChanged,
-    onSocketError,
+    onSocketError, onKicked,
   });
 
   const prevPlayersRef = useRef<Map<string, PlayerData>>(new Map());

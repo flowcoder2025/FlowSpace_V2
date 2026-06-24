@@ -6,12 +6,36 @@ import type {
 } from "../../src/features/space/protocol/internal/socket-events";
 import { getPrisma } from "../lib/prisma";
 import { recordingStates, spotlightStates, proximityStates } from "../state";
+import { createKickCooldown, KICK_COOLDOWN_MS } from "../../src/lib/kick-cooldown";
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 // spaceId → Map<userId, PlayerData>
 export const spacePlayersMap = new Map<string, Map<string, PlayerData>>();
+
+/**
+ * kick 쿨다운(WI-047). 강퇴된 (space,user)를 짧게 기록해, DB 무변경인 kick 직후
+ * 클라가 소켓을 재생성/재연결해 join:space를 자동 재발송해도 즉시 복귀하지 못하게 막는다.
+ * **이 게이트가 최종 강제력** — 클라 가드는 UX 보조이며 다중 탭/구버전 번들은 클라 메모리를
+ * 공유하지 않으므로 서버에서 막아야 한다(codex). 단일 OCI 인스턴스·Redis 없음 → in-memory.
+ * 서버 재시작 시 비워지나 kick은 임시(~30s)라 재시작=재입장 허용이 시맨틱과 무모순.
+ */
+const kickCooldown = createKickCooldown(KICK_COOLDOWN_MS);
+
+function kickKey(spaceId: string, userId: string): string {
+  return `${spaceId}:${userId}`;
+}
+
+/** (space,user)를 kick 쿨다운에 등록(enforce kick 적용 시). */
+export function markUserKicked(spaceId: string, userId: string): void {
+  kickCooldown.mark(kickKey(spaceId, userId), Date.now());
+}
+
+/** (space,user)가 kick 쿨다운 중인지(join 즉시 거부 판정). */
+export function isUserKicked(spaceId: string, userId: string): boolean {
+  return kickCooldown.isActive(kickKey(spaceId, userId), Date.now());
+}
 
 /**
  * archive 된 공간 deny cache(WI-036, TOCTOU 보강).
@@ -54,11 +78,26 @@ function getSpacePlayers(spaceId: string): Map<string, PlayerData> {
   return spacePlayersMap.get(spaceId)!;
 }
 
+/** WI-047: 강퇴 쿨다운 중 join 거부 통지(early 체크 + post-await TOCTOU 재확인 공용). */
+const KICKED_JOIN_ERROR = {
+  code: "KICKED",
+  message: "강퇴되어 잠시 후 다시 입장할 수 있습니다.",
+} as const;
+
 export function handleRoom(io: IO, socket: TypedSocket) {
   socket.on("join:space", async ({ spaceId, nickname, avatar }) => {
     // 인증된 userId 사용 (클라이언트 값 무시)
     const userId = socket.data.userId;
     if (!userId) return;
+
+    // WI-047: 최근 강퇴(kick) 쿨다운 중이면 즉시 거부. kick은 DB를 바꾸지 않으므로
+    // 이 게이트가 없으면 클라 소켓 재생성/재연결의 자동 join 재발송으로 즉시 복귀한다.
+    // 여기 early 체크는 효율(DB 조회 전 빠른 거부)용 — **권위 검증은 아래 모든 await 이후
+    // socket.join 직전의 재확인**이다(그 사이 kick이 일어나는 TOCTOU를 닫는다).
+    if (isUserKicked(spaceId, userId)) {
+      socket.emit("space:error", KICKED_JOIN_ERROR);
+      return;
+    }
 
     // join 전 동기 인가 검증: 공간 존재/활성 + 멤버십 + BANNED 차단.
     // 통과하기 전에는 socket.join / role / presence 등록을 하지 않는다.
@@ -119,6 +158,15 @@ export function handleRoom(io: IO, socket: TypedSocket) {
         code: "SPACE_NOT_FOUND",
         message: "공간을 찾을 수 없거나 비활성 상태입니다.",
       });
+      return;
+    }
+
+    // TOCTOU 보강(WI-047): DB 조회(await) 동안 이 사용자가 kick 됐을 수 있다. 그 경우
+    // applyEnforcement 의 markUserKicked 는 아직 room 미합류인 이 소켓을 socketsForUser 로
+    // 잡지 못하므로, archive 와 동일하게 socket.join 직전 쿨다운을 재확인해 강퇴 직후
+    // in-flight join 이 살아남는 창을 닫는다(서버 게이트=최종 강제력).
+    if (isUserKicked(spaceId, userId)) {
+      socket.emit("space:error", KICKED_JOIN_ERROR);
       return;
     }
 

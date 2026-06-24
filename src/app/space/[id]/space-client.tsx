@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useGameStore } from "@/stores/game-store";
 import { eventBridge, GameEvents } from "@/features/space/game";
 import { useSocketBridge } from "@/features/space/bridge";
@@ -35,6 +36,7 @@ interface SpaceClientProps {
 let chatMsgId = Date.now();
 
 export default function SpaceClient({ space, user }: SpaceClientProps) {
+  const router = useRouter();
   const { isLoading, isSceneReady, error, setSceneReady, setError, reset } = useGameStore();
   const [mapData, setMapData] = useState<StoredMapData | null>(null);
   const [mapObjects, setMapObjects] = useState<EditorMapObject[]>([]);
@@ -336,6 +338,12 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
     [addMessage]
   );
 
+  // WI-047: 본인이 강퇴(KICKED)당하면 공간을 떠나 목록으로 이동(자동 재입장 차단은
+  // 서버 join 게이트 + 클라 가드가 처리). kick은 임시라 차단 페이지가 아닌 목록으로 보낸다.
+  const onKicked = useCallback(() => {
+    router.replace("/my-spaces");
+  }, [router]);
+
   const {
     isConnected, socketError, players, sendChat, sendWhisper,
     sendReactionToggle, sendAdminCommand, sendAvatarUpdate,
@@ -361,6 +369,7 @@ export default function SpaceClient({ space, user }: SpaceClientProps) {
     onSpotlightDeactivated,
     onProximityChanged,
     onSocketError,
+    onKicked,
   });
 
   // Ref 업데이트

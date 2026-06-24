@@ -32,6 +32,7 @@ import {
   removeUserPresence,
   purgeSpaceState,
   markSpaceArchived,
+  markUserKicked,
 } from "./room";
 import { getPrisma } from "../lib/prisma";
 
@@ -131,6 +132,12 @@ export function applyEnforcement(io: IO, req: EnforceRequest): number {
     //    비웠으므로 지연 disconnect 의 leaveSpace 도 재실행되지 않는다.
     purgeSpaceState(req.spaceId);
     return targets.length;
+  }
+
+  // WI-047: kick은 DB를 바꾸지 않으므로, 강퇴 직후 자동 재입장을 막는 쿨다운을 대상 소켓
+  // 유무와 무관하게 먼저 등록한다(오프라인/다른 탭이 곧바로 재진입하는 경로까지 차단).
+  if (req.action === "kick") {
+    markUserKicked(req.spaceId, req.userId);
   }
 
   const targets = socketsForUser(io, req.spaceId, req.userId);
