@@ -114,6 +114,44 @@ describe("Dialog — WI-043 접근성 공용 모달", () => {
     expect(document.activeElement).toBe(dialog); // 밖으로 못 나감
   });
 
+  it("조상이 [hidden]/aria-hidden인 요소·input[type=hidden]는 focusable 제외(초기 포커스 건너뜀)", () => {
+    render(
+      <Dialog open onClose={vi.fn()}>
+        <div hidden>
+          <button>ghost-hidden</button>
+        </div>
+        <div aria-hidden="true">
+          <button>ghost-aria</button>
+        </div>
+        <input type="hidden" defaultValue="x" />
+        <button>real</button>
+      </Dialog>
+    );
+    // 첫 tabbable은 ghost들/hidden input을 건너뛴 "real"이어야 함.
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "real" }));
+  });
+
+  it("포커스된 요소가 disabled로 바뀌어도 Tab이 패널 밖으로 새지 않음(동적 disabled·codex P3)", () => {
+    function Harness() {
+      const [disabled, setDisabled] = useState(false);
+      return (
+        <Dialog open onClose={vi.fn()}>
+          <button disabled={disabled} onClick={() => setDisabled(true)}>
+            toggle
+          </button>
+          <button>other</button>
+        </Dialog>
+      );
+    }
+    render(<Harness />);
+    const toggle = screen.getByRole("button", { name: "toggle" });
+    toggle.focus();
+    fireEvent.click(toggle); // toggle → disabled (focusables에서 빠짐)
+    fireEvent.keyDown(document, { key: "Tab" });
+    // 패널 밖으로 새지 않고 남은 focusable("other")로 이동.
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "other" }));
+  });
+
   it("focus-restore: 닫힐 때 열기 직전 포커스(opener) 복원", () => {
     function Harness() {
       const [open, setOpen] = useState(false);
