@@ -1,7 +1,46 @@
-# 🔴 조사 우선순위 #1 — 인-스페이스 멤버 제재가 실제로 동작하지 않음 (다음 세션)
+# 🔴 조사 — 인-스페이스 멤버 제재가 실제로 동작하지 않음
 
-> **이 문서는 프레시 컨텍스트 전제로 자기완결적으로 작성됨. 다음 세션은 이 진단부터 시작.**
+> **이 문서는 프레시 컨텍스트 전제로 자기완결적으로 작성됨.**
 > **증분 패치 금지** — WI-035/038/039/044/045로 기능별 표면만 고쳐왔고 근본 원인을 못 짚었다. 먼저 root cause를 확정하고, 그 다음 한 번에 고친다.
+
+---
+
+## 🟢 2026-06-24 Session 2 — 근본원인 **확정** + 수정방향 결정 (아래 옛 섹션들 supersede)
+
+**상태: 사용자 지시로 임시보류(라이브 재현 직전 중단). 다음 세션은 다른 작업 시작. 이 섹션이 최신 결론.**
+
+### 실측으로 확정된 사실 (전부 직접 검증, OCI SSH·Vercel env pull·prod DB·codex consult r2)
+- **설정·인프라 100% 정상** — 조사 가설 #1(제어평면)·#2(식별자) **둘 다 실측 반증**:
+  - Vercel(flowspace-v2 prod)↔OCI 모든 시크릿 **sha256 일치**: `SOCKET_INTERNAL_SECRET`·`AUTH_SECRET`·`LIVEKIT_API_SECRET`·`LIVEKIT_API_KEY=APIckbN3jsUGFhP`. URL 전부 정상(`SOCKET_INTERNAL_URL`/`LIVEKIT_URL`/`NEXT_PUBLIC_*`).
+  - **LiveKit은 OCI 자체호스팅**(컨테이너 `flowspace-livekit`, Caddy `space-livekit.flow-coder.com`→172.18.0.1:7880). 클라 wss = 서버 REST = **동일 인스턴스**. prod 시크릿으로 `listRooms` → **200 인증 성공**.
+  - 식별자 정상: LiveKit·소켓 로그 모두 `user-{userId}`. `socket.data.userId`=JWT=`session.user.id`=`SpaceMember.userId` 동일 파생.
+  - Caddy 라우팅 정상, `/internal/enforce` 공개도달 정상(무서명 POST→401 "Missing signature"). **단 enforce 핸들러는 정상요청(401/403/409/200)을 로깅 안 함** → "로그에 enforce 없음"으로 도달여부 판정 불가(이전 세션 오판 주의).
+- **PATCH 정상 작동** — prod DB `SpaceMember`: test(`cmltb99mb...`) 행에 ban/mute가 **정확히 기록**됨. `SpaceEventLog` ADMIN_ACTION 12건이 PATCH 실행 증명. codex 가설 "PATCH가 DB 미변경/다른 row" **반증**.
+
+### 🔴 진짜 원인 (다층 — 단일 아님)
+1. **(과거 최대 원인, WI-045가 이미 해소)** 2026-06-23 ADMIN_ACTION 로그에서 test가 **같은 space에 SpaceMember.id 2개**(`cmqqscolt...`→`cmqqw9v1w...`) = 멤버 row **삭제→재생성**. 원인 = **pre-WI-045 `kick = spaceMember.delete`**. row 삭제 후 재입장 시 **새 row(restriction=NONE)** 생성 → mute/ban이 매 사이클 초기화. **현재 src에 `spaceMember.delete` 없음**(admin/members route.test.ts L188이 "delete 미호출" 명시 단언). **사용자 원 repro(2026-06-23)는 WI-045 승격 전 코드 = 이 버그가 살아있던 때.** → "전부 미동작" 체감의 대부분이 이 한 버그.
+2. **(현재 확정 결함) kick이 클라 자동재연결로 무력화** — kick은 DB 상태 무변경 + 소켓 disconnect만. socket.io 재연결이 `join:space` 자동 재발송(`use-socket.ts:325` `reconnect` 핸들러). DB상 정상 멤버라 즉시 복귀. **codex r2도 "확정 결함" 판정.** WI-045 후에도 남음.
+3. **(증폭기) 클라 재연결 루프** — `use-socket.ts:517-525` `pagehide`/`beforeunload`가 `leave:space`+`disconnectSocket()`, effect deps `[spaceId,userId,nickname,avatar]` 변경 시 cleanup도 동일. OCI 로그 "client namespace disconnect" 반복과 일치. → voice-mute 404(stale tile: 대상이 moderate 시점에 LiveKit room 이탈) + ban "새로고침 필요"(패널이 `participant_left`/`player:left`/refetch 의존) 유발.
+4. **mute/ban — 현재 코드선 정상 가능성 높음**(DB 지속·재입장 시 `spaceId_userId`로 row 재사용·restriction 재독). **단 WI-045 승격 후 admin 액션 로그 0건 → 현 배포 미검증.** ← 다음 세션 라이브 재현으로 확정 필요.
+5. **놓칠 위험(codex)**: 라이브에 **구버전 클라 번들/탭** 혼재 가능. e2e/하니스로 서버·프로토콜 먼저 판정 후 브라우저 UI 판정.
+
+### 결정된 수정 방향 (사용자 승인)
+- **kick 시맨틱 = 서버 쿨다운 + 클라 둘 다**: 서버 `kickedUntil`(예 30s) 상태 → 그 기간 `join:space`·LiveKit 토큰 거부(BANNED 영구 restriction과 **분리**). 클라: `KICKED` 수신 시 해당 공간 자동재연결 중단 + `/my-spaces` 이동. (서버 게이트 없으면 악성/구버전 클라에 뚫림 — codex.)
+- **검증 = 라이브 재현**(사용자 함께). 절차는 아래 "다음 세션 라이브 재현".
+- 부수 수정 후보: 재연결 루프 트리거 차단(불필요 pagehide/deps remount), voice-mute stale-tile UX, **unban 도달성**(차단된 멤버는 패널에 안 떠 unban 메뉴 불가 — 패널 외 멤버관리 UI 또는 별도 경로 필요), LiveKit webhook URL 정정(`v2.flow-coder.com` no-resolve·`flow-metaverse.vercel.app` 구버전 → `space.flow-coder.com`; moderation 무관하나 부채).
+
+### ⚠️ 이번 세션 prod 상태 변경 (반드시 인지)
+- **test(`cmltb99mb...`) @ space `cmqpe3ubf0002lb046nrfuy8h`("당근 강의실") restriction을 BANNED→NONE으로 리셋**(라이브 재현 활성화용, prisma 직접 update). 재현 미수행으로 **현재 NONE 상태**. 필요 시 재차단 또는 그대로 둠.
+
+### 다음 세션 라이브 재현 (보류된 절차)
+owner(조용현)+test 2계정 입장(test 카메라 ON) → owner가 test ⋮ 메뉴에서 순서대로: ①채팅음소거(test 채팅 막히나?+`PATCH`의 `realtimeEnforced`) ②음성음소거(`POST .../livekit/moderate` status?) ③강퇴(나갔다 자동복귀?) ④차단(사라지나/재입장?). **test 브라우저 새로고침 금지**(재연결 루프가 결과 흐림). OCI 로그 disconnect **사유**로 판정: `server namespace disconnect`=서버추방 동작 / `client namespace disconnect`=클라발. enforce 핸들러 무로깅이라 mute/voice는 사용자 관찰 의존.
+
+**codex consult r2 전문**: 세션 scratchpad `consult-mod-r2.out.txt`(없으면 재consult). codex 결론 = "5개 동일원인 아님, kick=확정결함(자동재연결), 재연결루프=증폭기, mute/ban은 DB SoT라 진짜 실패면 PATCH/다른row 또는 stale UI".
+
+---
+<br>
+
+## (이하 2026-06-24 Session 1 섹션 — 위 Session 2가 supersede, 이력 보존용)
 
 ## 증상 (사용자 라이브 실측, 2026-06-24)
 운영계정 조용현(owner), "참가자 2명" 상태에서:
