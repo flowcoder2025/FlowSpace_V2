@@ -74,6 +74,17 @@ describe("ParticipantPanel — WI-040 귓속말 버튼", () => {
     expect(emitSpy).not.toHaveBeenCalled();
   });
 
+  it("동일 닉네임 참가자 2명+ → 양쪽 모두 귓속말 버튼 미노출(nickname 오배송 방지·codex P2)", () => {
+    setup([
+      { userId: "u1", nickname: "Alice" },
+      { userId: "u2", nickname: "Alice" },
+    ]);
+    expect(
+      screen.queryAllByRole("button", { name: WHISPER.ariaLabel("Alice") })
+    ).toHaveLength(0);
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
   it("여러 참가자 — 공백없는 닉네임만 버튼 노출", () => {
     setup([
       { userId: "u1", nickname: "Alice" },

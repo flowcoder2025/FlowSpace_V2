@@ -86,6 +86,9 @@ export default function ChatPanel({
     lastDeactivateRef.current = Date.now();
     setIsActive(false);
     onFocusChange(false);
+    // 귓속말 prefill 소비/해제 — 닫은 뒤 일반 Enter로 재활성화할 때 ChatInputArea가
+    // 새로 마운트되며 stale prefill을 다시 적용해 과거 대상이 재등장/오송신되는 것 방지(codex P2).
+    setWhisperPrefill(null);
   }, [onFocusChange]);
 
   // isActive를 ref로 추적 (stale closure 방지)
