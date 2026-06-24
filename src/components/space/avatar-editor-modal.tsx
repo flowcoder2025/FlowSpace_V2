@@ -73,6 +73,7 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
           <button
             type="button"
             onClick={onClose}
+            aria-label="닫기"
             className="rounded-lg p-1.5 text-ink-light hover:bg-cream-deep hover:text-ink-muted"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
