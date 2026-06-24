@@ -1,0 +1,10 @@
+WI=WI-047-fix
+commit=681507e
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-047-fix.codex.r3.json
+evaluator=.flowset/eval-results/WI-047.eval.json
+gates=tsc,lint,vitest,build,esbuild
+verdict=codex:PASS 0 issues(r1 FAIL P1 TOCTOU->r2 WARNING->r3 PASS) evaluator:PASS 9.78(P0/P1/P2 0,fixNow0,P3x4 defer; r1 9.73->최종HEAD 9.78)
+notes=강퇴(kick) 쿨다운: 서버 join:space 게이트(최종 강제력)+클라 자동재입장 차단. 설계 codex consult 1R(저장소=in-memory·LiveKit 토큰게이팅 제외·서버가 다중탭 비공유 커버). codex r1 단독 P1 적출(evaluator 놓침→듀얼블라인드 가치): join 게이트 isUserKicked가 DB await 전에만 검사→in-flight join 중 kick 시 socketsForUser 미포착→socket.join 도달 TOCTOU→r2 post-await 재확인(WI-036 archive 패턴 mirror). r2 sweep(mark 시 만료 entry 정리)+r3 sweep 테스트 강화. 양측 변이검증(codex P1 reproduce / evaluator sweep B·C 검출). DB 마이그레이션 불요(in-memory). mute/ban 코드 무변경=라이브 검증 사항. vitest 632->650(+18). esbuild 런타임 src 입력 5개(+kick-cooldown) COPY 일치.
+rounds=3
+createdAt=2026-06-24

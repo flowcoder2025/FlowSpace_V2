@@ -1,0 +1,50 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 9.8,
+    "specificity": 9.8,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.78,
+  "verdict": "PASS",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "server/handlers/room.ts:97,168 (isUserKicked early+post-await 게이트) + server/handlers/enforce.ts:139-141 (markUserKicked)",
+      "description": "독립 재검증(최종 HEAD 681507e): 본 WI 최종 강제력인 서버 join:space 쿨다운 게이트는 자동 테스트가 여전히 전무하다. vitest.config.ts include는 [\"src/**/*.test.ts\",\"src/**/*.test.tsx\"]뿐이라 server/ 미스캔이고, git ls-files 전수로 레포에 server 핸들러 테스트가 0건임을 r1에서 확인 — 프로젝트 전체 관행(서버는 esbuild+라이브 PoC 검증). r2가 추가한 post-await TOCTOU 재확인(room.ts:168, socket.join 직전·WI-036 archive 가드와 동일 위치)이 핵심 안전속성을 강화했으나, 이 9~15줄 게이트 자체는 변이 주입 시 어떤 vitest도 실패시키지 못한다. 재사용 순수 스토어 src/lib/kick-cooldown.ts(9케이스, 경계·sweep·재mark·키독립 변이검증 통과)와 클라 배선(use-socket 7케이스)은 커버되나 서버 게이트 라운드트립은 미커버. 완화: (a) 레포 관행 일치(신규 공백 아님), (b) esbuild metafile로 server→kick-cooldown 번들 입력 5개 COPY 일치 확증, (c) early+post-await 이중 체크가 archive 패턴을 그대로 미러해 회귀 위험 낮음.",
+      "recommendation": "후속(test WI)으로 server/handlers join 인가 경로(early+post-await isUserKicked, markUserKicked→isUserKicked 라운드트립, in-flight join TOCTOU)를 io/socket 페이크로 단언하는 하니스 도입. applyEnforcement(kick) 중 join:space가 socket.join 전 거부되는지 검증하면 post-await 게이트 제거 변이를 검출 가능.",
+      "defer": true,
+      "deferRationale": "레포 전체 server 핸들러 테스트 0건(전수 확인)으로 본 WI 한정 결함이 아닌 구조적 관행이며, 수용 기준(서버 게이트가 TOCTOU 포함 최종 방어)은 코드 리뷰+esbuild 번들 검증+순수 스토어/클라 변이검증으로 충족. 서버 테스트 하니스 신규 도입은 별도 스코프(test WI)가 옳다.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/lib/kick-cooldown.ts:39-41 (mark 내 opportunistic sweep) + kick-cooldown.test.ts:62-86",
+      "description": "독립 변이검증: r2가 추가한 mark 내 sweep(만료 entry O(n) 정리)에 대해 3종 변이 주입. (B) 조건 반전 now>=until→now<until(유효 키 삭제) → '선택적 삭제 보존' 테스트 2 FAIL로 검출. (C) sweep 전체 제거 → '누수 방지' size 단언 2 FAIL로 검출. 둘 다 정상 차단. 그러나 (A) sweep 경계 now>=until→now>until 변이는 9케이스 전부 통과(미검출) — sweep 테스트가 now=40000으로 until=31000/32000를 strict 초과만 쓰고 now==until 정확 경계를 sweep 경로에서 exercise하지 않기 때문. 다만 이는 안전/기능 무영향: sweep은 비권위 메모리 정리 최적화이고, 권위 만료 판정 isActive의 now>=until 경계는 r1에서 변이검증으로 검출됨(boundary 테스트 보유). 경계-정확 entry가 sweep을 살아남아도 isActive가 정확히 inactive로 보고+lazy 삭제하므로 한 mark 주기 더 잔존할 뿐 누수·오판 없음. Map for...of 중 현재 키 삭제는 ES 스펙상 안전(canonical 패턴) — 정확.",
+      "recommendation": "선택: sweep 경계 케이스(mark의 now가 기존 entry until과 정확히 같을 때 그 entry가 sweep으로 제거되는지) 1케이스 추가로 변이검증 완전성 강화. strict improvement.",
+      "defer": true,
+      "deferRationale": "미검출 변이(sweep now>=→now>)는 비권위 정리 최적화의 경계 1틱 차이로 기능·안전·누수에 영향 없음(권위 isActive 경계는 검증됨). sweep의 존재·선택삭제 정확성은 변이 B/C로 실증돼 false-pass 없음. 추가 케이스는 본 WI 수용 기준과 무관한 엄격성 개선.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "server/handlers/room.ts:82-85 (KICKED_JOIN_ERROR) vs src/constants/space-copy.ts:65 (SOCKET.kickedCooldown)",
+      "description": "독립 재검증: r2가 두 서버 측 kick 거부(early+post-await)의 인라인 문자열 중복을 공용 상수 KICKED_JOIN_ERROR로 단일화한 것은 적절(r1에서 지적한 서버 내부 중복 해소). 다만 동일 한글 문구 \"강퇴되어 잠시 후 다시 입장할 수 있습니다.\"가 여전히 server KICKED_JOIN_ERROR와 client src/constants/space-copy.ts(SOCKET.kickedCooldown) 양측에 중복 정의된다. 이는 위반 아님 — Dockerfile.socket이 순수 계약/헬퍼만 선별 COPY하고 배럴/constants import를 금지(React 끌림 방지)하므로 server는 client constants를 import할 수 없고, room.ts의 모든 space:error message가 동일하게 인라인 한글임을 grep으로 확인(기존 패턴 정합). 또한 라이브 KICKED 표시는 클라가 data.message(서버 문자열)를 그대로 쓰고, SOCKET.kickedCooldown 상수는 가드 차단된 connect/reconnect 경로에서만 쓰여 서로 다른 레이어 담당. 두 값이 우연히 동일해 향후 드리프트 가능한 경미한 유지보수 관찰.",
+      "recommendation": "선택: 서버/클라 공유가 필요한 문구는 이미 번들 COPY 대상인 순수 contract/constants 파일에 단일 정의해 양측 참조하는 패턴 고려. 현 상태로도 안전(서버가 SoT, 클라 상수는 가드 경로 전용).",
+      "defer": true,
+      "deferRationale": "서버/클라 번들 격리(Dockerfile.socket COPY 정책)상 서버는 client constants import 불가라 인라인 강제이며 모든 기존 server 메시지가 동일 관행(무회귀·정합). 두 문자열은 서로 다른 코드 경로 담당으로 기능 결함 아님.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/socket/internal/use-socket.ts:305-314 (connect 가드)",
+      "description": "독립 재검증(델타 무관·r1 잔존): 쿨다운 중 새로 마운트되는 경로(강퇴 후 30초 내 뒤로가기/직접 URL 재진입)에서 connect 핸들러는 isSpaceKicked=true로 join을 보내지 않고 SOCKET.kickedCooldown 안내만 표시 후 return하며 onKicked(router.replace) 미호출 → 빈 공간 화면에 머문다(라이브 KICKED 이벤트 경로에서만 navigate). 안전속성(재입장 차단)은 클라 가드+서버 게이트(이제 TOCTOU 포함)로 충족돼 보안 결함 아니며 주석상 '안내만 표시'로 의도된 동작. UX 일관성 관점에서만 재진입 시에도 목록 유도가 매끄러울 수 있음.",
+      "recommendation": "선택적 UX 개선: connect/reconnect 가드 분기에서도 onKickedRef.current?.() 호출(또는 별도 콜백)로 재진입 시 목록 일관 유도. 라이브 검증 시 재진입 흐름 1회 확인 권장.",
+      "defer": true,
+      "deferRationale": "수용 기준은 '자동 재입장 차단'이고 해당 경로에서도 join은 차단돼 안전속성 충족. 자동 네비게이션은 강퇴 본 이벤트 경로에서 이미 동작하며 재진입 경로 네비게이션은 부가 UX로 별도 결정 사항.",
+      "fixNow": false
+    }
+  ]
+}
