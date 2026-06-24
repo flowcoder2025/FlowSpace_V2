@@ -1,0 +1,10 @@
+WI=WI-048-fix
+commit=9b8bf1f
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-048-fix.codex.r2.json
+evaluator=.flowset/eval-results/WI-048.eval.json
+gates=tsc,lint,vitest,build
+verdict=codex:WARNING(코드결함0·유일 잔여=샌드박스 vitest EPERM 환경 P3 defer; r1 WARNING P3 fixNow[ACTIVE 약한 단언]->r2 해소·"no WI-048 code defect") evaluator:WARNING 9.88(P0/P1/P2 0,fixNow0,P3x2 defer)
+notes=livekit/token archived 가드: POST /api/livekit/token 이 BANNED(WI-045)만 검사하고 Space.status 미검사->archived 스페이스 4h 화상 토큰 발급 가능(심층방어 갭, WI-046 evaluator defer·번호충돌로 한때 WI-047 오표기). roomName 검증 직후 단일 이른 status 게이트(space.findUnique status + isSpaceMutable + spaceNotActiveResponse 403 SPACE_NOT_ACTIVE)로 멤버/owner/게스트/dev-anon 균일 차단(세션 조회 전 단락). WI-046 정책 헬퍼 재사용·미존재 스페이스 흐름 보존(strictly additive). 설계 codex consult 1R(이른 단일 게이트·403 SPACE_NOT_ACTIVE·헬퍼 재사용·owner 예외 없음·놓칠위험=신규 토큰만 차단). codex r1 fixNow(ACTIVE 테스트 code 만 확인=false-pass)->r2 200+token 단언 강화. evaluator 변이검증 M1/M2/M3 전부 검출·소스 clean·route.ts 가 repo 유일 new AccessToken 발급지 독립 확인·isSpaceMutable=room.ts:114 소켓 join 게이트 정합. accepted-risk defer: 미인증 status 신호 노출(spaceId 고엔트로피·균일차단 의도·consult 승인)·기존 4h TTL 토큰/연결 participant 미차단(스코프밖·archive 시점 LiveKit 제거 후속). vitest 650->659(+9). Vercel 전용(server/·prisma 무관->OCI 재배포·마이그레이션 불요). main 미승격.
+rounds=2
+createdAt=2026-06-24
