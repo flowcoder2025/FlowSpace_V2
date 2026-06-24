@@ -164,6 +164,19 @@ function parseWhisper(input: string): ParsedInput | null {
 
 // ── 유틸리티 헬퍼 ──
 
+/**
+ * 닉네임이 `/닉네임 메시지` 귓속말 문법으로 **정확히 타겟 가능한지** 판정한다(WI-040).
+ *
+ * `parseWhisper`는 첫 공백 전까지만 targetNickname으로 보므로(line 149), 공백이 포함된
+ * 닉네임은 슬래시 문법으로 지정할 수 없다 — 예: "Staff Kim" → target "Staff", 본문 "Kim ..."
+ * 으로 **오배송**된다. 따라서 공백 없는 비어있지 않은 닉네임만 슬래시 prefill 대상이다.
+ * (OAuth user.name·게스트 닉네임에 공백 가능 → 발견성 버튼은 이 술어로 게이트한다.
+ *  공백 닉네임까지 지원하려면 `whisper:send`를 targetUserId 계약으로 바꾸는 별도 WI가 필요.)
+ */
+export function canWhisperTarget(nickname: string): boolean {
+  return nickname.length > 0 && !/\s/.test(nickname);
+}
+
 /** 귓속말 형식인지 확인 */
 export function isWhisperFormat(input: string): boolean {
   const trimmed = input.trim();

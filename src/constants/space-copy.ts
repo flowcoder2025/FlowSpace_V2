@@ -13,6 +13,14 @@ export const SPACE_COPY = {
     /** 관리 메뉴 토글 버튼 aria-label. */
     manageAriaLabel: (nickname: string) => `${nickname} 관리`,
     /**
+     * 귓속말(WI-040) — 채팅 입력창에 `/닉네임 `을 prefill하는 발견성 버튼.
+     * 관리 액션과 무관(모든 로그인 사용자·self 제외). 공백 없는 닉네임에만 노출(slash 문법 한계).
+     */
+    whisper: {
+      title: "귓속말",
+      ariaLabel: (nickname: string) => `${nickname}님에게 귓속말`,
+    },
+    /**
      * 관리 액션 — value(토큰)는 admin API의 action 값(mute/unmute/kick/ban),
      * 라벨만 한글. "채팅 음소거"는 음성 강제 음소거(WI-038/039)와 혼동 방지용 명시.
      */

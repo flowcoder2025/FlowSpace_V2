@@ -1,0 +1,10 @@
+WI=WI-040-feat
+commit=ca0e945
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-040-feat.codex.r2.json
+evaluator=.flowset/eval-results/WI-040.eval.json
+gates=tsc,lint,vitest,build
+verdict=codex:WARNING(r1 FAIL P2x2[stale prefill·동일닉 오배송]->r2 코드결함0·유일 잔여=샌드박스 vitest EPERM 환경 P3) evaluator:WARNING 9.65(P0/P1/P2 0,fixNow0,P3x3 defer; 테스트그물 P3 2건은 r3 강화)
+notes=귓속말 발견성: 송신은 이미 완전구현, 참가자 패널 발견성 버튼 추가. 설계 codex consult 2R(MemberActionsMenu admin전용->별도 WhisperButton Option B / ChatInputArea isActive시만 마운트->구독자=ChatPanel / 공백닉 오배송->canWhisperTarget 게이트). EventBridge CHAT_START_WHISPER{nickname}->ChatPanel activate(force)+prefill token-prop->ChatInputArea rAF setInput+focus. self 제외만 게이팅. codex r1 FAIL 적출 P2x2 즉시해소: (1)whisperPrefill 미해제->deactivate clear(닫고 재활성화 시 stale 재등장 방지) (2)동일닉 nickname 라우팅 오배송->nicknameCounts 중복닉 버튼 숨김. evaluator 변이검증 M2/M3/M4/M5 검출, M1(deactivate clear false-pass: rAF settle 전 동기단언)·M6(force 우회 무커버) 테스트그물 P3 적발->r3 강화(rAF 2프레임 대기+cooldown 우회 테스트, 직접 변이검증으로 M1/M6 FAIL 검출 실증). 게이트 tsc0/lint0err/vitest 661->680(+19)/build0. Vercel 전용(server/·prisma 무관). main 미승격. known limitation: 공백 닉네임·동일 닉네임은 버튼 미노출(slash/nickname 계약 한계, 실해결=targetUserId 계약 별도 WI).
+rounds=3
+createdAt=2026-06-24

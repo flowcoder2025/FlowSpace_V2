@@ -8,6 +8,8 @@ import type { ChatFontSize } from "@/features/space/chat";
 import { FONT_SIZE_STORAGE_KEY, CHAT_FONT_SIZE_ORDER } from "@/features/space/chat";
 import type { PlayerData } from "@/features/space/socket";
 import { useChatDrag } from "@/features/space/hooks";
+import { eventBridge, GameEvents } from "@/features/space/game";
+import type { ChatStartWhisperPayload } from "@/features/space/game";
 import { ChatTabs } from "./chat/chat-tabs";
 import { ChatMessageList } from "./chat/chat-message-list";
 import { ChatInputArea } from "./chat/chat-input-area";
@@ -51,6 +53,9 @@ export default function ChatPanel({
 }: ChatPanelProps) {
   const [isActive, setIsActive] = useState(false);
   const lastDeactivateRef = useRef(0);
+  // WI-040: 참가자 패널 귓속말 → 입력창 prefill. token++로 동일 닉네임 재클릭도 재적용.
+  const [whisperPrefill, setWhisperPrefill] = useState<{ value: string; token: number } | null>(null);
+  const whisperTokenRef = useRef(0);
   const { position, size, isDragging, isResizing, handleMoveStart, handleResizeStart } = useChatDrag();
 
   const [fontSize, setFontSizeState] = useState<ChatFontSize>(() => {
@@ -69,8 +74,10 @@ export default function ChatPanel({
     try { localStorage.setItem(FONT_SIZE_STORAGE_KEY, size); } catch { /* ignore */ }
   }, []);
 
-  const activate = useCallback(() => {
-    if (Date.now() - lastDeactivateRef.current < REACTIVATION_COOLDOWN) return;
+  // force=true는 명시적 사용자 액션(귓속말 버튼)용 — 전역 Enter 재활성화 cooldown을 우회한다
+  // (Esc/Enter로 닫은 직후 150ms 내 귓속말 클릭이 무시되지 않도록).
+  const activate = useCallback((force = false) => {
+    if (!force && Date.now() - lastDeactivateRef.current < REACTIVATION_COOLDOWN) return;
     setIsActive(true);
     onFocusChange(true);
   }, [onFocusChange]);
@@ -79,6 +86,9 @@ export default function ChatPanel({
     lastDeactivateRef.current = Date.now();
     setIsActive(false);
     onFocusChange(false);
+    // 귓속말 prefill 소비/해제 — 닫은 뒤 일반 Enter로 재활성화할 때 ChatInputArea가
+    // 새로 마운트되며 stale prefill을 다시 적용해 과거 대상이 재등장/오송신되는 것 방지(codex P2).
+    setWhisperPrefill(null);
   }, [onFocusChange]);
 
   // isActive를 ref로 추적 (stale closure 방지)
@@ -103,6 +113,21 @@ export default function ChatPanel({
     window.addEventListener("keydown", handleGlobalKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleGlobalKeyDown, { capture: true });
   }, [activate]);
+
+  // WI-040: 참가자 패널 "귓속말" 버튼 → 채팅 활성화 + 입력창 `/닉네임 ` prefill.
+  // 구독자는 항상 마운트된 ChatPanel — ChatInputArea는 isActive일 때만 마운트되기 때문.
+  useEffect(() => {
+    const onStartWhisper = (...args: unknown[]) => {
+      const nickname = (args[0] as ChatStartWhisperPayload | undefined)?.nickname;
+      if (!nickname) return;
+      onReply(null); // 답장 배너 제거(귓속말 입력과 혼동 방지)
+      activate(true); // 명시 버튼 → cooldown 우회
+      whisperTokenRef.current += 1;
+      setWhisperPrefill({ value: `/${nickname} `, token: whisperTokenRef.current });
+    };
+    eventBridge.on(GameEvents.CHAT_START_WHISPER, onStartWhisper);
+    return () => eventBridge.off(GameEvents.CHAT_START_WHISPER, onStartWhisper);
+  }, [activate, onReply]);
 
   const filteredMessages = useMemo(
     () => filterMessagesByTab(messages, activeTab, currentUserId),
@@ -217,6 +242,7 @@ export default function ChatPanel({
             activeTab={activeTab}
             whisperHistory={whisperHistory}
             autoFocus
+            prefill={whisperPrefill}
             onEscape={deactivate}
             placeholder={
               currentPartyId

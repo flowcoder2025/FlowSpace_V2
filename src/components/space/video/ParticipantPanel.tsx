@@ -14,6 +14,46 @@ import { VideoTile } from "./VideoTile";
 import { MemberActionsMenu } from "../member-actions-menu";
 import { useSpaceMembers, managedUserIdFromIdentity } from "../use-space-members";
 import type { ParticipantTrack } from "@/features/space/livekit";
+import { eventBridge, GameEvents } from "@/features/space/game";
+import { canWhisperTarget } from "@/features/space/chat";
+import { SPACE_COPY } from "@/constants/space-copy";
+
+const WHISPER_COPY = SPACE_COPY.PARTICIPANT_PANEL.whisper;
+
+/**
+ * 귓속말 발견성 버튼(WI-040) — 클릭 시 EventBridge로 채팅 입력창에 `/닉네임 ` prefill 요청.
+ * 관리 권한과 무관(모든 사용자·self 제외, 호출부 게이팅).
+ *
+ * 두 경우엔 노출하지 않는다(둘 다 오배송 방지):
+ * - 공백 포함 닉네임: `/닉네임 메시지` 파서가 첫 공백 전까지만 타겟으로 봐 다른 대상으로 감(canWhisperTarget).
+ * - 동일 닉네임 참가자 2명+(`ambiguous`): nickname 기반 whisper 라우팅이 같은 닉네임 소켓을 모두
+ *   대상으로 잡아, 특정 사람을 가리키는 버튼 UX와 실제 전송 대상이 불일치(비밀 메시지 오배송·codex P2).
+ *   targetUserId 계약 전환 전까지 중복 닉네임은 귓속말 버튼을 숨긴다.
+ */
+function WhisperButton({ nickname, ambiguous }: { nickname: string; ambiguous: boolean }) {
+  if (!canWhisperTarget(nickname) || ambiguous) return null;
+  return (
+    <button
+      type="button"
+      aria-label={WHISPER_COPY.ariaLabel(nickname)}
+      title={WHISPER_COPY.title}
+      onClick={(e) => {
+        e.stopPropagation();
+        eventBridge.emit(GameEvents.CHAT_START_WHISPER, { nickname });
+      }}
+      className="rounded bg-black/60 p-1 text-white/90 transition-colors hover:bg-black/80"
+    >
+      <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 4v-4z"
+        />
+      </svg>
+    </button>
+  );
+}
 
 export type ViewMode = "sidebar" | "grid" | "hidden";
 
@@ -94,6 +134,22 @@ export function ParticipantPanel({
 
     return result;
   }, [players, mediaParticipantIds, currentUserId, currentNickname]);
+
+  // 닉네임별 참가자 수(미디어 participantName + 비-미디어 nickname). 2명 이상이면 귓속말
+  // (nickname 기반 라우팅)이 어느 대상인지 모호 → 해당 닉네임 귓속말 버튼을 숨긴다(WI-040, 오배송 방지).
+  const nicknameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of participantTracks.values()) {
+      counts.set(t.participantName, (counts.get(t.participantName) ?? 0) + 1);
+    }
+    for (const p of nonMediaPlayers) {
+      counts.set(p.nickname, (counts.get(p.nickname) ?? 0) + 1);
+    }
+    return counts;
+  }, [participantTracks, nonMediaPlayers]);
+
+  const isAmbiguousNickname = (nickname: string) =>
+    (nicknameCounts.get(nickname) ?? 0) > 1;
 
   // 미디어 참가자 정렬
   const sortedTracks = useMemo(() => {
@@ -214,17 +270,26 @@ export function ParticipantPanel({
                 mirrorLocalVideo={mirrorLocalVideo}
                 isSpotlight={spotlightUsers.has(track.participantId)}
                 actionsSlot={
-                  <MemberActionsMenu
-                    spaceId={spaceId}
-                    target={{ userId: mediaUserId ?? "", nickname: track.participantName }}
-                    member={mediaMember}
-                    actorRole={actorRole}
-                    currentUserId={currentUserId ?? ""}
-                    onActionDone={refetch}
-                    align="left"
-                    // LiveKit room 참가자 → 음성 강제 음소거 가능(track.participantId = identity).
-                    participantIdentity={track.participantId}
-                  />
+                  <div className="flex items-center gap-1">
+                    {/* 귓속말 — 모든 사용자(self 제외)에게 노출. 관리 메뉴와 별개. */}
+                    {!isLocal && (
+                      <WhisperButton
+                        nickname={track.participantName}
+                        ambiguous={isAmbiguousNickname(track.participantName)}
+                      />
+                    )}
+                    <MemberActionsMenu
+                      spaceId={spaceId}
+                      target={{ userId: mediaUserId ?? "", nickname: track.participantName }}
+                      member={mediaMember}
+                      actorRole={actorRole}
+                      currentUserId={currentUserId ?? ""}
+                      onActionDone={refetch}
+                      align="left"
+                      // LiveKit room 참가자 → 음성 강제 음소거 가능(track.participantId = identity).
+                      participantIdentity={track.participantId}
+                    />
+                  </div>
                 }
               />
             </div>
@@ -251,14 +316,17 @@ export function ParticipantPanel({
               )}
             </div>
             {!p.isSelf && (
-              <MemberActionsMenu
-                spaceId={spaceId}
-                target={{ userId: p.id, nickname: p.nickname }}
-                member={membersByUserId.get(p.id) ?? null}
-                actorRole={actorRole}
-                currentUserId={currentUserId ?? ""}
-                onActionDone={refetch}
-              />
+              <div className="flex shrink-0 items-center gap-1">
+                <WhisperButton nickname={p.nickname} ambiguous={isAmbiguousNickname(p.nickname)} />
+                <MemberActionsMenu
+                  spaceId={spaceId}
+                  target={{ userId: p.id, nickname: p.nickname }}
+                  member={membersByUserId.get(p.id) ?? null}
+                  actorRole={actorRole}
+                  currentUserId={currentUserId ?? ""}
+                  onActionDone={refetch}
+                />
+              </div>
             )}
           </div>
         ))}
