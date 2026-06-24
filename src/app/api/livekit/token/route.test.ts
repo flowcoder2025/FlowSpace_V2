@@ -209,7 +209,9 @@ describe("POST /api/livekit/token — archived 스페이스 차단(WI-048)", () 
     expect(body.code).toBe("SPACE_NOT_ACTIVE");
   });
 
-  it("ACTIVE 스페이스는 status 게이트가 막지 않음 (SPACE_NOT_ACTIVE 아님)", async () => {
+  it("ACTIVE 스페이스는 status 게이트가 막지 않고 정상 토큰을 발급(200+token)", async () => {
+    // codex r1 P3: code!==SPACE_NOT_ACTIVE 만 보면 ACTIVE 가 401/403/500 로 깨져도 통과(false-pass)
+    // → 정상 발급(200·token·participantId)까지 단언해 회귀를 실제로 잡는다.
     const POST = await loadPOST();
     mockAuth.mockResolvedValue({ user: { id: "u-ok", name: "정상" } });
     mockPrisma.space.findUnique.mockResolvedValue({ status: "ACTIVE" });
@@ -219,8 +221,11 @@ describe("POST /api/livekit/token — archived 스페이스 차단(WI-048)", () 
     const res = await POST(
       tokenRequest({ ...VALID_BODY, participantId: "user-u-ok", participantName: "정상" }) as never
     );
-    const body = (await res.json().catch(() => ({}))) as { code?: string };
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { token?: string; participantId?: string; code?: string };
     expect(body.code).not.toBe("SPACE_NOT_ACTIVE");
+    expect(body.token).toBe("jwt-token");
+    expect(body.participantId).toBe("user-u-ok");
   });
 
   it("미존재 스페이스는 status 게이트가 404 로 바꾸지 않음 — 기존 흐름 보존(strictly additive)", async () => {
