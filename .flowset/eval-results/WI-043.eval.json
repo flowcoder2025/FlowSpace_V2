@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 9.9,
+    "specificity": 9.9,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.8,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/components/common/dialog.test.tsx:105-115",
+      "description": "0-focusable Tab-guard 테스트의 'Tab은 패널 고정' 단언(document.activeElement === dialog)이 false-pass다. 변이검증으로 실증: dialog.tsx의 focusables.length===0 가드 블록을 통째로 제거(M7a — 그러면 first/last가 undefined가 되어 undefined.focus() 까지 발생)했는데도 13개 테스트 전부 통과. 원인은 (a) jsdom이 native Tab 포커스 이동을 수행하지 않아 e.preventDefault() 제거가 관측 불가, (b) 초기 포커스 effect가 이미 panel에 포커스를 둬서 keydown 후에도 activeElement가 그대로 panel이기 때문. 즉 이 테스트는 0-focusable trap 로직(preventDefault/panel.focus)을 실제로 보호하지 못한다. 단, 0-focusable일 때 초기 포커스가 패널로 가는 경로는 M8(initial focus를 panel로 강제→3건 FAIL)이 동일 라인을 커버한다.",
+      "recommendation": "0-focusable trap 단언을 강화: 패널 밖 sentinel 요소(예: 모달 외부 button)에 명시적으로 focus를 준 뒤 Tab keydown을 발생시키고 activeElement가 패널 안(=dialog)으로 강제 복귀하는지 검증하거나, e.defaultPrevented를 단언해 preventDefault 동작을 직접 관측한다. 현 단언만으로는 변이가 통과한다.",
+      "defer": true,
+      "deferRationale": "테스트 전용 결함이고 게이트(P3)는 통과한다. 0-focusable 경계의 핵심(초기 포커스 패널 안착)은 M8로 이미 변이검증되며, 두 소비 모달(delete/avatar)에는 0-focusable 상태가 발생하지 않는다(닫기/취소 버튼 상시 존재). jsdom의 native Tab 미구현이라는 환경적 한계가 본질이라 별도 후속 WI에서 sentinel 기반 단언으로 보강함이 적절하다.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/components/dashboard/delete-space-section.tsx:89",
+      "description": "delete-space-section의 backdropClassName 값('fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4')이 dialog.tsx의 DEFAULT_BACKDROP 상수와 글자 그대로 동일한 리터럴로 중복 지정돼 있다. 기본값과 같으므로 prop 자체를 생략해도 동일 렌더가 되며, 현 형태는 동일 문자열을 두 곳에 박아 드리프트(상수만 바꾸면 delete 모달은 안 따라감) 여지를 만든다(CLAUDE.md '하드코딩 금지'·DRY 관점).",
+      "recommendation": "delete-space-section에서 backdropClassName prop을 생략해 Dialog의 DEFAULT_BACKDROP를 그대로 사용하거나(z-index 동일), 의도적으로 다른 값이 필요하면 그 의도를 주석으로 남긴다.",
+      "defer": true,
+      "deferRationale": "기능/접근성 영향 0의 순수 정리 사항이며 현재 렌더 결과는 정확하다. avatar 모달은 z-[100]/bg-black/60로 실제 다른 백드롭이 필요해 prop 주입 패턴 자체는 타당하다. 미세 위생 개선이라 후속에서 흡수 가능.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/components/common/dialog.tsx:44-45",
+      "description": "FOCUSABLE_SELECTOR가 [contenteditable], audio[controls], video[controls], details/summary 등 추가 tabbable 요소를 포함하지 않는다. 또한 주석(L19-20)이 명시하듯 CSS(display:none/visibility:hidden)로만 숨긴 focusable은 trap 후보에서 제외하지 않는다. 두 소비 모달(button/input/tab 버튼만 사용)에는 해당 요소가 없어 현재 결함은 아니나, 공용 컴포넌트로서 향후 contenteditable/미디어 컨트롤을 가진 모달이 흡수되면 trap이 일부 tabbable을 놓칠 수 있다.",
+      "recommendation": "공용 Dialog가 더 다양한 모달을 흡수하기 전에 selector를 contenteditable/미디어 컨트롤까지 확장하거나, 현 한계(주석에 일부만 기재)를 소비자 가이드로 명문화한다.",
+      "defer": true,
+      "deferRationale": "현 두 소비자에 해당 요소가 전무해 실결함이 아니고, 알려진 한계가 컴포넌트 주석(L19-20)에 부분 문서화돼 있다. 표면 0의 선제적 강화 항목이라 게이트 통과 후 흡수.",
+      "fixNow": false
+    }
+  ]
+}

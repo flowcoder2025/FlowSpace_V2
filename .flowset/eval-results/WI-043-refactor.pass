@@ -1,0 +1,10 @@
+WI=WI-043-refactor
+commit=a7a77ef
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-043-refactor.codex.r3.json
+evaluator=.flowset/eval-results/WI-043.eval.json
+gates=tsc,lint,vitest,build
+verdict=codex:WARNING(r1 FAIL P2[조상 미필터]+P3[동적 disabled]->r2 FAIL P2[avatar 닫기 무이름]->r3 코드결함0·유일 잔여=샌드박스 vitest EPERM) evaluator:WARNING 9.8(P0/P1/P2 0,fixNow0,P3x3 defer)
+notes=공용 접근성 Dialog(src/components/common/dialog.tsx) 추출 — focus-trap+focus-restore+useId aria 전무하던 것 통합. role=dialog/aria-modal/aria-labelledby(외부 id)·첫 tabbable 포커스·Tab/Shift+Tab 순환(active가 focusables 밖이면 경계처럼=동적 disabled 대응)·opener 복원·ESC/백드롭 닫기·제어형(open=false null)·0 focusable 패널 고정. getFocusable=disabled/input[type=hidden]/음수tabIndex/조상([hidden]/aria-hidden/fieldset[disabled]) 제외. 흡수: delete-space-section(동작·테스트 17건 보존·aria id 유지) + avatar-editor-modal(a11y 전무->추가, ESC/백드롭 닫기=의도된 동작변경, 닫기버튼 aria-label). member-actions-menu/ScreenShareOverlay 제외. 설계 codex 배치 consult. 듀얼 3R: codex r1 FAIL(P2 조상필터 미흡·P3 동적 disabled Tab 탈출)->r2 FAIL(P2 avatar 닫기 SVG 무이름·focus-trap 첫포커스로 노출)->r3 코드결함0 / evaluator 9.8(변이검증 M1~M8). 회귀테스트: dialog 13(조상 hidden·동적 disabled·0-focusable·restore·closeOn·순환)+avatar 3(role/aria·닫기이름·ESC)+delete 17 보존. 직접 변이검증으로 조상필터 false-pass 아님 실증. 게이트 tsc0/lint0err/vitest 680->696(+16)/build0. Vercel 전용(server/·prisma 무관). main 미승격. defer P3x3: 0-focusable Tab 가드 false-pass(jsdom 네이티브 Tab 미실행·소비처 도달불가·초기포커스는 M8 커버)·backdropClassName 리터럴 DEFAULT 중복(avatar는 다른 backdrop 필요)·FOCUSABLE_SELECTOR contenteditable/CSS-hidden 미포함(소비처 표면0).
+rounds=3
+createdAt=2026-06-24
