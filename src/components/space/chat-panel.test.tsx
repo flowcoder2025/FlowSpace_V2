@@ -81,6 +81,13 @@ describe("ChatPanel — WI-040 귓속말 prefill 생명주기", () => {
     // 4) 일반 Enter로 재활성화 → 입력창은 빈 상태여야 함(과거 /Alice 재등장 금지)
     fireEvent.keyDown(document.body, { key: "Enter" });
     await waitFor(() => expect(getInput()).not.toBeNull());
+    // prefill effect는 rAF로 적용된다 — clear가 빠지면 rAF settle 후 "/Alice "가 재등장하므로
+    // rAF 2프레임 대기 후 단언해야 deactivate clear 결함을 실제로 검출한다(동기 단언=false-pass).
+    await act(async () => {
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r(null)))
+      );
+    });
     expect(getInput()!.value).toBe("");
   });
 
@@ -88,6 +95,19 @@ describe("ChatPanel — WI-040 귓속말 prefill 생명주기", () => {
     render(<ChatPanel {...baseProps} />);
     act(() => bus.emit("chat:startWhisper", { nickname: "Alice" }));
     await waitFor(() => expect(getInput()?.value).toBe("/Alice "));
+    act(() => bus.emit("chat:startWhisper", { nickname: "Bob" }));
+    await waitFor(() => expect(getInput()?.value).toBe("/Bob "));
+  });
+
+  it("닫은 직후(cooldown 내) 귓속말 클릭도 활성화됨 — activate force 우회", async () => {
+    render(<ChatPanel {...baseProps} />);
+    // 먼저 열고 즉시 닫아 재활성화 cooldown(150ms)을 시작시킨다.
+    act(() => bus.emit("chat:startWhisper", { nickname: "Alice" }));
+    await waitFor(() => expect(getInput()?.value).toBe("/Alice "));
+    fireEvent.keyDown(getInput()!, { key: "Escape" });
+    await waitFor(() => expect(getInput()).toBeNull());
+    // cooldown 경과 전(지연 없음) 귓속말 → force 우회로 즉시 활성화되어야 함.
+    // (force 없이 activate()면 cooldown에 막혀 입력창이 안 열려 이 단언이 timeout FAIL.)
     act(() => bus.emit("chat:startWhisper", { nickname: "Bob" }));
     await waitFor(() => expect(getInput()?.value).toBe("/Bob "));
   });
