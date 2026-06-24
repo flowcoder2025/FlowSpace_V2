@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useId } from "react";
 import type { PartsAvatarConfig } from "@/features/space/avatar";
 import { DEFAULT_PARTS_AVATAR, buildPartsAvatarString, parseAvatarString, CHIBI_CHARACTERS } from "@/features/space/avatar";
 import { PLAYER_WIDTH, PLAYER_HEIGHT } from "@/constants/game-constants";
 import { CharacterEditor } from "@/components/avatar";
+import { Dialog } from "@/components/common/dialog";
 
 interface AvatarEditorModalProps {
   currentAvatar: string;
@@ -28,6 +29,7 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
     parsed.type === "chibi" ? parsed.characterId : null
   );
   const [saving, setSaving] = useState(false);
+  const titleId = useId();
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -57,10 +59,17 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
   }, [tab, selectedChibiId, config, onSave, onClose]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
-      <div className="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
+    /* WI-043: 공용 Dialog로 통합 — focus-trap/focus-restore/aria + ESC·백드롭 닫기 추가.
+       (기존엔 닫기 버튼만 있었음 — 표준 dialog 닫기 경로[ESC/백드롭]가 추가되는 의도된 동작 변경.) */
+    <Dialog
+      open
+      onClose={onClose}
+      labelledById={titleId}
+      backdropClassName="fixed inset-0 z-[100] flex items-center justify-center bg-black/60"
+      className="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl"
+    >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-ink">캐릭터 편집</h2>
+          <h2 id={titleId} className="text-lg font-semibold text-ink">캐릭터 편집</h2>
           <button
             type="button"
             onClick={onClose}
@@ -144,8 +153,7 @@ export function AvatarEditorModal({ currentAvatar, onSave, onClose }: AvatarEdit
             {saving ? "저장 중..." : "적용"}
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
