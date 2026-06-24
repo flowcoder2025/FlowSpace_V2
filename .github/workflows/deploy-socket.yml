@@ -10,6 +10,7 @@ on:
       - 'src/features/space/enforce/internal/contract.ts'
       - 'src/lib/auth-secret.ts'
       - 'src/lib/socket-startup.ts'
+      - 'src/lib/kick-cooldown.ts'
       - 'Dockerfile.socket'
       - 'docker-compose.prod.yml'
   workflow_dispatch: {}  # 수동 실행 허용 (재배포/테스트)

@@ -59,4 +59,9 @@ export const SPACE_COPY = {
     /** 네트워크 오류(fetch 예외). */
     networkError: "네트워크 오류가 발생했습니다.",
   },
+  /** 실시간 소켓 연결 상태 안내. */
+  SOCKET: {
+    /** 강퇴(WI-047) 쿨다운 중 재입장 시도 — 클라 가드/서버 게이트 모두 거부. */
+    kickedCooldown: "강퇴되어 잠시 후 다시 입장할 수 있습니다.",
+  },
 } as const;
