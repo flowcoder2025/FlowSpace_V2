@@ -14,6 +14,41 @@ import { VideoTile } from "./VideoTile";
 import { MemberActionsMenu } from "../member-actions-menu";
 import { useSpaceMembers, managedUserIdFromIdentity } from "../use-space-members";
 import type { ParticipantTrack } from "@/features/space/livekit";
+import { eventBridge, GameEvents } from "@/features/space/game";
+import { canWhisperTarget } from "@/features/space/chat";
+import { SPACE_COPY } from "@/constants/space-copy";
+
+const WHISPER_COPY = SPACE_COPY.PARTICIPANT_PANEL.whisper;
+
+/**
+ * 귓속말 발견성 버튼(WI-040) — 클릭 시 EventBridge로 채팅 입력창에 `/닉네임 ` prefill 요청.
+ * 관리 권한과 무관(모든 사용자·self 제외, 호출부 게이팅). slash 문법으로 타겟 불가한
+ * 공백 포함 닉네임은 노출하지 않는다(오배송 방지 — canWhisperTarget).
+ */
+function WhisperButton({ nickname }: { nickname: string }) {
+  if (!canWhisperTarget(nickname)) return null;
+  return (
+    <button
+      type="button"
+      aria-label={WHISPER_COPY.ariaLabel(nickname)}
+      title={WHISPER_COPY.title}
+      onClick={(e) => {
+        e.stopPropagation();
+        eventBridge.emit(GameEvents.CHAT_START_WHISPER, { nickname });
+      }}
+      className="rounded bg-black/60 p-1 text-white/90 transition-colors hover:bg-black/80"
+    >
+      <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 4v-4z"
+        />
+      </svg>
+    </button>
+  );
+}
 
 export type ViewMode = "sidebar" | "grid" | "hidden";
 
@@ -214,17 +249,21 @@ export function ParticipantPanel({
                 mirrorLocalVideo={mirrorLocalVideo}
                 isSpotlight={spotlightUsers.has(track.participantId)}
                 actionsSlot={
-                  <MemberActionsMenu
-                    spaceId={spaceId}
-                    target={{ userId: mediaUserId ?? "", nickname: track.participantName }}
-                    member={mediaMember}
-                    actorRole={actorRole}
-                    currentUserId={currentUserId ?? ""}
-                    onActionDone={refetch}
-                    align="left"
-                    // LiveKit room 참가자 → 음성 강제 음소거 가능(track.participantId = identity).
-                    participantIdentity={track.participantId}
-                  />
+                  <div className="flex items-center gap-1">
+                    {/* 귓속말 — 모든 사용자(self 제외)에게 노출. 관리 메뉴와 별개. */}
+                    {!isLocal && <WhisperButton nickname={track.participantName} />}
+                    <MemberActionsMenu
+                      spaceId={spaceId}
+                      target={{ userId: mediaUserId ?? "", nickname: track.participantName }}
+                      member={mediaMember}
+                      actorRole={actorRole}
+                      currentUserId={currentUserId ?? ""}
+                      onActionDone={refetch}
+                      align="left"
+                      // LiveKit room 참가자 → 음성 강제 음소거 가능(track.participantId = identity).
+                      participantIdentity={track.participantId}
+                    />
+                  </div>
                 }
               />
             </div>
@@ -251,14 +290,17 @@ export function ParticipantPanel({
               )}
             </div>
             {!p.isSelf && (
-              <MemberActionsMenu
-                spaceId={spaceId}
-                target={{ userId: p.id, nickname: p.nickname }}
-                member={membersByUserId.get(p.id) ?? null}
-                actorRole={actorRole}
-                currentUserId={currentUserId ?? ""}
-                onActionDone={refetch}
-              />
+              <div className="flex shrink-0 items-center gap-1">
+                <WhisperButton nickname={p.nickname} />
+                <MemberActionsMenu
+                  spaceId={spaceId}
+                  target={{ userId: p.id, nickname: p.nickname }}
+                  member={membersByUserId.get(p.id) ?? null}
+                  actorRole={actorRole}
+                  currentUserId={currentUserId ?? ""}
+                  onActionDone={refetch}
+                />
+              </div>
             )}
           </div>
         ))}

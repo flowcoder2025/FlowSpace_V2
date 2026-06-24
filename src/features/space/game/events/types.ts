@@ -25,6 +25,8 @@ export const GameEvents = {
 
   // UI events
   CHAT_FOCUS: "chat:focus",
+  /** 참가자 패널 "귓속말" → 채팅 입력창에 `/닉네임 ` prefill (WI-040, React↔React UI intent) */
+  CHAT_START_WHISPER: "chat:startWhisper",
   UI_OVERLAY_TOGGLE: "ui:overlay:toggle",
 
   // Asset events
@@ -90,6 +92,11 @@ export interface SceneErrorPayload {
 
 export interface ChatFocusPayload {
   focused: boolean;
+}
+
+export interface ChatStartWhisperPayload {
+  /** 귓속말 대상 닉네임(현 `whisper:send` 계약은 nickname 기반). */
+  nickname: string;
 }
 
 export interface UIOverlayPayload {

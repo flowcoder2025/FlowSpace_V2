@@ -4,6 +4,7 @@ export { useChatStorage } from "./internal/use-chat-storage";
 export {
   parseInput,
   isWhisperFormat,
+  canWhisperTarget,
   extractTargetNickname,
   isEditorCommandFormat,
   getEditorCommandSuggestions,

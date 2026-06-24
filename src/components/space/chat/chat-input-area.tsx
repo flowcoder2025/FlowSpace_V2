@@ -18,6 +18,12 @@ interface ChatInputAreaProps {
   autoFocus?: boolean;
   /** Escape 키 콜백 */
   onEscape?: () => void;
+  /**
+   * 외부(참가자 패널 귓속말, WI-040)에서 입력창을 prefill할 때 사용. `token`이 바뀔 때마다
+   * `value`를 입력에 적용하고 포커스한다(동일 닉네임 재클릭·이미 열린 상태도 재적용). 조건부
+   * 마운트(ChatPanel `isActive`)라 fresh 마운트 시엔 첫 effect에서, 이미 마운트면 token 변경으로 적용.
+   */
+  prefill?: { value: string; token: number } | null;
 }
 
 
@@ -32,6 +38,7 @@ export function ChatInputArea({
   whisperHistory = [],
   autoFocus = false,
   onEscape,
+  prefill,
 }: ChatInputAreaProps) {
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +51,23 @@ export function ChatInputArea({
       return () => clearTimeout(timer);
     }
   }, [autoFocus]);
+
+  // WI-040: 외부 귓속말 prefill — 입력창에 `/닉네임 `을 채우고 caret을 끝에 두고 포커스.
+  // prefill 객체는 ChatPanel state(이벤트마다 새 ref·token++)라 unrelated 리렌더엔 재실행 안 됨.
+  // setState/focus를 rAF로 미뤄 effect 본문 동기 setState(set-state-in-effect 린트)를 피하고,
+  // 조건부 마운트 직후 ref 안정화 뒤 caret을 끝에 둔다(unmount/연속 prefill 시 cleanup이 취소).
+  useEffect(() => {
+    if (!prefill) return;
+    const raf = requestAnimationFrame(() => {
+      setInput(prefill.value);
+      setWhisperIdx(-1);
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(prefill.value.length, prefill.value.length);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [prefill]);
 
 
   const handleSend = useCallback(() => {
