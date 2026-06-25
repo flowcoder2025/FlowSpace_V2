@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.7,
+    "consistency": 9.9,
+    "specificity": 9.8,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.78,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/app/api/livekit/webhook/route.ts:73 (효과는 미들웨어 public 노출에서 발생)",
+      "description": "webhook을 미들웨어 public allowlist에 추가하면서 미인증 POST가 라우트 핸들러에 도달한다. 라우트는 prod에서 fail-closed(미설정→throw→500 / 헤더없음→401 / 서명불일치→401)로 검증되었고 처리 본문은 서명 검증 후에만 실행되나, 각 미인증 요청마다 request.text() 읽기 + WebhookReceiver.receive() crypto 검증이 수행되는 미인증 DoS 표면(CPU/로그)이 새로 열린다. 정상적인 웹훅 노출의 본질적 비용이며 미들웨어 분류 수정 WI 스코프 밖.",
+      "recommendation": "운영 레이어(Cloudflare/Caddy rate-limit·IP allowlist) 또는 별도 WI로 webhook 엔드포인트 레이트리밋. 본 WI에서는 불필요.",
+      "defer": true,
+      "deferRationale": "어떤 웹훅 엔드포인트도 미인증 도달은 불가피(외부 콜백 특성). prod fail-closed 검증됨(미설정/헤더없음/서명불일치 전부 401|500, DB write는 spaceEventLog append-only이며 서명검증 후에만). 미들웨어 분류 수정이라는 WI 스코프 밖이고 인프라 레이어 관심사.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/app/api/livekit/webhook/route.ts:97-105 (IS_DEV 미검증 파싱 경로)",
+      "description": "IS_DEV(NODE_ENV==='development')일 때 webhook이 이제 미인증 public이고 라우트는 서명 검증 없이 raw JSON을 파싱·처리한다(logSpaceEvent 호출 포함). 로컬 개발 한정이라 prod 영향 없으나, 본 WI가 public 노출을 추가하면서 dev에서 임의 POST가 spaceEventLog.create를 유발할 수 있는 경로가 표면화. 본 WI가 만든 결함이 아니라 기존 라우트 동작이며 prod fail-closed라 무위험.",
+      "recommendation": "변경 불요. 향후 라우트 하드닝 시 dev 미검증 경로도 spaceId 존재 검증 등 추가 가능하나 별도 관심사.",
+      "defer": true,
+      "deferRationale": "NODE_ENV==='development' 게이트로 prod 무영향. WI-050은 미들웨어 분류만 수정했고 이 경로는 라우트 기존 코드. prod에서는 receiver+authHeader 없으면 401로 닫힘.",
+      "fixNow": false
+    }
+  ]
+}
