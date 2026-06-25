@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isPublicRequest, PUBLIC_FILES } from "./route-access";
+import { isPublicRequest, PUBLIC_FILES, PUBLIC_API_PATHS } from "./route-access";
 
 describe("isPublicRequest", () => {
   describe("public 정적 자산 (WI-020 회귀 — 로고 깨짐 방지)", () => {
@@ -54,5 +54,23 @@ describe("isPublicRequest", () => {
 
   it("PUBLIC_FILES 는 실제 public/ 자산만 포함", () => {
     expect(PUBLIC_FILES.has("/Logo.png")).toBe(true);
+  });
+
+  describe("자체 인증 외부 콜백 API (WI-050 — LiveKit webhook)", () => {
+    it("/api/livekit/webhook 은 미인증 통과(라우트가 서명 자체검증)", () => {
+      expect(isPublicRequest("/api/livekit/webhook")).toBe(true);
+    });
+    it("exact 매칭 — 하위 경로는 비공개(prefix 아님)", () => {
+      expect(isPublicRequest("/api/livekit/webhook/foo")).toBe(false);
+      expect(isPublicRequest("/api/livekit/webhookX")).toBe(false);
+    });
+    it("형제 라우트 /api/livekit/token 은 여전히 인증 필요(회귀 — 토큰 라우트 비노출)", () => {
+      expect(isPublicRequest("/api/livekit/token")).toBe(false);
+      expect(isPublicRequest("/api/livekit")).toBe(false);
+    });
+    it("PUBLIC_API_PATHS 는 webhook 정확 경로만 포함", () => {
+      expect(PUBLIC_API_PATHS.has("/api/livekit/webhook")).toBe(true);
+      expect(PUBLIC_API_PATHS.has("/api/livekit/token")).toBe(false);
+    });
   });
 });
