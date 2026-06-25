@@ -3,6 +3,8 @@ import { io } from "socket.io-client";
 import {
   fetchSocketToken,
   getSocketClient,
+  getSocketAuthToken,
+  consumeLastSocketAuthError,
   disconnectSocket,
   SocketTokenError,
   SOCKET_TOKEN_RETRY_DELAYS_MS,
@@ -71,8 +73,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  disconnectSocket(); // 모듈 싱글턴 + 토큰 캐시 리셋
   vi.restoreAllMocks();
-  disconnectSocket(); // 모듈 싱글턴 리셋
+  vi.useRealTimers();
 });
 
 /** 백오프 지연을 즉시화하면서 호출된 지연값을 기록하는 주입 sleep */
@@ -87,6 +90,20 @@ function makeInstantSleep() {
 const ok = (body: unknown): FetchStep => ({ kind: "response", ok: true, status: 200, body });
 const fail = (status: number): FetchStep => ({ kind: "response", ok: false, status });
 const netErr = (): FetchStep => ({ kind: "network-error" });
+
+/** exp(초)를 담은 가짜 JWT(header.payload.sig) — WI-049 캐시 힌트 디코드용 */
+function jwt(expSec: number, label = "t"): string {
+  const b64u = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64u({ alg: "HS256", typ: "JWT" })}.${b64u({ userId: "u", label, exp: expSec })}.sig`;
+}
+
+/** io mock에 전달된 auth 함수를 꺼내 직접 실행하고 cb로 받은 token을 반환 */
+async function invokeAuth(callIndex = 0): Promise<string> {
+  const opts = vi.mocked(io).mock.calls[callIndex][1] as {
+    auth: (cb: (data: { token: string }) => void) => void;
+  };
+  return new Promise<string>((resolve) => opts.auth((data) => resolve(data.token)));
+}
 
 async function tokenErrorFrom(opts: { sleep: (ms: number) => Promise<void> }): Promise<SocketTokenError> {
   let caught: unknown;
@@ -267,17 +284,150 @@ describe("getSocketClient — 동시 호출 dedupe (pending 공유)", () => {
     expect(fetchCalls).toBe(1);
   });
 
-  it("io() 옵션에 발급 token·reconnection 설정 보존(회귀 가드)", async () => {
-    steps = [ok({ token: "jwt-opts" })];
+  it("io() 옵션: auth는 함수(WI-049)·reconnection 보존, auth(cb)가 발급 token 공급", async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = jwt(exp, "opts");
+    steps = [ok({ token })];
 
     await getSocketClient();
 
     expect(vi.mocked(io)).toHaveBeenCalledTimes(1);
-    const opts = vi.mocked(io).mock.calls[0][1];
-    expect(opts).toMatchObject({
-      auth: { token: "jwt-opts" },
-      reconnection: true,
-    });
+    const opts = vi.mocked(io).mock.calls[0][1] as Record<string, unknown>;
+    expect(opts.reconnection).toBe(true);
+    // WI-049: 정적 객체가 아니라 함수여야 한다(매 handshake fresh 토큰).
+    expect(typeof opts.auth).toBe("function");
+    const supplied = await invokeAuth();
+    expect(supplied).toBe(token);
+    expect(fetchCalls).toBe(1); // prefetch 캐시 재사용 — auth 첫 호출이 재fetch 안 함
+  });
+});
+
+// ============================================================
+// WI-049: 토큰 재연결 갱신 — auth 함수 + 만료 인지 캐시 + 실패 stash
+// ============================================================
+describe("WI-049 getSocketAuthToken — 만료 인지 캐시", () => {
+  it("유효 캐시는 재발급 없이 반환(연속 호출 fetch 1회)", async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    steps = [ok({ token: jwt(exp, "a") })];
+
+    const t1 = await getSocketAuthToken();
+    const t2 = await getSocketAuthToken();
+
+    expect(t1).toBe(t2);
+    expect(fetchCalls).toBe(1);
+  });
+
+  it("동시 호출은 dedupe — 빈 캐시에서 병렬 2회도 fetch 1회", async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    steps = [ok({ token: jwt(exp, "dedupe") })];
+
+    const [a, b] = await Promise.all([getSocketAuthToken(), getSocketAuthToken()]);
+
+    expect(a).toBe(b);
+    expect(fetchCalls).toBe(1);
+  });
+
+  it("만료 임박 후 호출하면 새 토큰을 발급(fake clock)", async () => {
+    vi.useFakeTimers();
+    const baseMs = 1_700_000_000_000;
+    vi.setSystemTime(baseMs);
+    const baseSec = Math.floor(baseMs / 1000);
+    const tokenA = jwt(baseSec + 100, "A"); // 100초 후 만료
+    const tokenB = jwt(baseSec + 250, "B");
+    steps = [ok({ token: tokenA }), ok({ token: tokenB })];
+
+    const first = await getSocketAuthToken();
+    expect(first).toBe(tokenA);
+    expect(fetchCalls).toBe(1);
+
+    // 만료 60초(skew) 이내로 진입(base+50s → 잔여 50s < 60s) → 재발급
+    vi.setSystemTime(baseMs + 50_000);
+    const second = await getSocketAuthToken();
+
+    expect(second).toBe(tokenB);
+    expect(fetchCalls).toBe(2);
+  });
+
+  it("재발급 실패 + 기존 토큰 아직 유효 → 기존 토큰으로 버팀(끊김 완화)", async () => {
+    vi.useFakeTimers();
+    const baseMs = 1_700_000_000_000;
+    vi.setSystemTime(baseMs);
+    const baseSec = Math.floor(baseMs / 1000);
+    const tokenA = jwt(baseSec + 100, "A");
+    steps = [ok({ token: tokenA }), fail(401)]; // 2번째(갱신) 실패
+
+    await getSocketAuthToken(); // 캐시 적재
+    vi.setSystemTime(baseMs + 50_000); // skew 진입(잔여 50s)·아직 만료 전
+    const kept = await getSocketAuthToken();
+
+    expect(kept).toBe(tokenA); // 갱신 실패해도 만료 전 토큰 유지
+    expect(consumeLastSocketAuthError()).toBeNull();
+  });
+
+  it("갱신 실패 시 동시 호출자도 일관되게 기존 토큰으로 버팀(codex r2 P2)", async () => {
+    vi.useFakeTimers();
+    const baseMs = 1_700_000_000_000;
+    vi.setSystemTime(baseMs);
+    const baseSec = Math.floor(baseMs / 1000);
+    const tokenA = jwt(baseSec + 100, "A");
+    steps = [ok({ token: tokenA }), fail(401)]; // 초기 성공 + 갱신 401 실패
+
+    await getSocketAuthToken(); // 캐시 적재
+    vi.setSystemTime(baseMs + 50_000); // skew 진입(잔여 50s)·만료 전
+
+    // 동시 2회 — 첫 호출자만이 아니라 dedupe 공유자도 fallback 받아야 한다
+    const [a, b] = await Promise.all([getSocketAuthToken(), getSocketAuthToken()]);
+
+    expect(a).toBe(tokenA);
+    expect(b).toBe(tokenA);
+    expect(fetchCalls).toBe(2); // dedupe: 갱신 fetch 1회만(동시 2호출이 2회 아님)
+  });
+
+  it("in-flight 발급 중 disconnect → 해소돼도 캐시 재오염 안 함(세대 가드, codex r1 P1)", async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const staleToken = jwt(exp, "stale");
+    const freshToken = jwt(exp, "fresh");
+    const resp = (token: string) =>
+      ({ ok: true, status: 200, json: async () => ({ token }) }) as unknown as Response;
+
+    let resolveFirst!: (r: Response) => void;
+    let call = 0;
+    global.fetch = vi.fn(() => {
+      call += 1;
+      if (call === 1) return new Promise<Response>((r) => (resolveFirst = r));
+      return Promise.resolve(resp(freshToken));
+    }) as unknown as typeof fetch;
+
+    const p1 = getSocketAuthToken(); // 1차 발급 시작(pending)
+    disconnectSocket(); // 캐시/pending 폐기 + 세대 증가
+    resolveFirst(resp(staleToken)); // 1차 발급 해소(폐기된 세션 토큰)
+    await p1; // 구 awaiter는 stale을 받을 수 있으나(허용) 캐시엔 쓰면 안 됨
+
+    const next = await getSocketAuthToken(); // 새 세션 호출 → 캐시 비어 새로 발급
+    expect(next).toBe(freshToken); // stale 재사용 아님
+    expect(call).toBe(2); // 2차 fetch 실제 발생(캐시 히트 아님)
+  });
+});
+
+describe("WI-049 auth 콜백 실패 → 코드별 stash(consumeLastSocketAuthError)", () => {
+  it("만료 후 재발급 401 실패면 빈 토큰 공급 + UNAUTHORIZED stash(1회성 소비)", async () => {
+    vi.useFakeTimers();
+    const baseMs = 1_700_000_000_000;
+    vi.setSystemTime(baseMs);
+    const baseSec = Math.floor(baseMs / 1000);
+    steps = [ok({ token: jwt(baseSec + 100, "A") }), fail(401)];
+
+    await getSocketClient(); // prefetch 성공(fetch1)
+    vi.setSystemTime(baseMs + 200_000); // 만료(100s) 경과 → 기존 토큰도 무효
+
+    const supplied = await invokeAuth(); // auth 콜백 → 재발급 401 → throw → stash
+
+    expect(supplied).toBe(""); // 서버가 거부하도록 빈 토큰
+    const stashed = consumeLastSocketAuthError();
+    expect(stashed).toBeInstanceOf(SocketTokenError);
+    expect(stashed?.code).toBe<SocketTokenErrorCode>("UNAUTHORIZED");
+    expect(consumeLastSocketAuthError()).toBeNull(); // 1회성 소비
+    expect(fetchCalls).toBe(2);
   });
 });
 

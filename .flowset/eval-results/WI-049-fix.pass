@@ -1,0 +1,10 @@
+WI=WI-049-fix
+commit=1aa8e7d
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-049.codex-r3.json
+evaluator=.flowset/eval-results/WI-049.eval.json
+gates=tsc,lint,vitest,build
+verdict=codex:WARNING(r1 FAIL P1[in-flight 발급이 disconnect 후 cachedToken 재오염->다른 사용자 재로그인 stale 토큰 재사용]->r2 WARNING P2[dedupe 공유 동시 호출자가 갱신실패 resilience 못 받고 reject 수신]->r3 WARNING 코드결함0·유일 잔여=샌드박스 vitest EPERM) evaluator:PASS 9.83(P0/P1/P2 0,P3x2 defer·변이검증 2/2로 P1·P2 해소 확인)
+notes=socket.io 토큰 1h TTL + 정적 auth:{token}(1회 발급)이 재연결마다 만료 토큰 재전송->서버 verifySocketToken throw->"Invalid token"(1시간+ 세션 게임/채팅 소켓 死). 수정=클라가 매 (재)연결 handshake fresh 토큰 공급. 설계 codex consult 1R 수렴=(3)하이브리드. socket-client.ts: 신규 getSocketAuthToken(만료 인지 캐시 {token,expiresAt}+pendingToken in-flight dedupe·캐시 유효[만료 60s skew 전] 즉시반환·아니면 fetchSocketToken 재발급·갱신실패+기존 만료전이면 기존토큰 fallback) + decodeJwtExpiryMs(JWT exp 디코드·검증 아닌 캐시 힌트·base64url 패딩 복원·실패 null->폴백 50분 TTL) + getSocketClient가 await getSocketAuthToken() prefetch(초기 실패 SocketTokenError throw로 기존 코드별 UX 보존) + io auth를 함수로(catch시 lastAuthError stash+빈 토큰->서버 거부) + consumeLastSocketAuthError 1회성 + disconnectSocket이 캐시/pending/lastAuthError 폐기. use-socket.ts: connect_error가 stash 있으면 socketTokenErrorMessage(code) 없으면 generic. 서버 무변경=Vercel 전용(socket-client.ts/use-socket.ts는 클라 파일·Dockerfile.socket COPY 목록 밖·OCI 번들 무관). 듀얼 블라인드 3R: codex 단독 P1(세션간 토큰 재오염)·P2(공유자 resilience 불일치) 적출[evaluator r1 PASS 9.75라 놓침=듀얼 가치]->r2 세대 가드(tokenGeneration 캡처·disconnect시 ++·세대 일치시만 cachedToken write)·r3 resilience+캐시적재를 pending promise 내부로 이동(모든 dedupe 공유자 일관). evaluator 변이검증 r1 6/6 + 재채점 2/2(세대가드 무력화->재오염 테스트 FAIL / resilience outer 회귀->공유자 일관성 테스트 FAIL). 회귀테스트: socket-client +7(auth 함수·캐시 재사용·dedupe·만료 재발급·실패 stash 1회성·세대 가드·공유자 일관) use-socket +2(connect_error 코드별/generic). 게이트 tsc0/lint0err[선재 LiveKit 경고1]/vitest 696->705(+9)/build0. main 미승격(다음 develop->main 승격 시 라이브). defer P3x2: decodeJwtExpiryMs 깨진토큰 폴백 직접 테스트 부재(간접커버·코드 try/catch 안전)·lastAuthError 성공경로 미clear(빈토큰->즉시 connect_error->1회성 소비로 잔존윈도우 극소).
+rounds=3
+createdAt=2026-06-26

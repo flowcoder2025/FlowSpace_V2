@@ -129,6 +129,118 @@ export async function fetchSocketToken(
   throw new SocketTokenError("TEMPORARY_FAILURE", "소켓 토큰 발급 실패");
 }
 
+/**
+ * 소켓 토큰 캐시 (WI-049).
+ *
+ * `/api/socket/token` JWT는 TTL 1시간. socket.io 재연결은 handshake마다 토큰을
+ * 다시 제출하므로, 1시간 이상 열린 세션이 재연결할 때 만료 토큰을 보내면 서버가
+ * `Invalid token`으로 거부한다. 이를 막기 위해 `getSocketAuthToken()`이 토큰을
+ * 캐시하고 만료 임박 시에만 새로 발급한다(재연결마다 `/api/socket/token` 과호출 방지).
+ */
+interface CachedSocketToken {
+  token: string;
+  /** JWT exp(ms) 기반 만료 시각. exp 디코드 실패 시 보수적 폴백. */
+  expiresAt: number;
+}
+
+let cachedToken: CachedSocketToken | null = null;
+let pendingToken: Promise<string> | null = null;
+/**
+ * 토큰 캐시 세대. `disconnectSocket()`(로그아웃/세션 종료)에서 증가시킨다. in-flight
+ * 발급 promise는 시작 시 세대를 캡처해, 해소 시점에 세대가 바뀌었으면(=그 사이 disconnect)
+ * `cachedToken`을 적재하지 않는다 — 폐기된 세션의 토큰이 다음 세션 캐시를 재오염하는 것을
+ * 막는다(다른 사용자 재로그인 시 stale 토큰 재사용 차단, codex WI-049 r1 P1).
+ */
+let tokenGeneration = 0;
+
+/** 만료 이 시간 전부터는 미리 새 토큰을 받는다(handshake 직전 만료 경합 방지). */
+const TOKEN_REFRESH_SKEW_MS = 60_000;
+/** exp 디코드 실패 시 보수적 캐시 수명(서버 1h TTL보다 짧게). */
+const TOKEN_FALLBACK_TTL_MS = 50 * 60_000;
+
+/**
+ * JWT payload의 `exp`(초)를 ms로 디코드한다. **검증이 아니라 클라이언트 캐시 힌트
+ * 전용** — 서명 검증은 소켓 서버가 한다. 파싱 실패 시 null.
+ */
+function decodeJwtExpiryMs(token: string): number | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    // base64url → base64 + 패딩 복원(JWT payload는 패딩 없는 base64url).
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const json = JSON.parse(
+      typeof atob === "function"
+        ? atob(padded)
+        : Buffer.from(padded, "base64").toString("utf8")
+    );
+    return typeof json?.exp === "number" ? json.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 유효(만료 임박 전) 캐시 토큰을 반환하거나 새로 발급한다.
+ *
+ * - 캐시가 만료 임박 전이면 즉시 반환(네트워크 호출 없음).
+ * - 동시 호출은 `pendingToken`으로 dedupe(재연결 폭주 시 중복 fetch 방지).
+ * - 새 발급 실패 시, 기존 캐시 토큰이 아직 만료 전이면 그것으로 버틴다(끊김 완화).
+ */
+export async function getSocketAuthToken(
+  opts: FetchSocketTokenOptions = {}
+): Promise<string> {
+  const now = Date.now();
+  if (cachedToken && now < cachedToken.expiresAt - TOKEN_REFRESH_SKEW_MS) {
+    return cachedToken.token;
+  }
+  if (pendingToken) return pendingToken;
+
+  const previous = cachedToken;
+  const generation = tokenGeneration;
+  // resilience·캐시 적재를 pending 내부에 두어, dedupe로 이 promise를 공유하는
+  // 동시 호출자도 첫 호출자와 동일한 결과(갱신 실패 시 기존 토큰 fallback)를
+  // 받게 한다(codex r2 P2 — 공유자 일관성).
+  const pending = (async (): Promise<string> => {
+    try {
+      const token = await fetchSocketToken(opts);
+      // 발급 await 동안 disconnectSocket()가 일어났으면(세대 불일치) 캐시를 적재하지
+      // 않는다 — 폐기된 세션 토큰이 다음 세션을 재오염하지 못하게(codex r1 P1).
+      if (generation === tokenGeneration) {
+        cachedToken = {
+          token,
+          expiresAt: decodeJwtExpiryMs(token) ?? Date.now() + TOKEN_FALLBACK_TTL_MS,
+        };
+      }
+      return token;
+    } catch (err) {
+      // 갱신 실패 + 기존 토큰이 아직 만료 전이면 그걸로 버틴다(불필요한 끊김 방지).
+      if (previous && Date.now() < previous.expiresAt) return previous.token;
+      throw err;
+    }
+  })();
+  pendingToken = pending;
+  try {
+    return await pending;
+  } finally {
+    if (pendingToken === pending) pendingToken = null;
+  }
+}
+
+/**
+ * 마지막 auth 콜백(handshake)에서 발생한 토큰 발급 실패. socket.io `auth` 콜백은
+ * throw/reject로 타입 에러를 전달할 수 없어(빈 토큰 → 서버 거부 → `connect_error`),
+ * use-socket이 `connect_error` 시 이 값을 읽어 코드별 안내 메시지로 매핑한다(WI-049).
+ */
+let lastAuthError: SocketTokenError | null = null;
+
+/** 마지막 auth 실패를 1회성으로 소비한다(읽고 즉시 초기화). */
+export function consumeLastSocketAuthError(): SocketTokenError | null {
+  const err = lastAuthError;
+  lastAuthError = null;
+  return err;
+}
+
 function getSocketUrl(): string {
   if (typeof window === "undefined") return "";
   // 프로덕션: 별도 서브도메인 (e.g. https://v2-socket.flow-coder.com)
@@ -167,14 +279,27 @@ export async function getSocketClient(): Promise<TypedSocket> {
   }
 
   const pending = (async (): Promise<TypedSocket> => {
-    // 토큰 발급 (일시적 실패는 재시도, 원인별 SocketTokenError로 실패)
-    const token = await fetchSocketToken();
+    // 초기 토큰 prefetch — 실패 시 원인별 SocketTokenError를 그대로 던져
+    // use-socket의 catch가 코드별 안내 메시지로 매핑하는 기존 UX를 보존한다.
+    // (성공 시 캐시에 적재 → 직후 auth 콜백 첫 호출이 재fetch 없이 재사용.)
+    await getSocketAuthToken();
 
     const url = getSocketUrl();
     console.log("[Socket] Connecting to:", url);
 
     const next = io(url, {
-      auth: { token },
+      // WI-049: 정적 토큰 대신 함수 — socket.io가 매 (재)연결 handshake마다 호출.
+      // 캐시된 fresh 토큰을 공급하므로 1시간+ 세션의 재연결도 만료 토큰을 보내지 않는다.
+      // 발급 실패 시 빈 토큰을 넘겨 서버가 거부(connect_error)하게 하고, 원인은 stash해
+      // use-socket이 코드별 메시지로 안내한다.
+      auth: (cb: (data: { token: string }) => void) => {
+        getSocketAuthToken()
+          .then((token) => cb({ token }))
+          .catch((err) => {
+            lastAuthError = err instanceof SocketTokenError ? err : null;
+            cb({ token: "" });
+          });
+      },
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: RECONNECTION_ATTEMPTS,
@@ -204,4 +329,10 @@ export function disconnectSocket() {
     socket.disconnect();
     socket = null;
   }
+  // 세션 완전 종료 → 다음 마운트는 새 토큰을 받도록 캐시 폐기(WI-049).
+  // 세대 증가 → 진행 중인 발급이 해소돼도 이 캐시를 재오염하지 못한다(codex r1 P1).
+  cachedToken = null;
+  pendingToken = null;
+  lastAuthError = null;
+  tokenGeneration++;
 }
