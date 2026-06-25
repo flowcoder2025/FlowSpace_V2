@@ -363,6 +363,31 @@ describe("WI-049 getSocketAuthToken — 만료 인지 캐시", () => {
     expect(kept).toBe(tokenA); // 갱신 실패해도 만료 전 토큰 유지
     expect(consumeLastSocketAuthError()).toBeNull();
   });
+
+  it("in-flight 발급 중 disconnect → 해소돼도 캐시 재오염 안 함(세대 가드, codex r1 P1)", async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const staleToken = jwt(exp, "stale");
+    const freshToken = jwt(exp, "fresh");
+    const resp = (token: string) =>
+      ({ ok: true, status: 200, json: async () => ({ token }) }) as unknown as Response;
+
+    let resolveFirst!: (r: Response) => void;
+    let call = 0;
+    global.fetch = vi.fn(() => {
+      call += 1;
+      if (call === 1) return new Promise<Response>((r) => (resolveFirst = r));
+      return Promise.resolve(resp(freshToken));
+    }) as unknown as typeof fetch;
+
+    const p1 = getSocketAuthToken(); // 1차 발급 시작(pending)
+    disconnectSocket(); // 캐시/pending 폐기 + 세대 증가
+    resolveFirst(resp(staleToken)); // 1차 발급 해소(폐기된 세션 토큰)
+    await p1; // 구 awaiter는 stale을 받을 수 있으나(허용) 캐시엔 쓰면 안 됨
+
+    const next = await getSocketAuthToken(); // 새 세션 호출 → 캐시 비어 새로 발급
+    expect(next).toBe(freshToken); // stale 재사용 아님
+    expect(call).toBe(2); // 2차 fetch 실제 발생(캐시 히트 아님)
+  });
 });
 
 describe("WI-049 auth 콜백 실패 → 코드별 stash(consumeLastSocketAuthError)", () => {
