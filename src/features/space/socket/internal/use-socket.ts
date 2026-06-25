@@ -11,6 +11,7 @@ import type {
 import {
   getSocketClient,
   disconnectSocket,
+  consumeLastSocketAuthError,
   SocketTokenError,
   type SocketTokenErrorCode,
 } from "./socket-client";
@@ -318,8 +319,16 @@ export function useSocket({
         });
 
         sock.on("connect_error", (err) => {
-          console.error("[Socket] Connect error:", err.message);
-          setSocketError(`소켓 연결 실패: ${err.message}`);
+          // WI-049: handshake 토큰 발급 실패(만료 갱신 실패/세션 만료/네트워크)면
+          // 코드별 안내로, 그 외엔 generic 메시지로 표시.
+          const authErr = consumeLastSocketAuthError();
+          if (authErr) {
+            console.error("[Socket] Auth error on (re)connect:", authErr.code);
+            setSocketError(socketTokenErrorMessage(authErr.code));
+          } else {
+            console.error("[Socket] Connect error:", err.message);
+            setSocketError(`소켓 연결 실패: ${err.message}`);
+          }
           setIsConnected(false);
         });
 

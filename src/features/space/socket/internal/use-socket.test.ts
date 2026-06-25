@@ -10,10 +10,12 @@ import { renderHook, act, cleanup } from "@testing-library/react";
 // disconnectSocket 호출 횟수로 생명주기 동작을 단언한다.
 // ============================================================
 
-const { getSocketClientMock, disconnectSocketMock } = vi.hoisted(() => ({
-  getSocketClientMock: vi.fn(),
-  disconnectSocketMock: vi.fn(),
-}));
+const { getSocketClientMock, disconnectSocketMock, consumeLastSocketAuthErrorMock } =
+  vi.hoisted(() => ({
+    getSocketClientMock: vi.fn(),
+    disconnectSocketMock: vi.fn(),
+    consumeLastSocketAuthErrorMock: vi.fn(),
+  }));
 
 vi.mock("./socket-client", async (importActual) => {
   const actual = await importActual<typeof import("./socket-client")>();
@@ -21,6 +23,7 @@ vi.mock("./socket-client", async (importActual) => {
     ...actual, // SocketTokenError / 타입 등 실제 export 유지
     getSocketClient: getSocketClientMock,
     disconnectSocket: disconnectSocketMock,
+    consumeLastSocketAuthError: consumeLastSocketAuthErrorMock,
   };
 });
 
@@ -37,6 +40,7 @@ vi.mock("./kick-guard", () => ({
 }));
 
 import { useSocket } from "./use-socket";
+import { SocketTokenError } from "./socket-client";
 
 /** useSocket effect가 반환 소켓에 호출하는 표면을 최소 충족하는 가짜 소켓 */
 function makeFakeSocket() {
@@ -73,6 +77,8 @@ beforeEach(() => {
   isSpaceKickedMock.mockReset();
   isSpaceKickedMock.mockReturnValue(false); // 기본: 강퇴 아님
   markSpaceKickedMock.mockReset();
+  consumeLastSocketAuthErrorMock.mockReset();
+  consumeLastSocketAuthErrorMock.mockReturnValue(null); // 기본: 인증 stash 없음
 });
 
 afterEach(() => {
@@ -225,5 +231,43 @@ describe("useSocket — kick 가드(WI-047)", () => {
     expect(reconnect).toBeTypeOf("function");
     act(() => reconnect!());
     expect(joinEmits(fake).length).toBe(0);
+  });
+});
+
+describe("useSocket — connect_error 토큰 실패 매핑(WI-049)", () => {
+  it("auth stash 있으면 코드별 안내 메시지(UNAUTHORIZED → 세션 만료)", async () => {
+    consumeLastSocketAuthErrorMock.mockReturnValue(
+      new SocketTokenError("UNAUTHORIZED", "raw")
+    );
+    const fake = makeFakeSocket();
+    getSocketClientMock.mockResolvedValue(fake);
+    const { result } = renderHook(() => useSocket(baseProps));
+    await act(async () => {
+      await flush();
+    });
+
+    const connectError = onHandler(fake, "connect_error");
+    expect(connectError).toBeTypeOf("function");
+    act(() => connectError!({ message: "Invalid token" }));
+
+    // generic "소켓 연결 실패: Invalid token"이 아니라 코드별 안내여야 한다
+    expect(result.current.socketError).toBe(
+      "세션이 만료되었습니다. 다시 로그인해 주세요."
+    );
+  });
+
+  it("auth stash 없으면 generic 메시지(서버 err.message)", async () => {
+    consumeLastSocketAuthErrorMock.mockReturnValue(null);
+    const fake = makeFakeSocket();
+    getSocketClientMock.mockResolvedValue(fake);
+    const { result } = renderHook(() => useSocket(baseProps));
+    await act(async () => {
+      await flush();
+    });
+
+    const connectError = onHandler(fake, "connect_error");
+    act(() => connectError!({ message: "boom" }));
+
+    expect(result.current.socketError).toBe("소켓 연결 실패: boom");
   });
 });
