@@ -1,0 +1,10 @@
+WI=WI-050-fix
+commit=6ae5fdb
+sourceFingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+codex=.flowset/eval-results/WI-050.codex.json
+evaluator=.flowset/eval-results/WI-050.eval.json
+gates=tsc,lint,vitest,build
+verdict=codex:PASS(0 issues) evaluator:WARNING 9.78(P0/P1/P2 0,P3x2 defer)
+notes=LiveKit webhook(POST /api/livekit/webhook)이 미들웨어 isPublicRequest public allowlist에 없어 미인증 콜백이 307(/login)로 막혀 webhook 전송 실패(participant_left 등 app 미수신·presence/제재 정확도). 라우트(src/app/api/livekit/webhook/route.ts)는 WebhookReceiver로 LiveKit 서명 자체검증(prod fail-closed: 키 미설정 throw->500·Authorization 없음 401·불일치 401·IS_DEV만 미검증 파싱) → 세션 아닌 서명이 인증 경계. 설계 codex consult 1R: exact matcher 권고(PUBLIC_PREFIXES는 startsWith(p+"/")라 하위경로도 노출). 해소(impl 6ae5fdb): src/lib/route-access.ts 신규 export PUBLIC_API_PATHS=new Set(["/api/livekit/webhook"]) exact set + isPublicRequest에 PUBLIC_API_PATHS.has(pathname) 체크(PUBLIC_FILES 다음·PUBLIC_PREFIXES 전). 회귀 +4(webhook public·하위경로 /webhook/foo·/webhookX 비공개·형제 /api/livekit/token 비공개[token route는 auth() 세션 사용]·셋 내용). 듀얼 1R 수렴 codex PASS 0 issues·evaluator WARNING 9.78(변이검증 MUT1 가드제거->webhook 테스트 FAIL·MUT2 token 셋추가->형제 비노출 테스트 FAIL·원복 clean / evaluator 독립 grep: WebhookReceiver 자체검증 라우트 webhook 단1개=스코프 완결). 게이트 tsc0/lint0err[선재 LiveKit 경고1]/vitest 705->709[+4]/build0. Vercel 전용(route-access.ts 미들웨어·OCI 번들 무관). main 미승격. **부분 수정**: D-code(코드 경로만 열림). 실제 webhook 수신은 livekit.yaml URL이 죽은 도메인(v2.flow-coder.com=DNS없음/flow-metaverse.vercel.app=404)을 가리켜 D-infra(URL을 space.flow-coder.com으로 교정+LiveKit 재시작·OCI 승인 게이트) 후에야 흐름. 완료 판정=D-infra 후 실제 LiveKit 이벤트 수신 로그. defer P3x2: 미인증 POST DoS 표면(서명검증 비용·ops 레이어 rate limit/body size 관심사·WI 스코프 밖)·IS_DEV 미검증 파싱(NODE_ENV gate로 prod 무영향). codex 놓칠위험=public 노출시 대량 invalid POST DoS→ops 레이어 확인 권고.
+rounds=1
+createdAt=2026-06-26
