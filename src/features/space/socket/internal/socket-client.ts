@@ -198,25 +198,30 @@ export async function getSocketAuthToken(
 
   const previous = cachedToken;
   const generation = tokenGeneration;
+  // resilience·캐시 적재를 pending 내부에 두어, dedupe로 이 promise를 공유하는
+  // 동시 호출자도 첫 호출자와 동일한 결과(갱신 실패 시 기존 토큰 fallback)를
+  // 받게 한다(codex r2 P2 — 공유자 일관성).
   const pending = (async (): Promise<string> => {
-    const token = await fetchSocketToken(opts);
-    // 발급 await 동안 disconnectSocket()가 일어났으면(세대 불일치) 캐시를 적재하지
-    // 않는다 — 폐기된 세션 토큰이 다음 세션을 재오염하지 못하게(codex r1 P1).
-    if (generation === tokenGeneration) {
-      cachedToken = {
-        token,
-        expiresAt: decodeJwtExpiryMs(token) ?? Date.now() + TOKEN_FALLBACK_TTL_MS,
-      };
+    try {
+      const token = await fetchSocketToken(opts);
+      // 발급 await 동안 disconnectSocket()가 일어났으면(세대 불일치) 캐시를 적재하지
+      // 않는다 — 폐기된 세션 토큰이 다음 세션을 재오염하지 못하게(codex r1 P1).
+      if (generation === tokenGeneration) {
+        cachedToken = {
+          token,
+          expiresAt: decodeJwtExpiryMs(token) ?? Date.now() + TOKEN_FALLBACK_TTL_MS,
+        };
+      }
+      return token;
+    } catch (err) {
+      // 갱신 실패 + 기존 토큰이 아직 만료 전이면 그걸로 버틴다(불필요한 끊김 방지).
+      if (previous && Date.now() < previous.expiresAt) return previous.token;
+      throw err;
     }
-    return token;
   })();
   pendingToken = pending;
   try {
     return await pending;
-  } catch (err) {
-    // 갱신 실패 + 기존 토큰이 아직 만료 전이면 그걸로 버틴다(불필요한 끊김 방지).
-    if (previous && Date.now() < previous.expiresAt) return previous.token;
-    throw err;
   } finally {
     if (pendingToken === pending) pendingToken = null;
   }

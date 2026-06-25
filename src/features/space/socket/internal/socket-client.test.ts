@@ -364,6 +364,25 @@ describe("WI-049 getSocketAuthToken — 만료 인지 캐시", () => {
     expect(consumeLastSocketAuthError()).toBeNull();
   });
 
+  it("갱신 실패 시 동시 호출자도 일관되게 기존 토큰으로 버팀(codex r2 P2)", async () => {
+    vi.useFakeTimers();
+    const baseMs = 1_700_000_000_000;
+    vi.setSystemTime(baseMs);
+    const baseSec = Math.floor(baseMs / 1000);
+    const tokenA = jwt(baseSec + 100, "A");
+    steps = [ok({ token: tokenA }), fail(401)]; // 초기 성공 + 갱신 401 실패
+
+    await getSocketAuthToken(); // 캐시 적재
+    vi.setSystemTime(baseMs + 50_000); // skew 진입(잔여 50s)·만료 전
+
+    // 동시 2회 — 첫 호출자만이 아니라 dedupe 공유자도 fallback 받아야 한다
+    const [a, b] = await Promise.all([getSocketAuthToken(), getSocketAuthToken()]);
+
+    expect(a).toBe(tokenA);
+    expect(b).toBe(tokenA);
+    expect(fetchCalls).toBe(2); // dedupe: 갱신 fetch 1회만(동시 2호출이 2회 아님)
+  });
+
   it("in-flight 발급 중 disconnect → 해소돼도 캐시 재오염 안 함(세대 가드, codex r1 P1)", async () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const staleToken = jwt(exp, "stale");
