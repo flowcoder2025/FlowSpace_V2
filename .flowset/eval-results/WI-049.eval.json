@@ -1,0 +1,32 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.8,
+    "consistency": 9.9,
+    "specificity": 9.8,
+    "actionability": 9.8
+  },
+  "weightedTotal": 9.83,
+  "verdict": "PASS",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/features/space/socket/internal/socket-client.ts:165-181",
+      "description": "decodeJwtExpiryMs의 손상/비-JWT 토큰 폴백 경로(null -> TOKEN_FALLBACK_TTL_MS 50분)에 직접 단위 테스트가 없다. 코드 독해로 모든 분기(dot 없음 -> payload undefined -> null, atob throw -> catch null, JSON.parse throw -> catch null, exp 비-number -> null)가 throw 없이 null 폴백함을 확인했고 정상 JWT 경로는 jwt() 헬퍼로 충분히 검증됐으나, 깨진 토큰에 대한 폴백 TTL 적용은 간접적으로만 커버된다(만료 인지 캐시 테스트가 정상 exp만 사용). r2/r3 변경과 무관하게 r1부터 잔존하는 테스트 breadth 부채.",
+      "recommendation": "exp 없는 토큰/dot 없는 문자열/비-base64 payload를 getSocketAuthToken에 주입했을 때 throw 없이 캐시되고 만료시각이 now+TOKEN_FALLBACK_TTL_MS(50분)로 잡히는지 단언하는 테스트 1~2건 추가(현 vitest 패턴 jwt() 옆에 brokenToken() 헬퍼).",
+      "defer": true,
+      "deferRationale": "코드 경로 자체는 try/catch로 모든 실패가 null 폴백되어 정확하고(독립 코드 독해 확인), 폴백 TTL은 서버 1h TTL보다 짧아 보수적이라 런타임 결함 없음. 테스트 breadth 부채일 뿐 게이트 비차단.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/features/space/socket/internal/socket-client.ts:278-285, use-socket.ts:321-333",
+      "description": "lastAuthError 모듈 전역은 auth 콜백 실패 경로(.catch)에서만 set되고 성공 경로에서는 clear되지 않는다. 일반 흐름(빈 토큰 cb -> 서버 거부 -> 즉시 connect_error -> consumeLastSocketAuthError 1회성 소비)에서는 매 실패 시도마다 자기 connect_error가 stash를 소비하므로 안전하다. 다만 socket.io가 auth 실패 후 짝이 되는 connect_error를 발화하지 않거나(이론상), 이전 실패 시도의 미소비 stash가 이후 비-인증 사유 connect_error(transport/CORS)에 잔존하면 generic 메시지가 인증 메시지로 잘못 마스킹될 SUSPECTED 가능성이 있다. 실제로는 빈 토큰 cb가 결정적으로 connect_error를 유발해 윈도우가 극소다. r2(세대 가드)/r3(공유자 일관성)와 직교한 잔존 엣지.",
+      "recommendation": "auth 콜백 성공 경로(cb({token})) 직전에 lastAuthError=null로 선제 clear하면 직전 실패 시도의 stash가 후속 성공 핸드셰이크의 비-인증 connect_error로 새는 경로를 원천 차단할 수 있다(현재도 1회성 소비로 사실상 막혀 있어 선택적).",
+      "defer": true,
+      "deferRationale": "빈 토큰 공급이 서버 거부->connect_error를 결정적으로 유발하고 그 connect_error가 동일 stash를 즉시 소비하므로 잔존 윈도우가 사실상 없음. disconnectSocket도 stash를 폐기. 단일 탭 싱글턴 스코프라 다중 세션 오염 없음. 이론적 엣지로 게이트 비차단.",
+      "fixNow": false
+    }
+  ]
+}
