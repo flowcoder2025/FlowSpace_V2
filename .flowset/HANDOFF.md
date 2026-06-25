@@ -1,5 +1,31 @@
 # HANDOFF
 
+## ✅ 세션 2026-06-26 — 2회 승격 + 소켓 이슈 진단/수정 (다음 세션 최상단)
+**핸드오프 읽고 codex 협의→작업 진행 지시.** 요약(상세 MEMORY.md 상단):
+
+**① develop→main 1차 승격 완료·라이브** — WI-042/046/047/048/025/040/043+028docs(8건·36커밋)→**main `b0f56dd`**. WI-047(kick 쿨다운)이 유일 server/ 변경→OCI 소켓 CD **자동배포 success 32s**(롤백태그 `rollback-pre-wi047`). prisma 무변경. Vercel `iwwq18iic` Ready·스모크 200. codex 협의=WI-047 버전스큐 benign degraded·로컬main stale(origin/main 기준). 통합게이트 vitest 696.
+
+**② 사용자 "소켓 끊김" 제보 진단 = 3개 선재 이슈(전부 배포 무관, 코드/로그 확정)**:
+- **LiveKit signal WS 끊김**(RR_SIGNAL_DISCONNECTED·code1006·auto-resume): LiveKit 로그 7일 전수 1,250회·**13명 전 사용자**·systemic·인프라(Cloudflare 유력). 포그라운드 확인. A/B probe(CF vs nip.io 직결)는 60초 join-timeout으로 미확정→ironclad=@livekit/rtc-node 필요. 수정유력=CF DNS-only(단 origin cert=CloudFlare Origin CA라 naive 토글 시 TLS 깨짐 — nip.io는 LE). = **B**.
+- **socket.io "Invalid token"**: `/api/socket/token` JWT 1h TTL + 정적 `auth:{token}`이 재연결마다 만료 토큰 재전송→死. AUTH_SECRET 정상. = **C(WI-049)로 해소**.
+- **LiveKit webhook 이중고장**: livekit.yaml URL 죽음(v2.flow-coder.com=DNS없음/flow-metaverse.vercel.app=404·현재 prod=space.flow-coder.com) + `/api/livekit/webhook`이 미들웨어 PUBLIC_PREFIXES 부재로 307 차단. = **D-code(WI-050 코드)+D-infra(URL·미완)**.
+
+**③ codex 우선순위 협의**: **A back-sync → C 토큰 → D-code → E e2e → D-infra → B**.
+
+**④ 완료(A·C·D-code)**:
+- **A**: develop=main back-sync(트리 동일 확인 후 force-with-lease).
+- **C = WI-049-fix**(소켓 토큰 재연결 갱신·PR#58): auth 함수화(매 handshake fresh)+`getSocketAuthToken` 만료 인지 캐시(exp디코드·skew·dedupe·fallback)+세대 가드+실패 stash. **codex 단독 P1(세션간 토큰 재오염)·P2(공유자 resilience 불일치) 적출**(evaluator r1 PASS 놓침)→r2/r3 해소·codex r3 코드결함0·evaluator 9.83. Vercel 전용. vitest 705.
+- **D-code = WI-050-fix**(webhook 라우트 public·PR#59): `route-access.ts` exact `PUBLIC_API_PATHS` 추가(라우트는 WebhookReceiver 서명 자체검증·형제 token 비노출). codex PASS·evaluator 9.78. Vercel 전용. vitest 709.
+
+**⑤ 2차 승격(WI-049+050·PR#60)·라이브** — 둘 다 Vercel 전용→**OCI 재배포·DB 마이그레이션 불요·OCI CD 미발동**. **main `ae6cca8`**(author flowcoder25 보존). Vercel `b1tj3rx2c` Ready. 스모크 web 200·socket 200·**webhook 307→401**(WI-050 라이브 검증=미들웨어 차단 해제·라우트 자체 거부). back-sync develop=main=`ae6cca8`(0/0).
+
+**🟡 잔여(전부 사용자 게이트)**:
+- **사용자 즉시조치**: 현재 탭이 옛 번들(`page-aa9109464ecb4006.js`·승격前)이라 Invalid token 잔존 → **하드 새로고침(Ctrl+Shift+R)**이면 해소(증거: webhook 307→401·옛해시 새빌드 부재·WI-049 심볼 새번들 포함). 새로고침 후 재연결 시 fresh 토큰 fetch.
+- **E** 라이브 e2e(라이브 코드로 검증 가능): kick/mute/ban + WI-047 강퇴 쿨다운 + 1h+ 세션 재연결 무중단. 운영자+대상 2계정 2브라우저.
+- **D-infra**: OCI `~/flowspace/livekit/livekit.yaml` `webhook.urls`를 `https://space.flow-coder.com/api/livekit/webhook`로 교정 + LiveKit 재시작(`docker restart flowspace-livekit`·순간 화상 끊김). 키=`~/.ssh/flowspace-oci` ubuntu@144.24.72.143. 완료 후 webhook 실제 수신(LiveKit 로그 `sent webhook`). prod config=사용자 승인 게이트.
+- **B** LiveKit 끊김: @livekit/rtc-node 실참가자 probe로 CF경유 vs nip.io직결 ~30분 1006 비교→Cloudflare 확정→CF DNS-only(사용자 Cloudflare·단 origin cert 처리 필요) 또는 NEXT_PUBLIC_LIVEKIT_URL→nip.io(Vercel 재빌드). LiveKit API key=`APIckbN3jsUGFhP`·시크릿 OCI livekit.yaml.
+
+
 ## ✅ WI-047-fix (강퇴 kick 쿨다운 — 멤버 제재 근본결함 해소) develop 머지 완료 (2026-06-24, PR#51 merge `e003274`)
 **S2에서 확정·사용자 승인한 kick 수정을 구현·검증·머지.** 멤버 제재 라이브 미동작의 **잔존 확정결함=강퇴 무력화** 해소. 근본원인: kick은 `SpaceMember` DB 무변경(restriction=NONE·"임시 퇴장")이라, 소켓 disconnect(true)[io server disconnect=자동재연결 안 함] 후에도 클라 `useSocket` effect 리마운트/재연결로 새 소켓 생성→connect에서 `join:space` 자동 재발송→DB상 유효 멤버라 **즉시 복귀**(WI-045 후 잔존).
 
