@@ -16,6 +16,20 @@
 export const PUBLIC_FILES: ReadonlySet<string> = new Set(["/Logo.png"]);
 
 /**
+ * NextAuth 세션 대신 **자체 인증**(요청 서명 검증 등)을 갖는 외부 콜백 API 경로의
+ * **exact** allowlist (WI-050).
+ *
+ * LiveKit webhook(`POST /api/livekit/webhook`)은 `WebhookReceiver`로 LiveKit 서명을
+ * 검증한다(미설정/헤더없음/불일치 → 401, prod fail-closed). 세션 미들웨어가 막으면
+ * 외부 콜백이 307(/login)로 깨진다. **prefix가 아닌 정확 경로**로 둬서 하위 경로
+ * (`/api/livekit/webhook/...`)나 형제(`/api/livekit/token` — 세션 인증 필요)가 실수로
+ * public 되지 않게 한다(codex 적대 협의 — exact matcher 권고).
+ */
+export const PUBLIC_API_PATHS: ReadonlySet<string> = new Set([
+  "/api/livekit/webhook",
+]);
+
+/**
  * prefix는 정확히 그 경로이거나 그 하위 경로일 때만 public
  * (예: "/login"은 "/login", "/login/..."만 매칭하고 "/login-anything"은 비공개 유지).
  */
@@ -32,6 +46,10 @@ export function isPublicRequest(pathname: string): boolean {
   }
   // public/ 공개 정적 자산 (명시 allowlist)
   if (PUBLIC_FILES.has(pathname)) {
+    return true;
+  }
+  // 자체 인증 외부 콜백 API (exact — 하위/형제 경로 비노출, WI-050)
+  if (PUBLIC_API_PATHS.has(pathname)) {
     return true;
   }
   // 루트는 exact 매칭만 (startsWith("/")가 모든 경로를 통과시키던 no-op 금지)
