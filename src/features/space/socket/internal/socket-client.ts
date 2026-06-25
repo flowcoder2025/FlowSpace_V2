@@ -145,6 +145,13 @@ interface CachedSocketToken {
 
 let cachedToken: CachedSocketToken | null = null;
 let pendingToken: Promise<string> | null = null;
+/**
+ * 토큰 캐시 세대. `disconnectSocket()`(로그아웃/세션 종료)에서 증가시킨다. in-flight
+ * 발급 promise는 시작 시 세대를 캡처해, 해소 시점에 세대가 바뀌었으면(=그 사이 disconnect)
+ * `cachedToken`을 적재하지 않는다 — 폐기된 세션의 토큰이 다음 세션 캐시를 재오염하는 것을
+ * 막는다(다른 사용자 재로그인 시 stale 토큰 재사용 차단, codex WI-049 r1 P1).
+ */
+let tokenGeneration = 0;
 
 /** 만료 이 시간 전부터는 미리 새 토큰을 받는다(handshake 직전 만료 경합 방지). */
 const TOKEN_REFRESH_SKEW_MS = 60_000;
@@ -190,12 +197,17 @@ export async function getSocketAuthToken(
   if (pendingToken) return pendingToken;
 
   const previous = cachedToken;
+  const generation = tokenGeneration;
   const pending = (async (): Promise<string> => {
     const token = await fetchSocketToken(opts);
-    cachedToken = {
-      token,
-      expiresAt: decodeJwtExpiryMs(token) ?? Date.now() + TOKEN_FALLBACK_TTL_MS,
-    };
+    // 발급 await 동안 disconnectSocket()가 일어났으면(세대 불일치) 캐시를 적재하지
+    // 않는다 — 폐기된 세션 토큰이 다음 세션을 재오염하지 못하게(codex r1 P1).
+    if (generation === tokenGeneration) {
+      cachedToken = {
+        token,
+        expiresAt: decodeJwtExpiryMs(token) ?? Date.now() + TOKEN_FALLBACK_TTL_MS,
+      };
+    }
     return token;
   })();
   pendingToken = pending;
@@ -313,7 +325,9 @@ export function disconnectSocket() {
     socket = null;
   }
   // 세션 완전 종료 → 다음 마운트는 새 토큰을 받도록 캐시 폐기(WI-049).
+  // 세대 증가 → 진행 중인 발급이 해소돼도 이 캐시를 재오염하지 못한다(codex r1 P1).
   cachedToken = null;
   pendingToken = null;
   lastAuthError = null;
+  tokenGeneration++;
 }
