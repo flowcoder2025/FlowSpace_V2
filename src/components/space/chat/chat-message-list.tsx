@@ -67,6 +67,19 @@ export function ChatMessageList({
     }
   }, [messages, autoScroll]);
 
+  // 패널 드래그 리사이즈로 스크롤 컨테이너 박스 크기가 바뀌면, 하단에 붙어 있던
+  // 경우(autoScroll) 즉시 재고정. 메시지 수가 그대로라 위 자동 스크롤 effect가
+  // 다시 돌지 않는 상황을 보완. drag 중 jank 방지 위해 instant.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (autoScroll) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [autoScroll]);
+
   // 스크롤 위치 감지
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -125,13 +138,16 @@ export function ChatMessageList({
   };
 
   return (
-    <div className="relative">
+    <div className="relative h-full min-h-0">
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="h-full overflow-y-auto p-2 space-y-0.5 chat-scrollbar"
+        className="h-full min-h-0 overflow-y-auto p-2 chat-scrollbar flex flex-col"
         style={{ fontSize: `${fontSizePx}px` }}
       >
+        {/* mt-auto: 메시지가 적으면 하단 정렬, 넘치면 0으로 접혀 정상 스크롤
+            (justify-end의 "위로 스크롤 불가" 브라우저 버그 회피) */}
+        <div className="mt-auto space-y-0.5">
         {messages.map((msg, idx) => {
           const displayNickname = msg.type === "system"
             ? msg.nickname
@@ -229,6 +245,7 @@ export function ChatMessageList({
           );
         })}
         <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* 최신 메시지로 스크롤 버튼 */}

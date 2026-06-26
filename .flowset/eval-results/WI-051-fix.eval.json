@@ -1,0 +1,41 @@
+{
+  "reviewer": "evaluator",
+  "schemaVersion": 1,
+  "scores": {
+    "completeness": 9.5,
+    "consistency": 9.7,
+    "specificity": 9.8,
+    "actionability": 9.6
+  },
+  "weightedTotal": 9.63,
+  "verdict": "WARNING",
+  "issues": [
+    {
+      "severity": "P3",
+      "location": "src/components/space/chat/chat-message-list.tsx:70-81",
+      "description": "ResizeObserver effect 주석이 '리사이즈/폰트 변경'으로 하단 재고정을 보장한다고 주장하나, 관측 대상 el(containerRef = 스크롤 컨테이너, line 142-147)은 h-full로 부모(chat-panel.tsx:215-217의 definite height)에 의해 박스 크기가 고정된다. fontSize는 같은 엘리먼트의 inline style이라 '내부 콘텐츠 높이'만 바꾸고 관측 엘리먼트의 border/content-box 크기는 불변 → RO 콜백이 폰트 변경 시 발화하지 않는다. 따라서 '하단 고정 상태에서 폰트 확대 시 콘텐츠가 늘어나며 바닥에서 풀리는' 엣지는 실제로 커버되지 않는다. RO는 의도된 주 케이스(패널 드래그 리사이즈=관측 박스 크기 변동)에는 정상 동작하므로 WI 핵심(스크롤 가능성)은 영향 없음.",
+      "recommendation": "주석의 '폰트 변경' 문구를 제거하거나, fontSize를 dep로 갖는 별도 effect로 autoScroll일 때 el.scrollTop=el.scrollHeight 재고정을 추가해 실제로 폰트 변경 엣지를 커버.",
+      "defer": true,
+      "deferRationale": "WI 수용 기준의 핵심(높이 사슬 단절로 인한 스크롤 불가)은 완전히 해소됨. 폰트 변경 시 바닥 재고정은 2차 엣지이며 사용자 보고 증상과 무관. 비차단.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": "src/components/space/chat/chat-message-list.tsx:145",
+      "description": "스크롤 컨테이너의 min-h-0는 사실상 redundant(무해). 컨테이너는 outer(line 141, `relative`=display:block)의 일반 블록 자식이지 flex item이 아니므로 computed min-height가 CSS 초기값 0이다(min-height:auto는 flex/grid item에만 적용). 기능적으로 중요한 min-h-0는 outer(line 141, 부모 chat-panel의 flex flex-col justify-end의 flex item)에 있는 것이며, 이것이 flex item min-height:auto가 콘텐츠 높이로 팽창해 overflow-hidden 부모를 넘기던 근본 결함을 정확히 차단한다(올바른 핵심 수정). 라인 145의 min-h-0는 방어적/스펙 일치 차원에서 무해하나 동작에 기여하지 않음.",
+      "recommendation": "라인 145 min-h-0는 제거 가능(무해하므로 방어적으로 유지해도 무방). 회귀 위험 없음.",
+      "defer": true,
+      "deferRationale": "무해한 dead class. 동작·성능·가독성에 영향 없음.",
+      "fixNow": false
+    },
+    {
+      "severity": "P3",
+      "location": ".flowset/fix_plan.md (WI-051 항목 부재)",
+      "description": "수용 기준 출처로 지정된 fix_plan.md에 WI-051 항목이 존재하지 않음(grep '051' 무결과). 구현/테스트는 작업트리 미커밋 상태(git status: chat-message-list.tsx modified, *.test.tsx untracked)이고 브랜치=develop(WI 전용 fix/ 브랜치 아님). 코드 결함은 아니나 추적성(traceability)·게이트 원장 측면의 프로세스 갭. 채점은 태스크 프롬프트에 명시된 수용 기준으로 수행함.",
+      "recommendation": "커밋/PR 단계에서 fix_plan.md에 WI-051-fix 체크박스+수용 기준을 추가하고 fix/WI-051-fix-* 브랜치로 분기(wi-flowset.md 5절·wi-global.md 2절).",
+      "defer": true,
+      "deferRationale": "구현 품질과 무관한 원장/브랜치 위생 항목. 머지 전 정리 가능, 비차단.",
+      "fixNow": false
+    }
+  ]
+}
