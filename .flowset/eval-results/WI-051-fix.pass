@@ -1,0 +1,11 @@
+WI=WI-051-fix
+commit=74b2b0f
+sourceFingerprint=719c02383b94493425ac09385d02b40925a68956e5c3f2be1ce7ea72a35730a7
+codex=.flowset/eval-results/WI-051-fix.codex.r2.json
+codexR1=.flowset/eval-results/WI-051-fix.codex.r1.json
+evaluator=.flowset/eval-results/WI-051-fix.eval.json
+gates=tsc,lint,vitest,build
+verdict=codex:PASS(0 issues, r2) evaluator:WARNING 9.63(P0/P1/P2 0,P3x3 defer)
+notes=채팅 패널 스크롤 미동작(메시지 많아도 위로 스크롤 불가·스크롤바 미생성). 근본원인=높이 사슬 단절(장기 버그, 도입 9bfaeb7 이후 불변): 부모 chat-panel.tsx:215-217은 flex flex-col justify-end min-h-0 overflow-hidden + definite inline height인데 chat-message-list.tsx 중간 래퍼 <div className="relative">가 flex item이면서 h-full/min-h-0 없어 min-height:auto로 콘텐츠 높이만큼 팽창 -> 자식 스크롤 컨테이너 h-full(=100%)이 indefinite 부모 기준이라 auto로 무너져 overflow-y-auto 스크롤 불성립 -> 넘친 높이가 고정높이+overflow-hidden 부모에서 상단 클립(justify-end) -> 오래된 메시지 잘리고 스크롤 불가. 설계 codex consult 1R(root cause·수정 확정 + 보강: min-h-0 outer·scroller 둘 다[기능핵심=outer], ResizeObserver 재고정). 해소(chat-message-list.tsx만): outer->relative h-full min-h-0 / scroller->h-full min-h-0 overflow-y-auto p-2 chat-scrollbar flex flex-col(justify-end 미사용) / 신규 콘텐츠 래퍼 mt-auto space-y-0.5(적은 메시지 하단 정렬·넘치면 mt-auto 0 접힘->정상 스크롤, justify-content:flex-end 위로-스크롤 버그 회피) / ResizeObserver effect(드래그 리사이즈로 컨테이너 박스 변할 때 autoScroll이면 el.scrollTop=el.scrollHeight instant 재고정·typeof 가드 SSR/jsdom 안전). 무한루프 없음(scrollTop set은 관측 박스 불변->RO 미재발화). 사용자 스크롤 방해 없음(autoScroll=false->effect dep로 RO 재구독·false 클로저->강제 이동 안 함). 신규 회귀 테스트 5(구조 3 + RO 동작 2·캡처형 mock으로 콜백 실발화). 듀얼 블라인드 수렴: codex r1 WARNING(P3 RO 동작 미검증 테스트갭)->r2 PASS 0 issues / evaluator WARNING 9.63(completeness 9.5/consistency 9.7/specificity 9.8/actionability 9.6, P0/P1/P2 0, P3x3 전부 defer). 변이검증: 구조 클래스 revert->FAIL, autoScroll 가드제거->test5 FAIL, 재고정 no-op->test4 FAIL. 게이트 tsc0/lint0err[선재 LiveKit 경고1]/vitest 709->714[+5]/build0. Vercel 전용(server/·prisma/ 무관·OCI 번들 무관). main 미승격. defer P3x3: RO 주석 "폰트 변경" 부정확(관측 박스 불변->미발화·주 케이스 드래그 리사이즈 정상)=커밋서 주석 교정 / scroller min-h-0 redundant(block 자식 무해·심층방어) / 추적성(fix_plan WI-051 항목 추가). 남은 확인(사용자): 라이브 하드 새로고침 후 채팅 메시지 많을 때 위로 스크롤·스크롤바 노출·하단 자동고정.
+rounds=2
+createdAt=2026-06-26
